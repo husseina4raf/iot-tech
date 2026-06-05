@@ -59,3 +59,7 @@ export const ROLE_ROUTES = {
   admin: ['/admin'],
   super_admin: ['/dashboard', '/admin'],
 }
+
+// Sales rep names — derived from actual user accounts (role === 'sales')
+// This is the single source of truth for rep names across the app
+export const SALES_REPS = USERS.filter(u => u.role === 'sales').map(u => u.repName)

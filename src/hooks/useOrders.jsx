@@ -3,21 +3,44 @@ import { INITIAL_ORDERS, INITIAL_INVENTORY, INITIAL_AUDIT_LOG, INITIAL_TAX_INVOI
 
 const OrdersContext = createContext(null)
 
+// ── v2 keys: wiping all old mock data on first load ────────────────────────
+const KEYS = {
+  orders:    'sl_orders_v2',
+  inventory: 'sl_inventory_v2',
+  audit:     'sl_audit_v2',
+  tax:       'sl_tax_v2',
+  version:   'sl_data_version',
+}
+const DATA_VERSION = '2'
+
+function clearOldData() {
+  // Remove v1 keys from localStorage so old mock data doesn't persist
+  ['sl_orders','sl_inventory','sl_audit','sl_tax'].forEach(k => localStorage.removeItem(k))
+}
+
 function load(key, fallback) {
   try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback }
   catch { return fallback }
 }
 
 export function OrdersProvider({ children }) {
-  const [orders,      setOrders]      = useState(() => load('sl_orders',    INITIAL_ORDERS))
-  const [inventory,   setInventory]   = useState(() => load('sl_inventory', INITIAL_INVENTORY))
-  const [auditLog,    setAuditLog]    = useState(() => load('sl_audit',     INITIAL_AUDIT_LOG))
-  const [taxInvoices, setTaxInvoices] = useState(() => load('sl_tax',       INITIAL_TAX_INVOICES))
+  // On first mount: clear old v1 data if coming from a previous version
+  useEffect(() => {
+    if (localStorage.getItem(KEYS.version) !== DATA_VERSION) {
+      clearOldData()
+      localStorage.setItem(KEYS.version, DATA_VERSION)
+    }
+  }, [])
 
-  useEffect(() => { localStorage.setItem('sl_orders',    JSON.stringify(orders))      }, [orders])
-  useEffect(() => { localStorage.setItem('sl_inventory', JSON.stringify(inventory))   }, [inventory])
-  useEffect(() => { localStorage.setItem('sl_audit',     JSON.stringify(auditLog))    }, [auditLog])
-  useEffect(() => { localStorage.setItem('sl_tax',       JSON.stringify(taxInvoices)) }, [taxInvoices])
+  const [orders,      setOrders]      = useState(() => load(KEYS.orders,    INITIAL_ORDERS))
+  const [inventory,   setInventory]   = useState(() => load(KEYS.inventory, INITIAL_INVENTORY))
+  const [auditLog,    setAuditLog]    = useState(() => load(KEYS.audit,     INITIAL_AUDIT_LOG))
+  const [taxInvoices, setTaxInvoices] = useState(() => load(KEYS.tax,       INITIAL_TAX_INVOICES))
+
+  useEffect(() => { localStorage.setItem(KEYS.orders,    JSON.stringify(orders))      }, [orders])
+  useEffect(() => { localStorage.setItem(KEYS.inventory, JSON.stringify(inventory))   }, [inventory])
+  useEffect(() => { localStorage.setItem(KEYS.audit,     JSON.stringify(auditLog))    }, [auditLog])
+  useEffect(() => { localStorage.setItem(KEYS.tax,       JSON.stringify(taxInvoices)) }, [taxInvoices])
 
   // ── Audit helper ──────────────────────────────────────────────────────────
   const pushAudit = useCallback((entry) => {

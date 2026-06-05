@@ -7,13 +7,15 @@ export const PAYMENT_METHODS = ['كاش', 'انستاباي', 'تحويل']
 export const INVOICE_TYPES = ['بيان اسعار', 'فاتورة ضريبية']
 
 export const INITIAL_INVENTORY = [
-  { id: 'inv-1', name: 'Smart Lock Lezn', nameAr: 'قفل ذكي Lezn', stock: 12, price: 4500 },
-  { id: 'inv-2', name: 'Smart Lock Denak', nameAr: 'قفل ذكي Denak', stock: 3, price: 3800 },
-  { id: 'inv-3', name: 'iFace 19', nameAr: 'جهاز بصمة iFace 19', stock: 7, price: 6200 },
-  { id: 'inv-4', name: 'Camera Bosch', nameAr: 'كاميرا Bosch', stock: 2, price: 8500 },
-  { id: 'inv-5', name: 'Smart Lock PNDA', nameAr: 'قفل ذكي PNDA', stock: 4, price: 5100 },
-  { id: 'inv-6', name: 'Smart Door Bell', nameAr: 'جرس ذكي', stock: 9, price: 1800 },
+  { id: 'inv-1', name: 'Smart Lock Lezn',  nameAr: 'قفل ذكي Lezn',          stock: 12, price: 4500, costPrice: 2800, minStock: 5, category: 'أقفال ذكية', supplier: 'Lezn Trading', notes: '' },
+  { id: 'inv-2', name: 'Smart Lock Denak', nameAr: 'قفل ذكي Denak',         stock: 3,  price: 3800, costPrice: 2200, minStock: 5, category: 'أقفال ذكية', supplier: 'Denak Egypt',  notes: 'مخزون منخفض' },
+  { id: 'inv-3', name: 'iFace 19',         nameAr: 'جهاز بصمة iFace 19',    stock: 7,  price: 6200, costPrice: 3900, minStock: 3, category: 'أجهزة بصمة', supplier: 'ZK Teco',      notes: '' },
+  { id: 'inv-4', name: 'Camera Bosch',     nameAr: 'كاميرا Bosch',          stock: 2,  price: 8500, costPrice: 5200, minStock: 5, category: 'كاميرات',    supplier: 'Bosch Egypt',  notes: 'مخزون حرج' },
+  { id: 'inv-5', name: 'Smart Lock PNDA',  nameAr: 'قفل ذكي PNDA',          stock: 4,  price: 5100, costPrice: 3100, minStock: 5, category: 'أقفال ذكية', supplier: 'PNDA Tech',    notes: '' },
+  { id: 'inv-6', name: 'Smart Door Bell',  nameAr: 'جرس ذكي',               stock: 9,  price: 1800, costPrice: 950,  minStock: 3, category: 'إكسسوارات',  supplier: 'Local',        notes: '' },
 ]
+
+export const INVENTORY_CATEGORIES = ['أقفال ذكية', 'أجهزة بصمة', 'كاميرات', 'إكسسوارات', 'أنظمة تحكم']
 
 const now = new Date()
 const daysAgo = (d) => new Date(now - d * 86400000).toISOString()
@@ -261,5 +263,115 @@ export const INITIAL_ORDERS = [
     createdAt: daysAgo(0),
     updatedAt: daysAgo(0),
     editHistory: [],
+  },
+]
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+export const INITIAL_AUDIT_LOG = [
+  {
+    id: 'al-1',
+    type: 'status_change',
+    orderId: 'ORD-20240001',
+    orderRef: 'أحمد السيد — مجموعة النيل',
+    field: 'الحالة',
+    oldValue: 'جديد',
+    newValue: 'موافق عليه',
+    changedBy: 'مدير العمليات',
+    changedAt: daysAgo(10),
+    note: '',
+  },
+  {
+    id: 'al-2',
+    type: 'order_edit',
+    orderId: 'ORD-20240003',
+    orderRef: 'سامي عبد الله — مصنع الأمل',
+    field: 'تعديل الطلب',
+    oldValue: 'الكمية: 3',
+    newValue: 'الكمية: 5',
+    changedBy: 'محمد',
+    changedAt: daysAgo(8),
+    note: 'طلب العميل زيادة الكمية',
+  },
+  {
+    id: 'al-3',
+    type: 'status_change',
+    orderId: 'ORD-20240002',
+    orderRef: 'محمود حسن — شركة الفجر',
+    field: 'الحالة',
+    oldValue: 'موافق عليه',
+    newValue: 'تم الصرف',
+    changedBy: 'مدير العمليات',
+    changedAt: daysAgo(7),
+    note: '',
+  },
+  {
+    id: 'al-4',
+    type: 'order_edit',
+    orderId: 'ORD-20240006',
+    orderRef: 'المهندس رامي — برج الياسمين',
+    field: 'تعديل الطلب',
+    oldValue: 'السعر: 5000 LE',
+    newValue: 'السعر: 4500 LE',
+    changedBy: 'إسراء',
+    changedAt: daysAgo(3),
+    note: 'تعديل سعر بعد اتفاق مع العميل',
+  },
+  {
+    id: 'al-5',
+    type: 'inventory',
+    orderId: null,
+    orderRef: 'Smart Lock Denak',
+    field: 'المخزون',
+    oldValue: '8 وحدة',
+    newValue: '3 وحدة',
+    changedBy: 'مدير العمليات',
+    changedAt: daysAgo(2),
+    note: 'تسوية مخزون بعد جرد',
+  },
+]
+
+// ─── Tax Invoices ─────────────────────────────────────────────────────────────
+export const INITIAL_TAX_INVOICES = [
+  {
+    id: 'ti-1',
+    filename: 'فاتورة-ضريبية-مجموعة-النيل-20240001.pdf',
+    orderId: 'ORD-20240001',
+    orderSerial: '20240001',
+    clientName: 'مجموعة النيل للمقاولات',
+    taxNumber: '123456789',
+    amount: 19950,
+    uploadedBy: 'مدير العمليات',
+    uploadedAt: daysAgo(9),
+    verified: true,
+    notes: 'فاتورة ضريبية معتمدة',
+    fileData: null,
+  },
+  {
+    id: 'ti-2',
+    filename: 'فاتورة-ضريبية-شركة-الفجر-20240002.pdf',
+    orderId: 'ORD-20240002',
+    orderSerial: '20240002',
+    clientName: 'شركة الفجر للتطوير العقاري',
+    taxNumber: '987654321',
+    amount: 31578,
+    uploadedBy: 'مدير العمليات',
+    uploadedAt: daysAgo(6),
+    verified: true,
+    notes: '',
+    fileData: null,
+  },
+  {
+    id: 'ti-3',
+    filename: 'فاتورة-ضريبية-برج-الياسمين-20240006.pdf',
+    orderId: 'ORD-20240006',
+    orderSerial: '20240006',
+    clientName: 'برج الياسمين',
+    taxNumber: '111222333',
+    amount: 30780,
+    uploadedBy: 'مدير العمليات',
+    uploadedAt: daysAgo(1),
+    verified: false,
+    notes: 'بانتظار مراجعة المحاسب',
+    fileData: null,
   },
 ]

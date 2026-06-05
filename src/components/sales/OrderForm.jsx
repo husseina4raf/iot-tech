@@ -45,10 +45,10 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     const { dateRaw, ...orderData } = form
 
     if (isEdit) {
-      updateOrder(editOrder.id, orderData)
+      updateOrder(editOrder.id, orderData, user)
       toast('تم تحديث الطلب بنجاح ✓', 'success')
     } else {
-      addOrder(orderData)
+      addOrder(orderData, user)
       toast('تم إرسال الطلب بنجاح ✓', 'success')
       setForm(emptyForm())
     }
@@ -60,17 +60,17 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     <form onSubmit={handleSubmit} className="fade-in">
       <OrderFormFields form={form} setForm={setForm} />
 
-      <div className="flex gap-3 mt-6 justify-end">
+      <div style={{ display:'flex', gap:10, marginTop:20, justifyContent:'flex-end' }}>
         {!isEdit && (
           <button type="button" onClick={() => setForm(emptyForm())}
-            className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 text-slate-600 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors">
-            <RotateCcw size={15} />
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 20px', border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, borderRadius:10, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+            <RotateCcw size={14} />
             مسح النموذج
           </button>
         )}
         <button type="submit"
-          className="flex items-center gap-2 px-6 py-2.5 bg-orange-500 text-white text-sm font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/25">
-          <Send size={15} />
+          style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 24px', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, borderRadius:10, border:'none', cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 4px 12px rgba(37,99,235,0.35)' }}>
+          <Send size={14} />
           {isEdit ? 'حفظ التعديلات' : 'إرسال الطلب'}
         </button>
       </div>

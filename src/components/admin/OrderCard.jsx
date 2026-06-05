@@ -3,6 +3,7 @@ import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, Cr
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
+import { useAuth } from '../../hooks/useAuth'
 import { generateDispatchPDF, generateInvoicePDF } from '../../utils/pdfTemplates'
 import { ORDER_STATUSES } from '../../data/mockData'
 
@@ -18,12 +19,13 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 
 export default function OrderCard({ order }) {
   const { updateOrderStatus } = useOrders()
+  const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
 
   const [pdfLoading, setPdfLoading] = useState('')
 
-  const onStatus = s => { updateOrderStatus(order.id,s); toast(`تم تغيير الحالة إلى "${s}"`, 'success') }
+  const onStatus = s => { updateOrderStatus(order.id, s, user); toast(`تم تغيير الحالة إلى "${s}"`, 'success') }
 
   const onDispatch = async () => {
     setPdfLoading('dispatch')

@@ -3,7 +3,7 @@ import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw } from
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
-import { INVENTORY_CATEGORIES } from '../../data/mockData'
+import { INVENTORY_CATEGORIES, INVENTORY_BRANDS } from '../../data/mockData'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 const iStyle = { width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
@@ -29,7 +29,7 @@ function FSelect({ label, children, ...props }) {
 }
 
 const emptyForm = () => ({
-  name: '', nameAr: '', stock: '', minStock: '5', price: '', costPrice: '',
+  sku: '', name: '', nameAr: '', brand: '', stock: '', minStock: '3', price: '', costPrice: '',
   category: INVENTORY_CATEGORIES[0], supplier: '', notes: ''
 })
 
@@ -44,12 +44,14 @@ export default function InventoryManager() {
   const [adjustQty, setAdjustQty] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
   const [filter, setFilter] = useState('')
+  const [brandFilter, setBrandFilter] = useState('')
+  const [catFilter, setCatFilter] = useState('')
 
   const upd = (f, v) => setForm(p => ({ ...p, [f]: v }))
 
   const openAdd = () => { setForm(emptyForm()); setEditId(null); setShowForm(true) }
   const openEdit = (item) => {
-    setForm({ name: item.name, nameAr: item.nameAr, stock: item.stock, minStock: item.minStock, price: item.price, costPrice: item.costPrice || '', category: item.category || INVENTORY_CATEGORIES[0], supplier: item.supplier || '', notes: item.notes || '' })
+    setForm({ sku: item.sku || '', name: item.name, nameAr: item.nameAr, brand: item.brand || '', stock: item.stock, minStock: item.minStock, price: item.price, costPrice: item.costPrice || '', category: item.category || INVENTORY_CATEGORIES[0], supplier: item.supplier || '', notes: item.notes || '' })
     setEditId(item.id)
     setShowForm(true)
   }
@@ -81,9 +83,14 @@ export default function InventoryManager() {
     setAdjustModal(null); setAdjustQty(''); setAdjustNote('')
   }
 
-  const filtered = inventory.filter(i =>
-    !filter || i.name.toLowerCase().includes(filter.toLowerCase()) || i.nameAr.includes(filter) || (i.category || '').includes(filter)
-  )
+  const filtered = inventory.filter(i => {
+    const q = filter.toLowerCase()
+    return (
+      (!q || i.name.toLowerCase().includes(q) || (i.nameAr||'').includes(filter) || (i.sku||'').includes(q) || (i.brand||'').toLowerCase().includes(q)) &&
+      (!brandFilter || i.brand === brandFilter) &&
+      (!catFilter   || i.category === catFilter)
+    )
+  })
 
   const lowStock = inventory.filter(i => i.stock < (i.minStock || 5))
 
@@ -98,9 +105,25 @@ export default function InventoryManager() {
             </div>
           )}
         </div>
-        <div style={{ display:'flex', gap:10 }}>
-          <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="بحث في المخزون..."
-            style={{ ...iStyle, width:200 }} />
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+          <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="بحث بالاسم أو SKU..."
+            style={{ ...iStyle, width:180 }} />
+          <select value={brandFilter} onChange={e => setBrandFilter(e.target.value)} dir="rtl"
+            style={{ ...iStyle, width:130, cursor:'pointer' }}>
+            <option value="">كل الماركات</option>
+            {INVENTORY_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)} dir="rtl"
+            style={{ ...iStyle, width:130, cursor:'pointer' }}>
+            <option value="">كل الأصناف</option>
+            {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          {(filter || brandFilter || catFilter) && (
+            <button onClick={() => { setFilter(''); setBrandFilter(''); setCatFilter('') }}
+              style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:12, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+              مسح
+            </button>
+          )}
           <button onClick={openAdd}
             style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 3px 10px rgba(37,99,235,0.3)' }}>
             <Plus size={14}/>إضافة منتج
@@ -118,17 +141,22 @@ export default function InventoryManager() {
             </button>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
-            <FInput label="اسم المنتج (EN) *" value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
-            <FInput label="اسم المنتج (AR)" value={form.nameAr} onChange={e => upd('nameAr', e.target.value)} placeholder="قفل ذكي XYZ" />
+            <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
+            <FInput label="اسم الموديل (EN) *" value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
+            <FInput label="اسم الموديل (AR)" value={form.nameAr} onChange={e => upd('nameAr', e.target.value)} placeholder="قفل ذكي XYZ" />
+            <FSelect label="الماركة / البراند" value={form.brand} onChange={e => upd('brand', e.target.value)}>
+              <option value="">اختر الماركة</option>
+              {INVENTORY_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+            </FSelect>
             <FSelect label="التصنيف" value={form.category} onChange={e => upd('category', e.target.value)}>
               {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </FSelect>
+            <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
             <FInput label="سعر البيع (LE) *" type="number" value={form.price} onChange={e => upd('price', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="سعر التكلفة (LE)" type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
-            <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
             <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
-            <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="5" dir="ltr"/>
-            <FInput label="ملاحظات" value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
+            <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>
+            <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
           </div>
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
@@ -170,8 +198,8 @@ export default function InventoryManager() {
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
             <tr style={{ background:'#f8fafc' }}>
-              {['المنتج','التصنيف','سعر البيع','سعر التكلفة','هامش الربح','المخزون','الحالة','إجراءات'].map((h, i) => (
-                <th key={h} style={{ padding:'11px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
+              {['SKU','المنتج / الموديل','الماركة','التصنيف','سعر البيع','سعر التكلفة','هامش الربح','المخزون','الحالة','إجراءات'].map((h, i) => (
+                <th key={h} style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i===1?'right':'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -183,12 +211,25 @@ export default function InventoryManager() {
                 <tr key={item.id} style={{ borderBottom:'1px solid #f8fafc' }}
                   onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                  <td style={{ padding:'12px 16px' }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{item.name}</div>
-                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{item.nameAr}</div>
-                    {item.supplier && <div style={{ fontSize:10, color:'#94a3b8' }}>مورد: {item.supplier}</div>}
+                  {/* SKU */}
+                  <td style={{ padding:'10px 12px', textAlign:'center' }}>
+                    {item.sku ? (
+                      <span style={{ fontSize:11, padding:'2px 7px', borderRadius:6, background:'#f0f4fa', color:'#475569', border:'1px solid #e4eaf3', fontWeight:600, fontFamily:'monospace' }}>{item.sku}</span>
+                    ) : <span style={{ color:'#cbd5e1' }}>—</span>}
                   </td>
-                  <td style={{ padding:'12px 16px', textAlign:'center' }}>
+                  {/* Product name */}
+                  <td style={{ padding:'10px 12px' }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{item.name}</div>
+                    {item.nameAr && <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{item.nameAr}</div>}
+                  </td>
+                  {/* Brand */}
+                  <td style={{ padding:'10px 12px', textAlign:'center' }}>
+                    {item.brand
+                      ? <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#f5f3ff', color:'#7c3aed', border:'1px solid #ddd6fe', fontWeight:600 }}>{item.brand}</span>
+                      : <span style={{ color:'#cbd5e1' }}>—</span>}
+                  </td>
+                  {/* Category */}
+                  <td style={{ padding:'10px 12px', textAlign:'center' }}>
                     <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe' }}>{item.category || '—'}</span>
                   </td>
                   <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:600, color:'#0f172a' }} dir="ltr">{item.price.toLocaleString()} LE</td>

@@ -1,18 +1,15 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Lock, Edit3, FileText, TrendingUp, Calendar, ClipboardX } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText } from 'lucide-react'
 import Badge from '../ui/Badge'
 import OrderForm from './OrderForm'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
-import { generateInvoicePDF } from '../../utils/pdfTemplates'
-import { useToast } from '../ui/Toast'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
 export default function MonthlyInvoices() {
   const { user } = useAuth()
   const { getOrdersByRepGrouped } = useOrders()
-  const toast = useToast()
   const [editingOrder, setEditingOrder] = useState(null)
   const [openMonths, setOpenMonths] = useState({})
 
@@ -141,10 +138,6 @@ export default function MonthlyInvoices() {
                             <Lock size={10}/>مغلق
                           </span>
                         )}
-                        <button onClick={async () => { try { await generateInvoicePDF(order); toast('تم إنشاء الفاتورة ✓','success') } catch { toast('خطأ في PDF','error') } }}
-                          style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:7, border:'none', background:'#0f172a', color:'#fff', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                          <FileText size={11}/>PDF
-                        </button>
                       </div>
                     </div>
                   ))}

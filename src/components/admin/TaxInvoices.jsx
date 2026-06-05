@@ -36,18 +36,22 @@ export default function TaxInvoices() {
 
   const handleDrop = (e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]) }
 
+  const selectedOrder = orders.find(o => o.id === form.orderId)
+
   const handleSave = () => {
-    if (!selectedFile && !form.clientName) return toast('يرجى رفع ملف أو إدخال اسم العميل', 'error')
+    // Order link is now required
+    if (!form.orderId) return toast('يرجى ربط الفاتورة بطلب موجود في النظام', 'error')
+    if (!selectedFile) return toast('يرجى رفع ملف الفاتورة الضريبية', 'error')
     const order = orders.find(o => o.id === form.orderId)
     const invoice = {
-      filename: selectedFile?.name || `فاتورة-${form.clientName}-${Date.now()}.pdf`,
-      orderId: form.orderId || null,
+      filename: selectedFile.name,
+      orderId: form.orderId,
       orderSerial: order?.serialNumber || '—',
-      clientName: form.clientName || order?.clientName || '—',
-      taxNumber: form.taxNumber || order?.taxNumber || '',
-      amount: Number(form.amount) || order?.total || 0,
+      clientName: order?.invoiceName || order?.clientName || form.clientName || '—',
+      taxNumber: order?.taxNumber || form.taxNumber || '',
+      amount: order?.total || Number(form.amount) || 0,
       notes: form.notes,
-      fileData: null, // base64 could go here — skipped for demo storage limits
+      fileData: null,
     }
     addTaxInvoice(invoice, user)
     toast('تم رفع الفاتورة الضريبية ✓', 'success')
@@ -122,34 +126,54 @@ export default function TaxInvoices() {
             )}
           </div>
 
-          {/* Form fields */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
-            <div style={{ gridColumn:'1/-1' }}>
-              <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>ربط بطلب موجود (اختياري)</label>
-              <select value={form.orderId} onChange={e => handleOrderSelect(e.target.value)} dir="rtl"
-                style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
-                <option value="">— بدون ربط —</option>
-                {taxOrders.map(o => <option key={o.id} value={o.id}>#{o.serialNumber} — {o.clientName} ({o.total.toLocaleString()} LE)</option>)}
-              </select>
-            </div>
-            {[
-              { label:'اسم العميل / الشركة *', key:'clientName', placeholder:'اسم الجهة' },
-              { label:'الرقم الضريبي', key:'taxNumber', placeholder:'123456789', dir:'ltr' },
-              { label:'مبلغ الفاتورة (LE)', key:'amount', placeholder:'0', type:'number', dir:'ltr' },
-            ].map(f => (
-              <div key={f.key}>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>{f.label}</label>
-                <input value={form[f.key]} onChange={e => upd(f.key, e.target.value)} placeholder={f.placeholder} type={f.type||'text'} dir={f.dir}
-                  style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }}
-                  onFocus={e => { e.target.style.borderColor='#2563eb'; e.target.style.background='#fff' }}
-                  onBlur={e => { e.target.style.borderColor='#e4eaf3'; e.target.style.background='#f8fafc' }} />
+          {/* Order link — REQUIRED */}
+          <div style={{ marginBottom:16 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:700, color:'#1d4ed8', marginBottom:8 }}>
+              <FileText size={14}/>
+              الربط بالفاتورة في النظام
+              <span style={{ color:'#e11d48' }}>*</span>
+              <span style={{ fontSize:11, fontWeight:400, color:'#64748b', marginRight:4 }}>(مطلوب — يجب ربط الفاتورة الضريبية بطلب مسجّل)</span>
+            </label>
+            <select value={form.orderId} onChange={e => handleOrderSelect(e.target.value)} dir="rtl"
+              style={{ width:'100%', padding:'11px 14px', fontSize:13, border:`2px solid ${form.orderId ? '#2563eb' : '#fde68a'}`, borderRadius:10, background: form.orderId ? '#eff6ff' : '#fffbeb', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer', fontWeight:600 }}>
+              <option value="">— اختر الفاتورة المرتبطة من النظام —</option>
+              {taxOrders.map(o => (
+                <option key={o.id} value={o.id}>
+                  #{o.serialNumber} — {o.invoiceName || o.clientName} — {o.total.toLocaleString()} LE — {o.date}
+                </option>
+              ))}
+            </select>
+
+            {/* Preview of selected order */}
+            {selectedOrder && (
+              <div style={{ marginTop:10, padding:'12px 16px', borderRadius:10, background:'#f0f7ff', border:'1.5px solid #bfdbfe', display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>رقم الطلب</div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#1d4ed8' }}>#{selectedOrder.serialNumber}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>العميل / الشركة</div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>{selectedOrder.invoiceName || selectedOrder.clientName}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>الرقم الضريبي</div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }} dir="ltr">{selectedOrder.taxNumber || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>المبلغ الإجمالي</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#059669' }} dir="ltr">{selectedOrder.total.toLocaleString()} LE</div>
+                </div>
               </div>
-            ))}
-            <div>
-              <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>ملاحظات</label>
-              <input value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..."
-                style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }} />
-            </div>
+            )}
+          </div>
+
+          {/* Notes only — other fields auto-filled from order */}
+          <div style={{ marginBottom:12 }}>
+            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>ملاحظات (اختياري)</label>
+            <input value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات إضافية..."
+              style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }}
+              onFocus={e => { e.target.style.borderColor='#2563eb'; e.target.style.background='#fff' }}
+              onBlur={e => { e.target.style.borderColor='#e4eaf3'; e.target.style.background='#f8fafc' }} />
           </div>
 
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -190,54 +214,74 @@ export default function TaxInvoices() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
-                {['الفاتورة','رقم الطلب','العميل','الرقم الضريبي','المبلغ','تاريخ الرفع','بواسطة','الحالة','إجراءات'].map((h,i) => (
-                  <th key={h} style={{ padding:'10px 14px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i===0||i===2?'right':'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
+                {['الفاتورة الضريبية','الفاتورة المرتبطة في النظام','المبلغ','تاريخ الرفع','بواسطة','الحالة','إجراءات'].map((h,i) => (
+                  <th key={h} style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i<2?'right':'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((inv, i) => (
-                <tr key={inv.id} style={{ borderBottom: i<filtered.length-1?'1px solid #f8fafc':'none' }}
-                  onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                  <td style={{ padding:'12px 14px', maxWidth:180 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                      <FileText size={14} color={inv.verified?'#059669':'#94a3b8'} style={{ flexShrink:0 }} />
-                      <span style={{ fontSize:11, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={inv.filename}>{inv.filename}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding:'12px 14px', textAlign:'center', fontSize:11, color:'#64748b' }}>
-                    {inv.orderSerial !== '—' ? `#${inv.orderSerial}` : '—'}
-                  </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{inv.clientName}</div>
-                  </td>
-                  <td style={{ padding:'12px 14px', textAlign:'center', fontSize:12, color:'#64748b' }} dir="ltr">{inv.taxNumber || '—'}</td>
-                  <td style={{ padding:'12px 14px', textAlign:'center', fontWeight:700, color:'#0f172a' }} dir="ltr">{inv.amount ? `${inv.amount.toLocaleString()} LE` : '—'}</td>
-                  <td style={{ padding:'12px 14px', textAlign:'center', fontSize:11, color:'#94a3b8' }}>
-                    {new Date(inv.uploadedAt).toLocaleDateString('ar-EG', { year:'numeric', month:'short', day:'numeric' })}
-                  </td>
-                  <td style={{ padding:'12px 14px', textAlign:'center', fontSize:11, color:'#64748b' }}>{inv.uploadedBy}</td>
-                  <td style={{ padding:'12px 14px', textAlign:'center' }}>
-                    {inv.verified
-                      ? <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, padding:'3px 8px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontWeight:700 }}><Check size={10}/>معتمدة</span>
-                      : <span style={{ fontSize:11, padding:'3px 8px', borderRadius:20, background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a', fontWeight:600 }}>بانتظار المراجعة</span>}
-                  </td>
-                  <td style={{ padding:'12px 14px' }}>
-                    <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                      {!inv.verified && (
-                        <button onClick={() => handleVerify(inv.id)}
-                          style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                          <Check size={10}/>اعتماد
-                        </button>
+              {filtered.map((inv, i) => {
+                const linkedOrder = orders.find(o => o.id === inv.orderId)
+                return (
+                  <tr key={inv.id} style={{ borderBottom: i<filtered.length-1?'1px solid #f8fafc':'none' }}
+                    onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+
+                    {/* Tax invoice file */}
+                    <td style={{ padding:'12px 16px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <div style={{ width:32, height:32, borderRadius:8, background: inv.verified?'#ecfdf5':'#fffbeb', border:`1px solid ${inv.verified?'#a7f3d0':'#fde68a'}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <FileText size={14} color={inv.verified?'#059669':'#d97706'} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize:12, fontWeight:600, color:'#0f172a', maxWidth:160, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={inv.filename}>{inv.filename}</div>
+                          {inv.taxNumber && <div style={{ fontSize:10, color:'#94a3b8' }} dir="ltr">رقم ضريبي: {inv.taxNumber}</div>}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Linked order */}
+                    <td style={{ padding:'12px 16px' }}>
+                      {linkedOrder ? (
+                        <div style={{ padding:'8px 12px', borderRadius:8, background:'#f0f7ff', border:'1px solid #bfdbfe' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                            <span style={{ fontSize:11, fontWeight:800, color:'#1d4ed8' }}>#{linkedOrder.serialNumber}</span>
+                            <span style={{ fontSize:11, color:'#64748b' }}>—</span>
+                            <span style={{ fontSize:12, fontWeight:600, color:'#0f172a' }}>{linkedOrder.invoiceName || linkedOrder.clientName}</span>
+                          </div>
+                          <div style={{ fontSize:10, color:'#64748b' }}>{linkedOrder.company} · {linkedOrder.date}</div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize:11, color:'#94a3b8', fontStyle:'italic' }}>غير مرتبطة</span>
                       )}
-                      <button onClick={() => handleDelete(inv)}
-                        style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:11, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                        <Trash2 size={10}/>حذف
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#0f172a' }} dir="ltr">{inv.amount ? `${inv.amount.toLocaleString()} LE` : '—'}</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontSize:11, color:'#94a3b8' }}>
+                      {new Date(inv.uploadedAt).toLocaleDateString('ar-EG', { year:'numeric', month:'short', day:'numeric' })}
+                    </td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontSize:11, color:'#64748b' }}>{inv.uploadedBy}</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center' }}>
+                      {inv.verified
+                        ? <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, padding:'3px 8px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontWeight:700 }}><Check size={10}/>معتمدة</span>
+                        : <span style={{ fontSize:11, padding:'3px 8px', borderRadius:20, background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a', fontWeight:600 }}>بانتظار المراجعة</span>}
+                    </td>
+                    <td style={{ padding:'12px 16px' }}>
+                      <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                        {!inv.verified && (
+                          <button onClick={() => handleVerify(inv.id)}
+                            style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                            <Check size={10}/>اعتماد
+                          </button>
+                        )}
+                        <button onClick={() => handleDelete(inv)}
+                          style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:11, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                          <Trash2 size={10}/>حذف
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}

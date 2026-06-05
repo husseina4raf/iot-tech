@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Plus, Trash2, Calculator } from 'lucide-react'
+import { Plus, Trash2, Calculator, Lock } from 'lucide-react'
 import { SALES_REPS, PAYMENT_METHODS, INVOICE_TYPES } from '../../data/mockData'
+import { useAuth } from '../../hooks/useAuth'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', padding:24, boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -53,6 +54,8 @@ function FTextarea({ label, style={}, ...props }) {
 }
 
 export default function OrderFormFields({ form, setForm }) {
+  const { user } = useAuth()
+  const isSalesRep = user?.role === 'sales'
   const upd = (f,v) => setForm(p=>({...p,[f]:v}))
 
   const addItem = () => setForm(p=>({...p, items:[...p.items,{id:Date.now().toString(),name:'',model:'',price:0,quantity:1,total:0}]}))
@@ -84,10 +87,27 @@ export default function OrderFormFields({ form, setForm }) {
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
           <FInput label="الشركة / العميل" required style={{gridColumn:'1/-1'}} placeholder="اسم الشركة أو العميل" value={form.company} onChange={e=>upd('company',e.target.value)} />
           <FInput label="اسم العميل" required placeholder="الاسم الكامل" value={form.clientName} onChange={e=>upd('clientName',e.target.value)} />
-          <FSelect label="مندوب المبيعات" required value={form.salesRep} onChange={e=>upd('salesRep',e.target.value)}>
-            <option value="">اختر المندوب</option>
-            {SALES_REPS.map(r=><option key={r} value={r}>{r}</option>)}
-          </FSelect>
+
+          {/* Sales rep: locked for sales role, dropdown for admin */}
+          {isSalesRep ? (
+            <div>
+              <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+                مندوب المبيعات
+              </label>
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:8, background:'#f0f4fa', border:'1.5px solid #e4eaf3' }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'linear-gradient(135deg,#2563eb,#1d4ed8)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:700, flexShrink:0 }}>
+                  {user?.name?.[0]}
+                </div>
+                <span style={{ fontSize:13, fontWeight:700, color:'#0f172a', flex:1 }}>{user?.name}</span>
+                <Lock size={13} color="#94a3b8" />
+              </div>
+            </div>
+          ) : (
+            <FSelect label="مندوب المبيعات" required value={form.salesRep} onChange={e=>upd('salesRep',e.target.value)}>
+              <option value="">اختر المندوب</option>
+              {SALES_REPS.map(r=><option key={r} value={r}>{r}</option>)}
+            </FSelect>
+          )}
           <FInput label="موبايل" placeholder="01XXXXXXXXX" value={form.mobile} onChange={e=>upd('mobile',e.target.value)} dir="ltr"/>
           <FInput label="واتساب" placeholder="01XXXXXXXXX" value={form.whatsapp} onChange={e=>upd('whatsapp',e.target.value)} dir="ltr"/>
           <FTextarea label="العنوان" style={{gridColumn:'1/-1'}} placeholder="العنوان بالتفصيل" rows={2} value={form.address} onChange={e=>upd('address',e.target.value)} />

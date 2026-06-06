@@ -3,19 +3,18 @@ import { INITIAL_ORDERS, INITIAL_INVENTORY, INITIAL_AUDIT_LOG, INITIAL_TAX_INVOI
 
 const OrdersContext = createContext(null)
 
-// ── v2 keys: wiping all old mock data on first load ────────────────────────
+// ── v3 keys: reset inventory to pick up cost prices ───────────────────────
 const KEYS = {
   orders:    'sl_orders_v2',
-  inventory: 'sl_inventory_v2',
+  inventory: 'sl_inventory_v3',
   audit:     'sl_audit_v2',
   tax:       'sl_tax_v2',
   version:   'sl_data_version',
 }
-const DATA_VERSION = '2'
+const DATA_VERSION = '3'
 
 function clearOldData() {
-  // Remove v1 keys from localStorage so old mock data doesn't persist
-  ['sl_orders','sl_inventory','sl_audit','sl_tax'].forEach(k => localStorage.removeItem(k))
+  ['sl_orders','sl_inventory','sl_audit','sl_tax','sl_inventory_v2'].forEach(k => localStorage.removeItem(k))
 }
 
 function load(key, fallback) {

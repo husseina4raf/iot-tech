@@ -29,6 +29,7 @@ export default function ProfitReport() {
           units: 0,
           revenue: 0,
           totalCost: 0,
+          unitCost: costPrice,
           hasCost: costPrice > 0,
         }
       }
@@ -75,7 +76,7 @@ export default function ProfitReport() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
-                {['المنتج','الوحدات المباعة','سعر البيع','سعر التكلفة','صافي الربح','هامش %'].map((h, i) => (
+                {['المنتج','الوحدات','تكلفة الوحدة','إجمالي المبيعات','إجمالي التكلفة','صافي الربح','هامش %'].map((h, i) => (
                   <th key={h} style={{ padding:'11px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
                 ))}
               </tr>
@@ -92,16 +93,24 @@ export default function ProfitReport() {
                       <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{p.name}</div>
                     </td>
                     <td style={{ padding:'12px 16px', textAlign:'center', color:'#0f172a', fontWeight:600 }}>{p.units}</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#64748b', fontWeight:700 }} dir="ltr">
+                      {p.hasCost ? `${p.unitCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
+                    </td>
                     <td style={{ padding:'12px 16px', textAlign:'center', color:'#1d4ed8', fontWeight:700 }} dir="ltr">{p.revenue.toLocaleString()} LE</td>
                     <td style={{ padding:'12px 16px', textAlign:'center', color:'#64748b', fontWeight:700 }} dir="ltr">
                       {p.hasCost ? `${p.totalCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
                     </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#059669', fontWeight:700 }} dir="ltr">
-                      {p.hasCost ? `${Math.round(profit).toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700 }} dir="ltr">
+                      {p.hasCost
+                        ? <span style={{ color: profit >= 0 ? '#059669' : '#e11d48' }}>{Math.round(profit).toLocaleString()} LE</span>
+                        : <span style={{color:'#cbd5e1'}}>—</span>}
                     </td>
                     <td style={{ padding:'12px 16px', textAlign:'center' }}>
                       {p.hasCost
-                        ? <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontSize:11, fontWeight:700 }}>{margin}%</span>
+                        ? <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
+                            background: margin >= 0 ? '#ecfdf5' : '#fff1f2',
+                            color:      margin >= 0 ? '#059669' : '#e11d48',
+                            border:     `1px solid ${margin >= 0 ? '#a7f3d0' : '#fecdd3'}` }}>{margin}%</span>
                         : <span style={{color:'#cbd5e1', fontSize:11}}>—</span>}
                     </td>
                   </tr>
@@ -114,14 +123,17 @@ export default function ProfitReport() {
                 <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }}>
                   {products.reduce((s, p) => s + p.units, 0)}
                 </td>
+                <td style={{ padding:'12px 16px', textAlign:'center', color:'#94a3b8', fontSize:11 }}>—</td>
                 <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">
                   {totalRevenue.toLocaleString()} LE
                 </td>
                 <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#64748b' }} dir="ltr">
                   {Math.round(totalCost).toLocaleString()} LE
                 </td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#059669' }} dir="ltr">
-                  {Math.round(totalProfit).toLocaleString()} LE
+                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800 }} dir="ltr">
+                  <span style={{ color: totalProfit >= 0 ? '#059669' : '#e11d48' }}>
+                    {Math.round(totalProfit).toLocaleString()} LE
+                  </span>
                 </td>
                 <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#7c3aed' }}>
                   {totalRevenue > 0 ? `${Math.round((totalProfit/totalRevenue)*100)}%` : '—'}

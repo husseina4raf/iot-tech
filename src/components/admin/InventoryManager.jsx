@@ -58,7 +58,7 @@ export default function InventoryManager() {
 
   const handleSave = () => {
     if (!form.name.trim()) return toast('يرجى إدخال اسم المنتج', 'error')
-    const data = { ...form, stock: Number(form.stock) || 0, minStock: Number(form.minStock) || 3, price: 0, costPrice: 0 }
+    const data = { ...form, stock: Number(form.stock) || 0, minStock: Number(form.minStock) || 3, price: Number(form.price) || 0, costPrice: Number(form.costPrice) || 0 }
     if (editId) {
       updateInventoryItem(editId, data, user)
       toast('تم تحديث المنتج ✓', 'success')
@@ -153,6 +153,7 @@ export default function InventoryManager() {
             <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
             <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>
+            <FInput label="سعر التكلفة (LE)" type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
           </div>
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -195,7 +196,7 @@ export default function InventoryManager() {
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
             <tr style={{ background:'#f8fafc' }}>
-              {['SKU','المنتج / الموديل','الماركة','التصنيف','المخزون','الحالة','إجراءات'].map((h, i) => (
+              {['SKU','المنتج / الموديل','الماركة','التصنيف','سعر التكلفة','المخزون','الحالة','إجراءات'].map((h, i) => (
                 <th key={h} style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i===1?'right':'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -227,6 +228,12 @@ export default function InventoryManager() {
                   {/* Category */}
                   <td style={{ padding:'10px 12px', textAlign:'center' }}>
                     <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe' }}>{item.category || '—'}</span>
+                  </td>
+                  {/* Cost Price */}
+                  <td style={{ padding:'10px 12px', textAlign:'center' }}>
+                    {item.costPrice > 0
+                      ? <span style={{ fontSize:12, fontWeight:700, color:'#0f172a' }} dir="ltr">{item.costPrice.toLocaleString()} LE</span>
+                      : <span style={{ color:'#cbd5e1', fontSize:12 }}>—</span>}
                   </td>
                   <td style={{ padding:'12px 16px', textAlign:'center' }}>
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>

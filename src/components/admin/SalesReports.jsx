@@ -5,9 +5,11 @@ import { SALES_REPS } from '../../data/mockData'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
-const MARGIN_RATES = {
-  'Smart Lock Lezn': 0.38, 'Smart Lock Denak': 0.42, 'Smart Lock PNDA': 0.39,
-  'iFace 19': 0.37, 'Camera Bosch': 0.39, 'Smart Door Bell': 0.47,
+const getCostPrice = (itemName, inventory) => {
+  const inv = inventory.find(i =>
+    i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName
+  )
+  return inv?.costPrice || 0
 }
 
 export default function SalesReports() {
@@ -19,12 +21,12 @@ export default function SalesReports() {
   const repStats = SALES_REPS.map(rep => {
     const ro = orders.filter(o => o.salesRep === rep)
     const revenue = ro.reduce((s, o) => s + o.total, 0)
-    const profit  = ro.reduce((s, o) => {
-      return s + o.items.reduce((ss, item) => {
-        const rate = MARGIN_RATES[item.name] || 0.35
-        return ss + item.total * rate
+    const profit  = ro.reduce((s, o) =>
+      s + o.items.reduce((ss, item) => {
+        const cost = getCostPrice(item.name, inventory)
+        return ss + (item.price - cost) * item.quantity
       }, 0)
-    }, 0)
+    , 0)
     const completed = ro.filter(o => ['تم الصرف','مكتمل'].includes(o.status)).length
     return { rep, count: ro.length, revenue, profit, completed, rate: ro.length > 0 ? Math.round((completed/ro.length)*100) : 0 }
   }).sort((a, b) => b.revenue - a.revenue)
@@ -33,10 +35,15 @@ export default function SalesReports() {
   const productMap = {}
   const filtered = repFilter ? orders.filter(o => o.salesRep === repFilter) : orders
   filtered.forEach(o => o.items.forEach(item => {
-    if (!productMap[item.name]) productMap[item.name] = { name: item.name, units: 0, revenue: 0, orders: 0 }
-    productMap[item.name].units   += item.quantity
-    productMap[item.name].revenue += item.total
-    productMap[item.name].orders  += 1
+    if (!productMap[item.name]) {
+      const costPrice = getCostPrice(item.name, inventory)
+      productMap[item.name] = { name: item.name, units: 0, revenue: 0, totalCost: 0, orders: 0, hasCost: costPrice > 0 }
+    }
+    const costPrice = getCostPrice(item.name, inventory)
+    productMap[item.name].units     += item.quantity
+    productMap[item.name].revenue   += item.total
+    productMap[item.name].totalCost += costPrice * item.quantity
+    productMap[item.name].orders    += 1
   }))
   const products = Object.values(productMap).sort((a, b) => b.revenue - a.revenue)
 
@@ -55,7 +62,12 @@ export default function SalesReports() {
   const maxRev = Math.max(...months.map(m => m.revenue), 1)
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0)
-  const totalProfit  = orders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.total * (MARGIN_RATES[i.name]||0.35), 0), 0)
+  const totalProfit  = orders.reduce((s, o) =>
+    s + o.items.reduce((ss, i) => {
+      const cost = getCostPrice(i.name, inventory)
+      return ss + (i.price - cost) * i.quantity
+    }, 0)
+  , 0)
 
   const tabs = [
     { id:'reps',     label:'حسب المندوب', icon:Users },
@@ -68,9 +80,9 @@ export default function SalesReports() {
       {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
-          { label:'إجمالي الإيرادات',    value:`${(totalRevenue/1000).toFixed(1)}K LE`, color:'#1d4ed8' },
-          { label:'صافي الربح (تقديري)', value:`${(totalProfit/1000).toFixed(1)}K LE`,  color:'#059669' },
-          { label:'متوسط هامش الربح',    value:`${Math.round((totalProfit/Math.max(totalRevenue,1))*100)}%`, color:'#7c3aed' },
+          { label:'إجمالي الإيرادات', value:`${(totalRevenue/1000).toFixed(1)}K LE`, color:'#1d4ed8' },
+          { label:'صافي الربح',       value:`${(totalProfit/1000).toFixed(1)}K LE`,  color:'#059669' },
+          { label:'هامش الربح',       value:`${Math.round((totalProfit/Math.max(totalRevenue,1))*100)}%`, color:'#7c3aed' },
           { label:'إجمالي الطلبات',      value: orders.length, color:'#0891b2' },
         ].map(k => (
           <div key={k.label} style={{ ...card, padding:'16px 18px' }}>
@@ -100,7 +112,7 @@ export default function SalesReports() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
-                {['المندوب','عدد الطلبات','الإيرادات','الربح التقديري','هامش الربح','معدل الإغلاق'].map((h,i) => (
+                {['المندوب','عدد الطلبات','الإيرادات','صافي الربح','هامش الربح','معدل الإغلاق'].map((h,i) => (
                   <th key={h} style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign:i===0?'right':'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
                 ))}
               </tr>
@@ -157,14 +169,15 @@ export default function SalesReports() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
-                {['المنتج','الوحدات','عدد الطلبات','الإيرادات','هامش الربح','الربح التقديري'].map((h,i) => (
+                {['المنتج','الوحدات','عدد الطلبات','سعر البيع','سعر التكلفة','صافي الربح','هامش %'].map((h,i) => (
                   <th key={h} style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign:i===0?'right':'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {products.map(p => {
-                const rate = MARGIN_RATES[p.name] || 0.35
+                const profit = p.revenue - p.totalCost
+                const margin = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
                 return (
                   <tr key={p.name} style={{ borderBottom:'1px solid #f8fafc' }}
                     onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
@@ -172,10 +185,17 @@ export default function SalesReports() {
                     <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700 }}>{p.units}</td>
                     <td style={{ padding:'12px 16px', textAlign:'center' }}>{p.orders}</td>
                     <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#1d4ed8' }} dir="ltr">{p.revenue.toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center' }}>
-                      <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontWeight:700 }}>{Math.round(rate*100)}%</span>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#64748b' }} dir="ltr">
+                      {p.hasCost ? `${p.totalCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
                     </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">{Math.round(p.revenue*rate).toLocaleString()} LE</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">
+                      {p.hasCost ? `${Math.round(profit).toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
+                    </td>
+                    <td style={{ padding:'12px 16px', textAlign:'center' }}>
+                      {p.hasCost
+                        ? <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontWeight:700 }}>{margin}%</span>
+                        : <span style={{color:'#cbd5e1', fontSize:11}}>—</span>}
+                    </td>
                   </tr>
                 )
               })}

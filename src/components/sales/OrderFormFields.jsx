@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Plus, Trash2, Calculator, Lock } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Plus, Trash2, Calculator, Lock, Search, Package } from 'lucide-react'
 import { SALES_REPS, PAYMENT_METHODS, INVOICE_TYPES } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
+import { useOrders } from '../../hooks/useOrders'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', padding:24, boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -53,12 +54,91 @@ function FTextarea({ label, style={}, ...props }) {
   )
 }
 
+function ProductSearch({ value, inventory, onSelect }) {
+  const [query, setQuery]   = useState(value || '')
+  const [open, setOpen]     = useState(false)
+  const ref                 = useRef(null)
+
+  // Keep display in sync when parent resets the form
+  useEffect(() => { setQuery(value || '') }, [value])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = query.trim()
+    ? inventory.filter(i =>
+        i.name.toLowerCase().includes(query.toLowerCase()) ||
+        (i.nameAr || '').includes(query) ||
+        (i.sku || '').toLowerCase().includes(query.toLowerCase()) ||
+        (i.brand || '').toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8)
+    : inventory.slice(0, 8)
+
+  const iStyle = { width:'100%', padding:'9px 10px 9px 32px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', boxSizing:'border-box' }
+
+  return (
+    <div ref={ref} style={{ position:'relative' }}>
+      <Search size={13} color="#94a3b8" style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', zIndex:1 }} />
+      <input
+        value={query}
+        placeholder="ابحث عن منتج..."
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={e => { setOpen(true); e.target.style.borderColor='#2563eb'; e.target.style.background='#fff' }}
+        onBlur={e => { e.target.style.borderColor='#e4eaf3'; e.target.style.background='#f8fafc' }}
+        style={iStyle}
+      />
+      {open && (
+        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, background:'#fff', border:'1.5px solid #e4eaf3', borderRadius:10, boxShadow:'0 8px 24px rgba(15,23,42,0.12)', zIndex:999, maxHeight:240, overflowY:'auto' }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding:'12px 14px', fontSize:12, color:'#94a3b8', display:'flex', alignItems:'center', gap:6 }}>
+              <Package size={13}/> لا توجد منتجات مطابقة
+            </div>
+          ) : filtered.map(inv => (
+            <div key={inv.id}
+              onMouseDown={e => { e.preventDefault(); onSelect(inv); setQuery(inv.name); setOpen(false) }}
+              style={{ padding:'9px 14px', cursor:'pointer', borderBottom:'1px solid #f8fafc', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}
+              onMouseEnter={e => e.currentTarget.style.background='#f0f6ff'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <div>
+                <div style={{ fontSize:12, fontWeight:600, color:'#0f172a' }}>{inv.name}</div>
+                {inv.nameAr && <div style={{ fontSize:11, color:'#94a3b8' }}>{inv.nameAr}</div>}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                {inv.sku && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:5, background:'#f0f4fa', color:'#475569', border:'1px solid #e4eaf3', fontFamily:'monospace' }}>{inv.sku}</span>}
+                <span style={{ fontSize:10, padding:'1px 6px', borderRadius:5, fontWeight:600,
+                  background: inv.stock > 0 ? '#ecfdf5' : '#fff1f2',
+                  color:      inv.stock > 0 ? '#059669' : '#e11d48',
+                  border:     `1px solid ${inv.stock > 0 ? '#a7f3d0' : '#fecdd3'}` }}>
+                  {inv.stock > 0 ? `${inv.stock} متاح` : 'نفد'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function OrderFormFields({ form, setForm }) {
   const { user } = useAuth()
+  const { inventory } = useOrders()
   const isSalesRep = user?.role === 'sales'
   const upd = (f,v) => setForm(p=>({...p,[f]:v}))
 
-  const addItem = () => setForm(p=>({...p, items:[...p.items,{id:Date.now().toString(),name:'',model:'',price:0,quantity:1,total:0}]}))
+  const addItem = () => setForm(p=>({...p, items:[...p.items,{id:Date.now().toString(),name:'',sku:'',model:'',price:0,quantity:1,total:0}]}))
+
+  const selectProduct = (itemId, inv) => setForm(p => {
+    const items = p.items.map(item => {
+      if (item.id !== itemId) return item
+      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '' }
+    })
+    return { ...p, items }
+  })
   const rmItem  = id  => setForm(p=>({...p, items:p.items.filter(i=>i.id!==id)}))
   const upItem  = (id,field,raw) => setForm(p=>{
     const items=p.items.map(item=>{
@@ -124,21 +204,24 @@ export default function OrderFormFields({ form, setForm }) {
           </button>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'2fr 1.2fr 80px 70px 90px 36px', gap:8, paddingBottom:8, marginBottom:4, borderBottom:'1px solid #f0f4fa', fontSize:11, fontWeight:700, color:'#94a3b8' }}>
-          <span>اسم الصنف</span><span>الموديل</span><span>السعر</span><span>الكمية</span><span>الإجمالي</span><span/>
+        <div style={{ display:'grid', gridTemplateColumns:'2.5fr 90px 90px 70px 90px 36px', gap:8, paddingBottom:8, marginBottom:4, borderBottom:'1px solid #f0f4fa', fontSize:11, fontWeight:700, color:'#94a3b8' }}>
+          <span>اسم الصنف</span><span>SKU</span><span>سعر البيع</span><span>الكمية</span><span>الإجمالي</span><span/>
         </div>
 
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {form.items.map(item=>(
-            <div key={item.id} style={{ display:'grid', gridTemplateColumns:'2fr 1.2fr 80px 70px 90px 36px', gap:8, alignItems:'center' }}>
-              {['name','model'].map(f=>(
-                <input key={f} value={item[f]} placeholder={f==='name'?'اسم الصنف':'الموديل'} onChange={e=>upItem(item.id,f,e.target.value)}
-                  style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
-              ))}
-              {['price','quantity'].map(f=>(
-                <input key={f} type="number" placeholder={f==='price'?'0':'1'} value={item[f]||''} onChange={e=>upItem(item.id,f,e.target.value)} dir="ltr"
-                  style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
-              ))}
+            <div key={item.id} style={{ display:'grid', gridTemplateColumns:'2.5fr 90px 90px 70px 90px 36px', gap:8, alignItems:'center' }}>
+              <ProductSearch
+                value={item.name}
+                inventory={inventory}
+                onSelect={inv => selectProduct(item.id, inv)}
+              />
+              <input value={item.sku||''} placeholder="SKU" readOnly dir="ltr"
+                style={{ ...iStyle, background:'#f0f4fa', color:'#64748b', cursor:'default', fontFamily:'monospace', fontSize:11 }} />
+              <input type="number" placeholder="0" value={item.price||''} onChange={e=>upItem(item.id,'price',e.target.value)} dir="ltr"
+                style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
+              <input type="number" placeholder="1" value={item.quantity||''} onChange={e=>upItem(item.id,'quantity',e.target.value)} dir="ltr"
+                style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:40, borderRadius:8, background:'#f0f4fa', border:'1px solid #e4eaf3', fontSize:13, fontWeight:700, color:'#0f172a' }} dir="ltr">
                 {(item.total||0).toLocaleString()}
               </div>

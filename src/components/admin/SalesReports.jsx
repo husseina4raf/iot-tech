@@ -40,7 +40,7 @@ export default function SalesReports() {
       productMap[item.name] = { name: item.name, units: 0, revenue: 0, totalCost: 0, orders: 0, hasCost: costPrice > 0 }
     }
     const costPrice = getCostPrice(item.name, inventory)
-    productMap[item.name].units     += item.quantity
+    productMap[item.name].units     += Number(item.quantity) || 0
     productMap[item.name].revenue   += item.total
     productMap[item.name].totalCost += costPrice * item.quantity
     productMap[item.name].orders    += 1

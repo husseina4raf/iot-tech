@@ -32,9 +32,9 @@ export default function ProfitReport() {
           hasCost: costPrice > 0,
         }
       }
-      productMap[item.name].units     += item.quantity
+      productMap[item.name].units     += Number(item.quantity) || 0
       productMap[item.name].revenue   += item.total
-      productMap[item.name].totalCost += costPrice * item.quantity
+      productMap[item.name].totalCost += costPrice * (Number(item.quantity) || 0)
     })
   })
 

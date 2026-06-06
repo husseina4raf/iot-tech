@@ -1,22 +1,36 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-import { USERS, ROLE_ROUTES } from '../data/authData'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { USERS, ROLE_ROUTES, ROLE_LABELS } from '../data/authData'
 
 const AuthContext = createContext(null)
+const USERS_KEY = 'sl_users_v1'
 
 function loadSession() {
+  try { return JSON.parse(localStorage.getItem('sl_session')) ?? null }
+  catch { return null }
+}
+
+function loadUsers() {
   try {
-    const raw = localStorage.getItem('sl_session')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+    const raw = localStorage.getItem(USERS_KEY)
+    return raw ? JSON.parse(raw) : USERS
+  } catch { return USERS }
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(loadSession)
+  const [user,  setUser]  = useState(loadSession)
+  const [users, setUsers] = useState(loadUsers)
+
+  // Persist users list whenever it changes
+  useEffect(() => {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users))
+  }, [users])
+
+  // Dynamic sales reps list (single source of truth)
+  const salesReps = users.filter(u => u.role === 'sales').map(u => u.repName)
 
   const login = useCallback((email, password) => {
-    const found = USERS.find(
+    const list  = loadUsers()   // always read latest from storage
+    const found = list.find(
       u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password
     )
     if (!found) return { success: false, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' }
@@ -36,10 +50,31 @@ export function AuthProvider({ children }) {
     return ROLE_ROUTES[user.role]?.some(r => path.startsWith(r)) ?? false
   }, [user])
 
+  const addUser = useCallback((data) => {
+    // data: { name, nameEn, email, password, repName }
+    const newUser = {
+      id:       `u-${Date.now()}`,
+      role:     'sales',
+      avatar:   data.name?.[0] ?? '؟',
+      ...data,
+    }
+    setUsers(prev => [...prev, newUser])
+    return newUser
+  }, [])
+
+  const deleteUser = useCallback((userId) => {
+    setUsers(prev => prev.filter(u => u.id !== userId))
+  }, [])
+
   const defaultRoute = user ? (ROLE_ROUTES[user.role]?.[0] ?? '/login') : '/login'
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, canAccess, defaultRoute }}>
+    <AuthContext.Provider value={{
+      user, users, salesReps,
+      login, logout,
+      addUser, deleteUser,
+      isAuthenticated: !!user, canAccess, defaultRoute,
+    }}>
       {children}
     </AuthContext.Provider>
   )

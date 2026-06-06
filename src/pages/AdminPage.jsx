@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { ClipboardList, Package, BarChart2, History, FileText } from 'lucide-react'
+import { ClipboardList, Package, BarChart2, History, FileText, Users } from 'lucide-react'
 import OrdersList from '../components/admin/OrdersList'
 import InventoryManager from '../components/admin/InventoryManager'
 import SalesReports from '../components/admin/SalesReports'
 import AuditLog from '../components/admin/AuditLog'
 import TaxInvoices from '../components/admin/TaxInvoices'
+import UserManager from '../components/admin/UserManager'
 import { useOrders } from '../hooks/useOrders'
 
 const tabs = [
   { id:'orders',    label:'الطلبات',          icon:ClipboardList },
   { id:'inventory', label:'إدارة المخزون',    icon:Package },
   { id:'reports',   label:'تقارير المبيعات',  icon:BarChart2 },
+  { id:'users',     label:'المستخدمون',        icon:Users },
   { id:'audit',     label:'سجل التعديلات',    icon:History },
   { id:'tax',       label:'الفواتير الضريبية', icon:FileText },
 ]
@@ -47,6 +49,7 @@ export default function AdminPage() {
       {tab === 'orders'    && <OrdersList />}
       {tab === 'inventory' && <InventoryManager />}
       {tab === 'reports'   && <SalesReports />}
+      {tab === 'users'     && <UserManager />}
       {tab === 'audit'     && <AuditLog />}
       {tab === 'tax'       && <TaxInvoices />}
     </div>

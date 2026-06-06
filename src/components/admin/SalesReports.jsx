@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TrendingUp, Users, Package, BarChart2 } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
-import { SALES_REPS } from '../../data/mockData'
+import { useAuth } from '../../hooks/useAuth'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -14,6 +14,7 @@ const getCostPrice = (itemName, inventory) => {
 
 export default function SalesReports() {
   const { orders, inventory } = useOrders()
+  const { salesReps: SALES_REPS } = useAuth()
   const [activeTab, setActiveTab] = useState('reps')
   const [repFilter, setRepFilter] = useState('')
 

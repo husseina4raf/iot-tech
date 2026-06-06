@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Calculator, Lock, Search, Package } from 'lucide-react'
-import { SALES_REPS, PAYMENT_METHODS, INVOICE_TYPES } from '../../data/mockData'
+import { PAYMENT_METHODS, INVOICE_TYPES } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import { useOrders } from '../../hooks/useOrders'
 
@@ -125,7 +125,7 @@ function ProductSearch({ value, inventory, onSelect }) {
 }
 
 export default function OrderFormFields({ form, setForm }) {
-  const { user } = useAuth()
+  const { user, salesReps } = useAuth()
   const { inventory } = useOrders()
   const isSalesRep = user?.role === 'sales'
   const upd = (f,v) => setForm(p=>({...p,[f]:v}))
@@ -185,7 +185,7 @@ export default function OrderFormFields({ form, setForm }) {
           ) : (
             <FSelect label="مندوب المبيعات" required value={form.salesRep} onChange={e=>upd('salesRep',e.target.value)}>
               <option value="">اختر المندوب</option>
-              {SALES_REPS.map(r=><option key={r} value={r}>{r}</option>)}
+              {salesReps.map(r=><option key={r} value={r}>{r}</option>)}
             </FSelect>
           )}
           <FInput label="موبايل" placeholder="01XXXXXXXXX" value={form.mobile} onChange={e=>upd('mobile',e.target.value)} dir="ltr"/>

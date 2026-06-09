@@ -58,11 +58,13 @@ export function OrdersProvider({ children }) {
 
   const addOrder = (orderData, user) => {
     const serial = getNextSerial()
+    // Sales reps need team leader approval; admin/super_admin bypass directly to جديد
+    const initialStatus = user?.role === 'sales' ? 'بانتظار الموافقة' : 'جديد'
     const newOrder = {
       ...orderData,
       id: `ORD-${serial}`,
       serialNumber: serial,
-      status: 'جديد',
+      status: initialStatus,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       editHistory: [],
@@ -137,6 +139,9 @@ export function OrdersProvider({ children }) {
     })
   }
 
+  const approveOrder = (id, user) => updateOrderStatus(id, 'جديد', user)
+  const rejectOrder  = (id, user) => updateOrderStatus(id, 'مرفوض', user)
+
   const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep)
 
   // Orders grouped by month for a given rep
@@ -204,7 +209,8 @@ export function OrdersProvider({ children }) {
   return (
     <OrdersContext.Provider value={{
       orders, inventory, auditLog, taxInvoices,
-      addOrder, updateOrder, updateOrderStatus, getOrdersByRep, getOrdersByRepGrouped,
+      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
+      getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,
     }}>

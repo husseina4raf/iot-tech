@@ -14,13 +14,13 @@ export default function OrderForm({ editOrder = null, onSaved }) {
   const emptyForm = () => ({
     company: '', clientName: '', mobile: '', whatsapp: '',
     address: '', locationLink: '',
-    items: [{ id: Date.now().toString(), name: '', model: '', price: 0, quantity: 1, total: 0 }],
-    subtotal: 0, vatPercent: 1, vatAmount: 0, total: 0,
+    items: [{ id: Date.now().toString(), name: '', sku: '', model: '', price: 0, quantity: 1, total: 0 }],
+    subtotal: 0, vatPercent: 14, vatAmount: 0, total: 0,
     invoiceType: 'بيان اسعار', invoiceName: '', taxNumber: '',
-    notes: '', paymentMethod: 'كاش',
+    notes: '', paymentMethod: '',
     dateRaw: new Date().toISOString().split('T')[0],
     date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
-    time: new Date().toTimeString().slice(0, 5),
+    time: '',
     salesRep: user?.repName || '',
   })
 

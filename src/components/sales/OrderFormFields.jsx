@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Calculator, Lock, Search, Package } from 'lucide-react'
-import { PAYMENT_METHODS, INVOICE_TYPES } from '../../data/mockData'
+import { Plus, Trash2, Calculator, Lock, Search, Package, AlertTriangle } from 'lucide-react'
+import { INVOICE_TYPES } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import { useOrders } from '../../hooks/useOrders'
 
@@ -54,7 +54,7 @@ function FTextarea({ label, style={}, ...props }) {
   )
 }
 
-function ProductSearch({ value, inventory, onSelect }) {
+function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
   const [query, setQuery]   = useState(value || '')
   const [open, setOpen]     = useState(false)
   const ref                 = useRef(null)
@@ -109,12 +109,14 @@ function ProductSearch({ value, inventory, onSelect }) {
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
                 {inv.sku && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:5, background:'#f0f4fa', color:'#475569', border:'1px solid #e4eaf3', fontFamily:'monospace' }}>{inv.sku}</span>}
-                <span style={{ fontSize:10, padding:'1px 6px', borderRadius:5, fontWeight:600,
-                  background: inv.stock > 0 ? '#ecfdf5' : '#fff1f2',
-                  color:      inv.stock > 0 ? '#059669' : '#e11d48',
-                  border:     `1px solid ${inv.stock > 0 ? '#a7f3d0' : '#fecdd3'}` }}>
-                  {inv.stock > 0 ? `${inv.stock} متاح` : 'نفد'}
-                </span>
+                {!hideStock && (
+                  <span style={{ fontSize:10, padding:'1px 6px', borderRadius:5, fontWeight:600,
+                    background: inv.stock > 0 ? '#ecfdf5' : '#fff1f2',
+                    color:      inv.stock > 0 ? '#059669' : '#e11d48',
+                    border:     `1px solid ${inv.stock > 0 ? '#a7f3d0' : '#fecdd3'}` }}>
+                    {inv.stock > 0 ? `${inv.stock} متاح` : 'نفد'}
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -130,12 +132,22 @@ export default function OrderFormFields({ form, setForm }) {
   const isSalesRep = user?.role === 'sales'
   const upd = (f,v) => setForm(p=>({...p,[f]:v}))
 
+  // Look up cost price from inventory by product name
+  const getCostPrice = (name) => {
+    if (!name) return null
+    const match = inventory.find(i =>
+      i.name.toLowerCase() === name.toLowerCase() ||
+      (i.nameAr && i.nameAr === name)
+    )
+    return match?.costPrice || null
+  }
+
   const addItem = () => setForm(p=>({...p, items:[...p.items,{id:Date.now().toString(),name:'',sku:'',model:'',price:0,quantity:1,total:0}]}))
 
   const selectProduct = (itemId, inv) => setForm(p => {
     const items = p.items.map(item => {
       if (item.id !== itemId) return item
-      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '' }
+      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '', costPrice: inv.costPrice || 0 }
     })
     return { ...p, items }
   })
@@ -149,12 +161,9 @@ export default function OrderFormFields({ form, setForm }) {
       u.total=pr*qt; return u
     })
     const sub=items.reduce((s,i)=>s+(i.total||0),0)
-    const vat=Math.round(sub*(p.vatPercent/100))
-    return {...p,items,subtotal:sub,vatAmount:vat,total:sub+vat}
-  })
-  const upVat = v => setForm(p=>{
-    const vat=Math.round(p.subtotal*(v/100))
-    return {...p,vatPercent:Number(v),vatAmount:vat,total:p.subtotal+vat}
+    const VAT_FIXED = 14
+    const vat=Math.round(sub*(VAT_FIXED/100))
+    return {...p,items,subtotal:sub,vatPercent:VAT_FIXED,vatAmount:vat,total:sub+vat}
   })
 
   const iStyle = { width:'100%', padding:'9px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
@@ -208,31 +217,46 @@ export default function OrderFormFields({ form, setForm }) {
           <span>اسم الصنف</span><span>SKU</span><span>سعر البيع</span><span>الكمية</span><span>الإجمالي</span><span/>
         </div>
 
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {form.items.map(item=>(
-            <div key={item.id} style={{ display:'grid', gridTemplateColumns:'2.5fr 90px 90px 70px 90px 36px', gap:8, alignItems:'center' }}>
-              <ProductSearch
-                value={item.name}
-                inventory={inventory}
-                onSelect={inv => selectProduct(item.id, inv)}
-              />
-              <input value={item.sku||''} placeholder="SKU" readOnly dir="ltr"
-                style={{ ...iStyle, background:'#f0f4fa', color:'#64748b', cursor:'default', fontFamily:'monospace', fontSize:11 }} />
-              <input type="number" placeholder="0" value={item.price||''} onChange={e=>upItem(item.id,'price',e.target.value)} dir="ltr"
-                style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
-              <input type="number" placeholder="1" value={item.quantity||''} onChange={e=>upItem(item.id,'quantity',e.target.value)} dir="ltr"
-                style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:40, borderRadius:8, background:'#f0f4fa', border:'1px solid #e4eaf3', fontSize:13, fontWeight:700, color:'#0f172a' }} dir="ltr">
-                {(item.total||0).toLocaleString()}
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {form.items.map(item=>{
+            const costP = item.costPrice || getCostPrice(item.name)
+            const isBelowCost = isSalesRep && costP && Number(item.price) > 0 && Number(item.price) < costP
+            return (
+              <div key={item.id}>
+                <div style={{ display:'grid', gridTemplateColumns:'2.5fr 90px 90px 70px 90px 36px', gap:8, alignItems:'center' }}>
+                  <ProductSearch
+                    value={item.name}
+                    inventory={inventory}
+                    onSelect={inv => selectProduct(item.id, inv)}
+                    hideStock={isSalesRep}
+                  />
+                  <input value={item.sku||''} placeholder="SKU" readOnly dir="ltr"
+                    style={{ ...iStyle, background:'#f0f4fa', color:'#64748b', cursor:'default', fontFamily:'monospace', fontSize:11 }} />
+                  <input type="number" placeholder="0" value={item.price||''} onChange={e=>upItem(item.id,'price',e.target.value)} dir="ltr"
+                    style={{ ...iStyle, border:`1.5px solid ${isBelowCost ? '#f97316' : '#e4eaf3'}`, background: isBelowCost ? '#fff7ed' : '#f8fafc' }}
+                    onFocus={e=>{e.target.style.borderColor=isBelowCost?'#ea580c':'#2563eb';e.target.style.background='#fff'}}
+                    onBlur={e=>{e.target.style.borderColor=isBelowCost?'#f97316':'#e4eaf3';e.target.style.background=isBelowCost?'#fff7ed':'#f8fafc'}} />
+                  <input type="number" placeholder="1" value={item.quantity||''} onChange={e=>upItem(item.id,'quantity',e.target.value)} dir="ltr"
+                    style={iStyle} onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}} onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:40, borderRadius:8, background:'#f0f4fa', border:'1px solid #e4eaf3', fontSize:13, fontWeight:700, color:'#0f172a' }} dir="ltr">
+                    {(item.total||0).toLocaleString()}
+                  </div>
+                  <button type="button" onClick={()=>rmItem(item.id)} disabled={form.items.length===1}
+                    style={{ width:36, height:40, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, border:'none', background:'transparent', cursor:form.items.length===1?'not-allowed':'pointer', color:'#94a3b8', opacity:form.items.length===1?0.3:1 }}
+                    onMouseEnter={e=>{if(form.items.length>1){e.currentTarget.style.background='#fff1f2';e.currentTarget.style.color='#e11d48'}}}
+                    onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#94a3b8'}}>
+                    <Trash2 size={14}/>
+                  </button>
+                </div>
+                {isBelowCost && (
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'5px 10px', borderRadius:7, background:'#fff7ed', border:'1px solid #fed7aa', fontSize:11, color:'#9a3412' }}>
+                    <AlertTriangle size={12} color="#f97316"/>
+                    تحذير: سعر البيع أقل من سعر التكلفة ({costP?.toLocaleString()} LE)
+                  </div>
+                )}
               </div>
-              <button type="button" onClick={()=>rmItem(item.id)} disabled={form.items.length===1}
-                style={{ width:36, height:40, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:8, border:'none', background:'transparent', cursor:form.items.length===1?'not-allowed':'pointer', color:'#94a3b8', opacity:form.items.length===1?0.3:1 }}
-                onMouseEnter={e=>{if(form.items.length>1){e.currentTarget.style.background='#fff1f2';e.currentTarget.style.color='#e11d48'}}}
-                onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#94a3b8'}}>
-                <Trash2 size={14}/>
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Totals */}
@@ -244,12 +268,12 @@ export default function OrderFormFields({ form, setForm }) {
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13, color:'#64748b', marginBottom:12 }}>
-              <span>ضريبة القيمة المضافة</span>
+              <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                ضريبة القيمة المضافة
+                <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#f0f4fa', color:'#94a3b8', border:'1px solid #e4eaf3', fontWeight:600 }}>ثابت</span>
+              </span>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <input type="number" min={0} max={30} value={form.vatPercent} onChange={e=>upVat(e.target.value)}
-                  style={{ width:50, padding:'4px 6px', textAlign:'center', fontSize:12, fontWeight:700, border:'1.5px solid #e4eaf3', borderRadius:6, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }}
-                  onFocus={e=>e.target.style.borderColor='#2563eb'} onBlur={e=>e.target.style.borderColor='#e4eaf3'} />
-                <span style={{fontSize:11,color:'#94a3b8'}}>%</span>
+                <span style={{ fontSize:12, fontWeight:800, color:'#0f172a', padding:'4px 8px', borderRadius:6, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>14%</span>
                 <span style={{fontSize:12,fontWeight:600,color:'#64748b'}} dir="ltr">({form.vatAmount.toLocaleString()} LE)</span>
               </div>
             </div>
@@ -265,21 +289,17 @@ export default function OrderFormFields({ form, setForm }) {
 
       {/* 3. Invoice */}
       <div style={card}>
-        <SectionTitle n="٣">بيانات الفاتورة والدفع</SectionTitle>
+        <SectionTitle n="٣">بيانات الفاتورة</SectionTitle>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
           <FSelect label="نوع الفاتورة" required value={form.invoiceType} onChange={e=>upd('invoiceType',e.target.value)}>
             {INVOICE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
           </FSelect>
-          <FSelect label="طريقة الدفع" required value={form.paymentMethod} onChange={e=>upd('paymentMethod',e.target.value)}>
-            {PAYMENT_METHODS.map(m=><option key={m} value={m}>{m}</option>)}
-          </FSelect>
+          <FInput label="التاريخ" required type="date" value={form.dateRaw} dir="ltr"
+            onChange={e=>{const d=e.target.value;setForm(p=>({...p,dateRaw:d,date:d?d.split('-').reverse().join('-'):''}))}}/>
           {form.invoiceType==='فاتورة ضريبية'&&<>
             <FInput label="الاسم على الفاتورة" placeholder="اسم الشركة" value={form.invoiceName} onChange={e=>upd('invoiceName',e.target.value)}/>
             <FInput label="الرقم الضريبي" placeholder="123456789" value={form.taxNumber} onChange={e=>upd('taxNumber',e.target.value)} dir="ltr"/>
           </>}
-          <FInput label="التاريخ" required type="date" value={form.dateRaw} dir="ltr"
-            onChange={e=>{const d=e.target.value;setForm(p=>({...p,dateRaw:d,date:d?d.split('-').reverse().join('-'):''}))}}/>
-          <FInput label="الوقت" required type="time" value={form.time} dir="ltr" onChange={e=>upd('time',e.target.value)}/>
           <FTextarea label="ملاحظات" style={{gridColumn:'1/-1'}} placeholder="أي ملاحظات إضافية..." rows={3} value={form.notes} onChange={e=>upd('notes',e.target.value)}/>
         </div>
       </div>

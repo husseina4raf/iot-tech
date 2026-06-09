@@ -42,21 +42,24 @@ export const USERS = [
 ]
 
 export const ROLE_LABELS = {
-  sales: 'مندوب مبيعات',
-  admin: 'مدير',
+  sales:       'مندوب مبيعات',
+  team_leader: 'قائد فريق',
+  admin:       'مدير',
   super_admin: 'مدير عام',
 }
 
 export const ROLE_COLORS = {
-  sales: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-  admin: 'bg-green-500/20 text-green-300 border border-green-500/30',
+  sales:       'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  team_leader: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30',
+  admin:       'bg-green-500/20 text-green-300 border border-green-500/30',
   super_admin: 'bg-orange-500/20 text-orange-300 border border-orange-500/30',
 }
 
 // Which routes each role can access
 export const ROLE_ROUTES = {
-  sales: ['/sales'],
-  admin: ['/admin'],
+  sales:       ['/sales'],
+  team_leader: ['/team-leader'],
+  admin:       ['/admin'],
   super_admin: ['/dashboard', '/admin'],
 }
 

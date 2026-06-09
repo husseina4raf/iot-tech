@@ -7,7 +7,10 @@ const map = {
   warning:    { bg:'#fff1f2', color:'#9f1239', border:'#fecdd3' },
   orange:     { bg:'#fff7ed', color:'#9a3412', border:'#fed7aa' },
 }
-const statusMap = { 'جديد':'new', 'موافق عليه':'approved', 'تم الصرف':'dispatched', 'مكتمل':'completed' }
+const statusMap = {
+  'جديد':'new', 'موافق عليه':'approved', 'تم الصرف':'dispatched', 'مكتمل':'completed',
+  'بانتظار الموافقة':'orange', 'مرفوض':'warning',
+}
 
 export default function Badge({ children, variant, status, className='' }) {
   const key = status ? (statusMap[status]||'default') : (variant||'default')

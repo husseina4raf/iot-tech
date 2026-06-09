@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { PlusCircle, FolderOpen, TrendingUp } from 'lucide-react'
+import { PlusCircle, FolderOpen, TrendingUp, Trophy } from 'lucide-react'
 import OrderForm from '../components/sales/OrderForm'
 import MonthlyInvoices from '../components/sales/MonthlyInvoices'
 import ProfitReport from '../components/sales/ProfitReport'
+import Leaderboard from '../components/sales/Leaderboard'
 
 const tabs = [
-  { id:'new',     label:'طلب جديد',    icon:PlusCircle },
-  { id:'monthly', label:'فواتيري',      icon:FolderOpen },
-  { id:'profit',  label:'تقرير الأرباح', icon:TrendingUp },
+  { id:'new',         label:'طلب جديد',        icon:PlusCircle },
+  { id:'monthly',     label:'فواتيري',           icon:FolderOpen },
+  { id:'profit',      label:'تقرير الأرباح',    icon:TrendingUp },
+  { id:'leaderboard', label:'المتصدرون',         icon:Trophy },
 ]
 
 export default function SalesPage() {
@@ -26,9 +28,10 @@ export default function SalesPage() {
         ))}
       </div>
 
-      {tab === 'new'     && <OrderForm />}
-      {tab === 'monthly' && <MonthlyInvoices />}
-      {tab === 'profit'  && <ProfitReport />}
+      {tab === 'new'         && <OrderForm />}
+      {tab === 'monthly'     && <MonthlyInvoices />}
+      {tab === 'profit'      && <ProfitReport />}
+      {tab === 'leaderboard' && <Leaderboard />}
     </div>
   )
 }

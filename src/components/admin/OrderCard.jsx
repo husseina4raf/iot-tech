@@ -7,7 +7,12 @@ import { useAuth } from '../../hooks/useAuth'
 import { generateDispatchPDF, generateInvoicePDF } from '../../utils/pdfTemplates'
 import { ORDER_STATUSES } from '../../data/mockData'
 
-const accent = { 'جديد':'#2563eb', 'موافق عليه':'#059669', 'تم الصرف':'#d97706', 'مكتمل':'#7c3aed' }
+const accent = {
+  'بانتظار الموافقة':'#f97316',
+  'جديد':'#2563eb', 'موافق عليه':'#059669',
+  'تم الصرف':'#d97706', 'مكتمل':'#7c3aed',
+  'مرفوض':'#e11d48',
+}
 
 // Inject spin keyframe once
 if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
@@ -62,8 +67,8 @@ export default function OrderCard({ order }) {
             <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', fontSize:12, color:'#94a3b8' }}>
               <span style={{display:'flex',alignItems:'center',gap:4}}><User size={11}/>{order.salesRep}</span>
               <span>#{order.serialNumber}</span>
-              <span>{order.date} — {order.time}</span>
-              <span style={{display:'flex',alignItems:'center',gap:4}}><CreditCard size={11}/>{order.paymentMethod}</span>
+              <span>{order.date}{order.time ? ` — ${order.time}` : ''}</span>
+              {order.paymentMethod && <span style={{display:'flex',alignItems:'center',gap:4}}><CreditCard size={11}/>{order.paymentMethod}</span>}
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>

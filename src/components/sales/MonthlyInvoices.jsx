@@ -1,9 +1,14 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText, Filter } from 'lucide-react'
 import Badge from '../ui/Badge'
 import OrderForm from './OrderForm'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
+
+const MONTHS_AR = [
+  'يناير','فبراير','مارس','أبريل','مايو','يونيو',
+  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
+]
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -13,6 +18,11 @@ export default function MonthlyInvoices() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [openMonths, setOpenMonths] = useState({})
 
+  // Month filter state (null = show all)
+  const now = new Date()
+  const [filterYear,  setFilterYear]  = useState(null)
+  const [filterMonth, setFilterMonth] = useState(null)
+
   const repName = user?.repName
   if (!repName) return (
     <div style={{ ...card, padding:40, textAlign:'center' }}>
@@ -20,9 +30,18 @@ export default function MonthlyInvoices() {
     </div>
   )
 
-  const groups = getOrdersByRepGrouped(repName)
-  const totalOrders = groups.reduce((s, g) => s + g.orders.length, 0)
-  const totalRevenue = groups.reduce((s, g) => s + g.orders.reduce((ss, o) => ss + o.total, 0), 0)
+  const allGroups = getOrdersByRepGrouped(repName)
+
+  // Apply filter
+  const groups = (filterYear !== null && filterMonth !== null)
+    ? allGroups.filter(g => g.key === `${filterYear}-${String(filterMonth + 1).padStart(2, '0')}`)
+    : allGroups
+
+  const totalOrders = allGroups.reduce((s, g) => s + g.orders.length, 0)
+  const totalRevenue = allGroups.reduce((s, g) => s + g.orders.reduce((ss, o) => ss + o.total, 0), 0)
+
+  // Years available
+  const availableYears = [...new Set(allGroups.map(g => g.key.split('-')[0]))].sort((a,b)=>b-a)
 
   const toggleMonth = (key) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -49,6 +68,46 @@ export default function MonthlyInvoices() {
 
   return (
     <div>
+      {/* Month filter */}
+      <div style={{ ...card, padding:'12px 18px', marginBottom:16, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <Filter size={14} color="#2563eb"/>
+        <span style={{ fontSize:12, fontWeight:700, color:'#374151' }}>فلتر الشهر:</span>
+        <select
+          value={filterYear !== null ? filterYear : ''}
+          onChange={e => {
+            const y = e.target.value ? Number(e.target.value) : null
+            setFilterYear(y)
+            if (y === null) setFilterMonth(null)
+            else if (filterMonth === null) setFilterMonth(now.getMonth())
+          }}
+          dir="ltr"
+          style={{ padding:'5px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+          <option value="">كل السنوات</option>
+          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        {filterYear !== null && (
+          <select
+            value={filterMonth !== null ? filterMonth : ''}
+            onChange={e => setFilterMonth(e.target.value !== '' ? Number(e.target.value) : null)}
+            dir="rtl"
+            style={{ padding:'5px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+            <option value="">كل الأشهر</option>
+            {MONTHS_AR.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+        )}
+        {(filterYear !== null || filterMonth !== null) && (
+          <button onClick={() => { setFilterYear(null); setFilterMonth(null) }}
+            style={{ fontSize:11, padding:'4px 10px', borderRadius:8, border:'1px solid #fecdd3', background:'#fff1f2', color:'#e11d48', cursor:'pointer', fontFamily:'Cairo,sans-serif', fontWeight:600 }}>
+            مسح الفلتر ✕
+          </button>
+        )}
+        {filterYear !== null && filterMonth !== null && (
+          <span style={{ fontSize:12, color:'#2563eb', fontWeight:700, marginRight:'auto' }}>
+            {MONTHS_AR[filterMonth]} {filterYear}
+          </span>
+        )}
+      </div>
+
       {/* Summary strip */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
         {[

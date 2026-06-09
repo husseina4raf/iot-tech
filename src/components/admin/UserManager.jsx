@@ -28,10 +28,11 @@ function FInput({ label, required, icon: Icon, ...props }) {
   )
 }
 
-const emptyForm = () => ({ name:'', nameEn:'', repName:'', email:'', password:'' })
+const emptyForm = () => ({ name:'', nameEn:'', repName:'', email:'', password:'', role:'sales' })
 
 const ROLE_BADGE = {
   sales:       { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe', label:'مندوب مبيعات' },
+  team_leader: { bg:'#ecfeff', color:'#0e7490', border:'#a5f3fc', label:'قائد فريق' },
   admin:       { bg:'#f0fdf4', color:'#15803d', border:'#86efac', label:'مدير' },
   super_admin: { bg:'#fff7ed', color:'#c2410c', border:'#fed7aa', label:'مدير عام' },
 }
@@ -66,8 +67,10 @@ export default function UserManager() {
       repName:  form.repName.trim(),
       email:    form.email.trim().toLowerCase(),
       password: form.password,
+      role:     form.role || 'sales',
     })
-    toast('تم إضافة المندوب بنجاح ✓', 'success')
+    const roleLabel = form.role === 'team_leader' ? 'قائد الفريق' : 'المندوب'
+    toast(`تم إضافة ${roleLabel} بنجاح ✓`, 'success')
     setShowForm(false)
     setForm(emptyForm())
     setErrors({})
@@ -80,20 +83,22 @@ export default function UserManager() {
     toast('تم حذف المستخدم', 'success')
   }
 
-  // Only show sales reps in the list (admins manage sales only)
-  const salesUsers = users.filter(u => u.role === 'sales')
-  const otherUsers = users.filter(u => u.role !== 'sales')
+  // Managed users: sales reps + team leaders
+  const salesUsers = users.filter(u => u.role === 'sales' || u.role === 'team_leader')
+  const otherUsers = users.filter(u => u.role === 'admin' || u.role === 'super_admin')
 
   return (
     <div>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
         <div style={{ fontSize:13, color:'#64748b' }}>
-          <span style={{ fontWeight:700, color:'#0f172a' }}>{salesUsers.length}</span> مندوب مبيعات مسجل
+          <span style={{ fontWeight:700, color:'#0f172a' }}>{salesUsers.filter(u=>u.role==='sales').length}</span> مندوب
+          <span style={{ margin:'0 6px', color:'#cbd5e1' }}>·</span>
+          <span style={{ fontWeight:700, color:'#0f172a' }}>{salesUsers.filter(u=>u.role==='team_leader').length}</span> قائد فريق
         </div>
         <button onClick={() => { setShowForm(true); setForm(emptyForm()); setErrors({}) }}
           style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 3px 10px rgba(37,99,235,0.3)' }}>
-          <UserPlus size={14}/>إضافة مندوب
+          <UserPlus size={14}/>إضافة مستخدم
         </button>
       </div>
 
@@ -107,6 +112,23 @@ export default function UserManager() {
             <button onClick={() => { setShowForm(false); setErrors({}) }} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
               <X size={18}/>
             </button>
+          </div>
+
+          {/* Role selector */}
+          <div style={{ display:'flex', gap:10, marginBottom:14 }}>
+            {[
+              { val:'sales',       label:'مندوب مبيعات', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+              { val:'team_leader', label:'قائد فريق',    color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc' },
+            ].map(opt => {
+              const active = form.role === opt.val
+              return (
+                <button key={opt.val} type="button" onClick={() => upd('role', opt.val)}
+                  style={{ flex:1, padding:'10px 8px', borderRadius:10, border:`2px solid ${active ? opt.border : '#e4eaf3'}`, background: active ? opt.bg : '#fff', color: active ? opt.color : '#64748b', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  {active && <Check size={14}/>}
+                  {opt.label}
+                </button>
+              )
+            })}
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
@@ -136,9 +158,9 @@ export default function UserManager() {
             </div>
           </div>
 
-          <div style={{ padding:'10px 14px', borderRadius:8, background:'#eff6ff', border:'1px solid #bfdbfe', fontSize:12, color:'#1d4ed8', marginBottom:14 }}>
+          <div style={{ padding:'10px 14px', borderRadius:8, background: form.role==='team_leader'?'#ecfeff':'#eff6ff', border:`1px solid ${form.role==='team_leader'?'#a5f3fc':'#bfdbfe'}`, fontSize:12, color: form.role==='team_leader'?'#0e7490':'#1d4ed8', marginBottom:14 }}>
             <Shield size={12} style={{ display:'inline', marginLeft:4 }}/>
-            سيتم إنشاء الحساب بصلاحية <strong>مندوب مبيعات</strong> فقط
+            سيتم إنشاء الحساب بصلاحية <strong>{form.role==='team_leader'?'قائد فريق':'مندوب مبيعات'}</strong>
           </div>
 
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -148,7 +170,7 @@ export default function UserManager() {
             </button>
             <button onClick={handleSave}
               style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-              <Check size={14}/>إضافة المندوب
+              <Check size={14}/>{form.role === 'team_leader' ? 'إضافة قائد الفريق' : 'إضافة المندوب'}
             </button>
           </div>
         </div>
@@ -158,7 +180,7 @@ export default function UserManager() {
       <div style={{ ...card, marginBottom:16 }}>
         <div style={{ padding:'14px 20px', borderBottom:'1px solid #f0f4fa', display:'flex', alignItems:'center', gap:8 }}>
           <User size={15} color="#2563eb"/>
-          <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>مندوبو المبيعات</h3>
+          <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>المندوبون وقادة الفريق</h3>
           <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe', fontWeight:700 }}>{salesUsers.length}</span>
         </div>
         {salesUsers.length === 0 ? (

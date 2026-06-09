@@ -51,11 +51,11 @@ export function AuthProvider({ children }) {
   }, [user])
 
   const addUser = useCallback((data) => {
-    // data: { name, nameEn, email, password, repName }
+    // data: { name, nameEn, email, password, repName, role? }
     const newUser = {
-      id:       `u-${Date.now()}`,
-      role:     'sales',
-      avatar:   data.name?.[0] ?? '؟',
+      id:     `u-${Date.now()}`,
+      role:   data.role || 'sales',
+      avatar: data.name?.[0] ?? '؟',
       ...data,
     }
     setUsers(prev => [...prev, newUser])

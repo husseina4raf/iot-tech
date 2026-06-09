@@ -75,25 +75,25 @@ const BASE_CSS = `
     /* Info grid */
     .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:20px 40px; }
     .info-box { background:#f8fafc; border:1px solid #e4eaf3; border-radius:10px; padding:14px 18px; }
-    .info-row { display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px; }
+    .info-row { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; }
     .info-row:last-child { margin-bottom:0; }
     .info-label { color:#64748b; }
     .info-val { font-weight:700; color:#0f172a; direction:rtl; text-align:right; }
     /* Table */
     .tbl-wrap { padding:0 40px 20px; }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
     thead tr { background:#0d1b3e; }
-    thead th { padding:10px 14px; color:#fff; font-weight:700; text-align:center; }
+    thead th { padding:11px 14px; color:#fff; font-weight:700; text-align:center; }
     thead th:first-child { text-align:right; }
     tbody tr:nth-child(even) { background:#f8fafc; }
-    tbody td { padding:10px 14px; border-bottom:1px solid #f0f4fa; color:#1e293b; text-align:center; }
+    tbody td { padding:11px 14px; border-bottom:1px solid #f0f4fa; color:#1e293b; text-align:center; }
     tbody td:first-child { text-align:right; font-weight:600; direction:rtl; }
     tfoot tr { background:#e8f0fe; }
-    tfoot td { padding:10px 14px; font-weight:800; color:#1d4ed8; font-size:13px; }
+    tfoot td { padding:11px 14px; font-weight:800; color:#1d4ed8; font-size:14px; }
     /* Totals */
     .totals { display:flex; justify-content:flex-end; padding:0 40px 20px; }
     .totals-box { min-width:260px; background:#f8fafc; border:1px solid #e4eaf3; border-radius:10px; overflow:hidden; }
-    .total-row { display:flex; justify-content:space-between; padding:9px 16px; font-size:12px; border-bottom:1px solid #f0f4fa; }
+    .total-row { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; border-bottom:1px solid #f0f4fa; }
     .total-row .tl { color:#64748b; }
     .total-row .tv { font-weight:700; color:#0f172a; direction:ltr; }
     .total-grand { display:flex; justify-content:space-between; padding:12px 16px; background:#0d1b3e; }

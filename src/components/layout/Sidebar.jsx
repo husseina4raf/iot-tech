@@ -1,16 +1,18 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_LABELS, ROLE_ROUTES } from '../../data/authData'
 
 const ALL_NAV = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'لوحة التحكم',  labelEn: 'Dashboard', roles: ['super_admin'] },
-  { to: '/sales',     icon: ShoppingCart,    label: 'المبيعات',      labelEn: 'Sales',      roles: ['sales'] },
-  { to: '/admin',     icon: Settings,        label: 'الإدارة',       labelEn: 'Admin',      roles: ['admin', 'super_admin'] },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'لوحة التحكم',  labelEn: 'Dashboard',   roles: ['super_admin'] },
+  { to: '/sales',        icon: ShoppingCart,    label: 'المبيعات',      labelEn: 'Sales',        roles: ['sales'] },
+  { to: '/team-leader',  icon: Users,           label: 'مراجعة الطلبات', labelEn: 'Team Leader', roles: ['team_leader'] },
+  { to: '/admin',        icon: Settings,        label: 'الإدارة',       labelEn: 'Admin',        roles: ['admin', 'super_admin'] },
 ]
 
 const roleInfo = {
   sales:       { bg:'rgba(59,130,246,0.15)',  color:'#93c5fd', label:'مندوب مبيعات', avatar:'linear-gradient(135deg,#3b82f6,#1d4ed8)' },
+  team_leader: { bg:'rgba(6,182,212,0.15)',   color:'#67e8f9', label:'قائد فريق',     avatar:'linear-gradient(135deg,#0891b2,#0e7490)' },
   admin:       { bg:'rgba(52,211,153,0.15)',  color:'#6ee7b7', label:'مدير',           avatar:'linear-gradient(135deg,#10b981,#047857)' },
   super_admin: { bg:'rgba(167,139,250,0.15)', color:'#c4b5fd', label:'مدير عام',       avatar:'linear-gradient(135deg,#8b5cf6,#6d28d9)' },
 }

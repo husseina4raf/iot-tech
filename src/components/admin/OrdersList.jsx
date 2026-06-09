@@ -2,12 +2,21 @@ import { useState, useMemo } from 'react'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 import OrderCard from './OrderCard'
 import { useOrders } from '../../hooks/useOrders'
-import { SALES_REPS, ORDER_STATUSES } from '../../data/mockData'
+import { useAuth } from '../../hooks/useAuth'
+import { ORDER_STATUSES } from '../../data/mockData'
 
-const pill = { 'جديد':['#eff6ff','#bfdbfe','#1d4ed8'], 'موافق عليه':['#ecfdf5','#a7f3d0','#065f46'], 'تم الصرف':['#fffbeb','#fde68a','#92400e'], 'مكتمل':['#f5f3ff','#ddd6fe','#4c1d95'] }
+const pill = {
+  'بانتظار الموافقة': ['#fff7ed','#fed7aa','#c2410c'],
+  'جديد':             ['#eff6ff','#bfdbfe','#1d4ed8'],
+  'موافق عليه':       ['#ecfdf5','#a7f3d0','#065f46'],
+  'تم الصرف':         ['#fffbeb','#fde68a','#92400e'],
+  'مكتمل':            ['#f5f3ff','#ddd6fe','#4c1d95'],
+  'مرفوض':            ['#fff1f2','#fecdd3','#9f1239'],
+}
 
 export default function OrdersList() {
   const { orders } = useOrders()
+  const { salesReps } = useAuth()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [rep,    setRep]    = useState('')
@@ -29,7 +38,7 @@ export default function OrdersList() {
   return (
     <div>
       {/* Status pills */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
         {ORDER_STATUSES.map(s=>{
           const [bg,border,color]=pill[s]
           const active=status===s
@@ -56,7 +65,7 @@ export default function OrdersList() {
         </select>
         <select value={rep} onChange={e=>setRep(e.target.value)} dir="rtl" style={sel} onFocus={e=>e.target.style.borderColor='#2563eb'} onBlur={e=>e.target.style.borderColor='#e4eaf3'}>
           <option value="">كل المندوبين</option>
-          {SALES_REPS.map(r=><option key={r} value={r}>{r}</option>)}
+          {salesReps.map(r=><option key={r} value={r}>{r}</option>)}
         </select>
         {hasFilter && (
           <button onClick={clear} style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 12px', borderRadius:8, border:'1px solid #fecdd3', background:'#fff1f2', color:'#9f1239', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif', flexShrink:0 }}>

@@ -15,30 +15,33 @@ function SectionTitle({ n, children }) {
   )
 }
 
-function FInput({ label, required, style={}, ...props }) {
+function FInput({ label, required, error, style={}, ...props }) {
   const [f, setF] = useState(false)
+  const errStyle = error ? { borderColor:'#e11d48', background:'#fff7f7' } : {}
   return (
     <div style={style}>
       <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
         {label}{required&&<span style={{color:'#e11d48'}}> *</span>}
       </label>
-      <input {...props} style={{ width:'100%', padding:'10px 12px', fontSize:13, border:`1.5px solid ${f?'#2563eb':'#e4eaf3'}`, borderRadius:8, background:f?'#fff':'#f8fafc', color:'#0f172a', outline:'none', boxShadow:f?'0 0 0 3px rgba(37,99,235,0.1)':'none', transition:'all 0.15s', fontFamily:'Cairo,sans-serif' }}
+      <input {...props} style={{ width:'100%', padding:'10px 12px', fontSize:13, border:`1.5px solid ${f?'#2563eb': error?'#e11d48':'#e4eaf3'}`, borderRadius:8, background:f?'#fff': error?'#fff7f7':'#f8fafc', color:'#0f172a', outline:'none', boxShadow:f?'0 0 0 3px rgba(37,99,235,0.1)':'none', transition:'all 0.15s', fontFamily:'Cairo,sans-serif', ...errStyle }}
         onFocus={()=>setF(true)} onBlur={()=>setF(false)} />
+      {error && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{error}</span>}
     </div>
   )
 }
 
-function FSelect({ label, required, children, style={}, ...props }) {
+function FSelect({ label, required, error, children, style={}, ...props }) {
   const [f,setF]=useState(false)
   return (
     <div style={style}>
       <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
         {label}{required&&<span style={{color:'#e11d48'}}> *</span>}
       </label>
-      <select {...props} style={{ width:'100%', padding:'10px 12px', fontSize:13, border:`1.5px solid ${f?'#2563eb':'#e4eaf3'}`, borderRadius:8, background:f?'#fff':'#f8fafc', color:'#0f172a', outline:'none', boxShadow:f?'0 0 0 3px rgba(37,99,235,0.1)':'none', cursor:'pointer', transition:'all 0.15s', fontFamily:'Cairo,sans-serif' }}
+      <select {...props} style={{ width:'100%', padding:'10px 12px', fontSize:13, border:`1.5px solid ${f?'#2563eb': error?'#e11d48':'#e4eaf3'}`, borderRadius:8, background:f?'#fff': error?'#fff7f7':'#f8fafc', color:'#0f172a', outline:'none', boxShadow:f?'0 0 0 3px rgba(37,99,235,0.1)':'none', cursor:'pointer', transition:'all 0.15s', fontFamily:'Cairo,sans-serif' }}
         onFocus={()=>setF(true)} onBlur={()=>setF(false)}>
         {children}
       </select>
+      {error && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{error}</span>}
     </div>
   )
 }
@@ -126,11 +129,11 @@ function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
   )
 }
 
-export default function OrderFormFields({ form, setForm }) {
+export default function OrderFormFields({ form, setForm, errors = {}, setErrors = () => {} }) {
   const { user, salesReps } = useAuth()
   const { inventory } = useOrders()
   const isSalesRep = user?.role === 'sales'
-  const upd = (f,v) => setForm(p=>({...p,[f]:v}))
+  const upd = (f,v) => { setForm(p=>({...p,[f]:v})); setErrors(p=>({...p,[f]:''})) }
 
   // Look up cost price from inventory by product name
   const getCostPrice = (name) => {
@@ -174,8 +177,8 @@ export default function OrderFormFields({ form, setForm }) {
       <div style={card}>
         <SectionTitle n="١">بيانات العميل</SectionTitle>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-          <FInput label="الشركة / العميل" required style={{gridColumn:'1/-1'}} placeholder="اسم الشركة أو العميل" value={form.company} onChange={e=>upd('company',e.target.value)} />
-          <FInput label="اسم العميل" required placeholder="الاسم الكامل" value={form.clientName} onChange={e=>upd('clientName',e.target.value)} />
+          <FInput label="الشركة / العميل" required error={errors.company} style={{gridColumn:'1/-1'}} placeholder="اسم الشركة أو العميل" value={form.company} onChange={e=>upd('company',e.target.value)} />
+          <FInput label="اسم العميل" required error={errors.clientName} placeholder="الاسم الكامل" value={form.clientName} onChange={e=>upd('clientName',e.target.value)} />
 
           {/* Sales rep: locked for sales role, dropdown for admin */}
           {isSalesRep ? (
@@ -192,7 +195,7 @@ export default function OrderFormFields({ form, setForm }) {
               </div>
             </div>
           ) : (
-            <FSelect label="مندوب المبيعات" required value={form.salesRep} onChange={e=>upd('salesRep',e.target.value)}>
+            <FSelect label="مندوب المبيعات" required error={errors.salesRep} value={form.salesRep} onChange={e=>upd('salesRep',e.target.value)}>
               <option value="">اختر المندوب</option>
               {salesReps.map(r=><option key={r} value={r}>{r}</option>)}
             </FSelect>
@@ -213,6 +216,7 @@ export default function OrderFormFields({ form, setForm }) {
           </button>
         </div>
 
+        {errors.items && <div style={{ marginBottom:8, padding:'6px 12px', borderRadius:8, background:'#fff1f2', border:'1px solid #fecdd3', fontSize:12, color:'#e11d48', display:'flex', alignItems:'center', gap:6 }}><AlertTriangle size={12}/>{errors.items}</div>}
         <div style={{ display:'grid', gridTemplateColumns:'2.5fr 90px 90px 70px 90px 36px', gap:8, paddingBottom:8, marginBottom:4, borderBottom:'1px solid #f0f4fa', fontSize:11, fontWeight:700, color:'#94a3b8' }}>
           <span>اسم الصنف</span><span>SKU</span><span>سعر البيع</span><span>الكمية</span><span>الإجمالي</span><span/>
         </div>

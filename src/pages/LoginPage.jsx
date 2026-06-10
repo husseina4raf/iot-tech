@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { USERS, ROLE_LABELS, ROLE_ROUTES } from '../data/authData'
 
@@ -13,20 +13,20 @@ const roleStyle = {
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [focused, setFocused]   = useState('')
+  const [username, setUsername]  = useState('')
+  const [password, setPassword]  = useState('')
+  const [showPass, setShowPass]  = useState(false)
+  const [error, setError]        = useState('')
+  const [loading, setLoading]    = useState(false)
+  const [focused, setFocused]    = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!email.trim() || !password) { setError('يرجى إدخال البريد الإلكتروني وكلمة المرور'); return }
+    if (!username.trim() || !password) { setError('يرجى إدخال اسم المستخدم وكلمة المرور'); return }
     setLoading(true)
     await new Promise(r => setTimeout(r, 450))
-    const result = login(email, password)
+    const result = login(username, password)
     setLoading(false)
     if (!result.success) { setError(result.error) }
     else { navigate(ROLE_ROUTES[result.user.role]?.[0] ?? '/dashboard', { replace: true }) }
@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   const fieldStyle = (name) => ({
     width: '100%', padding: '11px 14px', fontSize: 14,
-    fontFamily: 'Cairo, sans-serif', direction: name === 'email' || name === 'pass' ? 'ltr' : 'rtl',
+    fontFamily: 'Cairo, sans-serif', direction: 'ltr',
     border: `1.5px solid ${focused === name ? '#2563eb' : '#dde3ed'}`,
     borderRadius: 10, background: focused === name ? '#fff' : '#f7f9fc',
     color: '#0f172a', outline: 'none',
@@ -95,18 +95,18 @@ export default function LoginPage() {
             <p style={{ fontSize:13, color:'#64748b', marginBottom:24 }}>أدخل بياناتك للوصول إلى حسابك</p>
 
             <form onSubmit={handleSubmit}>
-              {/* Email */}
+              {/* Username */}
               <div style={{ marginBottom:16 }}>
                 <label style={{ display:'block', fontSize:13, fontWeight:600, color:'#374151', marginBottom:6 }}>
-                  البريد الإلكتروني
+                  اسم المستخدم
                 </label>
                 <div style={{ position:'relative' }}>
-                  <Mail size={15} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color: focused==='email'?'#2563eb':'#94a3b8', transition:'color 0.15s' }} />
-                  <input type="email" value={email} placeholder="example@smarthome.com"
-                    style={{ ...fieldStyle('email'), paddingRight:38 }}
-                    onChange={e => { setEmail(e.target.value); setError('') }}
-                    onFocus={() => setFocused('email')} onBlur={() => setFocused('')}
-                    autoComplete="email" />
+                  <User size={15} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', color: focused==='user'?'#2563eb':'#94a3b8', transition:'color 0.15s' }} />
+                  <input type="text" value={username} placeholder="username"
+                    style={{ ...fieldStyle('user'), paddingRight:38 }}
+                    onChange={e => { setUsername(e.target.value); setError('') }}
+                    onFocus={() => setFocused('user')} onBlur={() => setFocused('')}
+                    autoComplete="username" autoCapitalize="none" />
                 </div>
               </div>
 
@@ -165,7 +165,7 @@ export default function LoginPage() {
               {USERS.map(u => {
                 const rs = roleStyle[u.role]
                 return (
-                  <button key={u.id} type="button" onClick={() => { setEmail(u.email); setPassword(u.password); setError('') }}
+                  <button key={u.id} type="button" onClick={() => { setUsername(u.username); setPassword(u.password); setError('') }}
                     style={{
                       textAlign:'right', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e8eef6',
                       background:'#f7f9fc', cursor:'pointer', transition:'all 0.15s', fontFamily:'Cairo, sans-serif',
@@ -177,6 +177,7 @@ export default function LoginPage() {
                       <span style={{ fontSize:12, fontWeight:700, color:'#0f172a' }}>{u.name}</span>
                     </div>
                     <div style={{ fontSize:11, color:'#94a3b8', paddingRight:12 }}>{ROLE_LABELS[u.role]}</div>
+                    <div style={{ fontSize:11, color:'#60a5fa', paddingRight:12, fontFamily:'monospace', marginTop:1 }}>{u.username}</div>
                   </button>
                 )
               })}

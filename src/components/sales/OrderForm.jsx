@@ -34,14 +34,19 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     return emptyForm()
   })
 
+  const [errors, setErrors] = useState({})
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!form.company.trim()) return toast('يرجى إدخال اسم الشركة أو العميل', 'error')
-    if (!form.clientName.trim()) return toast('يرجى إدخال اسم العميل', 'error')
-    if (!form.salesRep) return toast('يرجى اختيار مندوب المبيعات', 'error')
-    if (form.items.some(i => !i.name.trim())) return toast('يرجى إدخال أسماء جميع الأصناف', 'error')
-    if (form.total <= 0) return toast('يرجى إدخال أصناف بقيمة صحيحة', 'error')
+    const errs = {}
+    if (!form.company.trim())                    errs.company    = 'اسم الشركة أو العميل مطلوب'
+    if (!form.clientName.trim())                 errs.clientName = 'اسم العميل مطلوب'
+    if (!form.salesRep)                          errs.salesRep   = 'يرجى اختيار مندوب المبيعات'
+    if (form.items.some(i => !i.name.trim()))    errs.items      = 'يرجى إدخال أسماء جميع الأصناف'
+    if (form.total <= 0)                         errs.items      = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
+    if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
+    setErrors({})
     const { dateRaw, ...orderData } = form
 
     if (isEdit) {
@@ -58,11 +63,11 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
   return (
     <form onSubmit={handleSubmit} className="fade-in">
-      <OrderFormFields form={form} setForm={setForm} />
+      <OrderFormFields form={form} setForm={setForm} errors={errors} setErrors={setErrors} />
 
       <div style={{ display:'flex', gap:10, marginTop:20, justifyContent:'flex-end' }}>
         {!isEdit && (
-          <button type="button" onClick={() => setForm(emptyForm())}
+          <button type="button" onClick={() => { setForm(emptyForm()); setErrors({}) }}
             style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 20px', border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, borderRadius:10, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
             <RotateCcw size={14} />
             مسح النموذج

@@ -9,12 +9,18 @@ const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', b
 const iStyle = { width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
 const focusStyle = { borderColor:'#2563eb', background:'#fff', boxShadow:'0 0 0 3px rgba(37,99,235,0.1)' }
 
-function FInput({ label, ...props }) {
+function FInput({ label, required, error, ...props }) {
   const [f, setF] = useState(false)
+  const errStyle = error ? { borderColor:'#e11d48', background:'#fff7f7' } : {}
   return (
     <div>
-      {label && <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>{label}</label>}
-      <input {...props} style={{ ...iStyle, ...(f ? focusStyle : {}) }} onFocus={() => setF(true)} onBlur={() => setF(false)} />
+      {label && <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>
+        {label}{required && <span style={{ color:'#e11d48' }}> *</span>}
+      </label>}
+      <input {...props}
+        style={{ ...iStyle, ...(f ? focusStyle : {}), ...errStyle }}
+        onFocus={() => setF(true)} onBlur={() => setF(false)} />
+      {error && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{error}</span>}
     </div>
   )
 }
@@ -49,17 +55,28 @@ export default function InventoryManager() {
   const [brandFilter, setBrandFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
 
-  const upd = (f, v) => setForm(p => ({ ...p, [f]: v }))
+  const [errors, setErrors] = useState({})
 
-  const openAdd = () => { setForm(emptyForm()); setEditId(null); setShowForm(true) }
+  const upd = (f, v) => { setForm(p => ({ ...p, [f]: v })); setErrors(p => ({ ...p, [f]: '' })) }
+
+  const openAdd = () => { setForm(emptyForm()); setEditId(null); setErrors({}); setShowForm(true) }
   const openEdit = (item) => {
     setForm({ sku: item.sku || '', name: item.name, nameAr: item.nameAr, brand: item.brand || '', stock: item.stock, minStock: item.minStock, price: item.price, costPrice: item.costPrice || '', category: item.category || INVENTORY_CATEGORIES[0], supplier: item.supplier || '', notes: item.notes || '' })
     setEditId(item.id)
+    setErrors({})
     setShowForm(true)
   }
 
+  const validate = () => {
+    const e = {}
+    if (!form.name.trim())                       e.name      = 'اسم المنتج مطلوب'
+    if (!form.costPrice || Number(form.costPrice) <= 0) e.costPrice = 'سعر التكلفة مطلوب'
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
   const handleSave = () => {
-    if (!form.name.trim()) return toast('يرجى إدخال اسم المنتج', 'error')
+    if (!validate()) return
     const data = { ...form, stock: Number(form.stock) || 0, minStock: Number(form.minStock) || 3, price: Number(form.price) || 0, costPrice: Number(form.costPrice) || 0 }
     if (editId) {
       updateInventoryItem(editId, data, user)
@@ -140,13 +157,13 @@ export default function InventoryManager() {
         <div style={{ ...card, padding:20, marginBottom:16 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
             <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>{editId ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h3>
-            <button onClick={() => { setShowForm(false); setEditId(null) }} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
+            <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
               <X size={18}/>
             </button>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
             <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
-            <FInput label="اسم الموديل (EN) *" value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
+            <FInput label="اسم الموديل (EN)" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
             <FInput label="اسم الموديل (AR)" value={form.nameAr} onChange={e => upd('nameAr', e.target.value)} placeholder="قفل ذكي XYZ" />
             <FSelect label="الماركة / البراند" value={form.brand} onChange={e => upd('brand', e.target.value)}>
               <option value="">اختر الماركة</option>
@@ -158,11 +175,11 @@ export default function InventoryManager() {
             <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
             <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>
-            <FInput label="سعر التكلفة (LE)" type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
+            <FInput label="سعر التكلفة (LE)" required error={errors.costPrice} type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
           </div>
           <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-            <button onClick={() => { setShowForm(false); setEditId(null) }}
+            <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }}
               style={{ padding:'8px 16px', borderRadius:8, border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
               إلغاء
             </button>

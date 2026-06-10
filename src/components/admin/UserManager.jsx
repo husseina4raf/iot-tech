@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus, Trash2, X, Check, User, Mail, Lock, Shield } from 'lucide-react'
+import { UserPlus, Trash2, X, Check, User, Mail, Lock, Shield, AtSign } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
 import { ROLE_LABELS } from '../../data/authData'
@@ -28,7 +28,7 @@ function FInput({ label, required, icon: Icon, ...props }) {
   )
 }
 
-const emptyForm = () => ({ name:'', nameEn:'', repName:'', email:'', password:'', role:'sales' })
+const emptyForm = () => ({ name:'', nameEn:'', repName:'', username:'', email:'', password:'', role:'sales' })
 
 const ROLE_BADGE = {
   sales:       { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe', label:'مندوب مبيعات' },
@@ -48,13 +48,17 @@ export default function UserManager() {
 
   const validate = () => {
     const e = {}
-    if (!form.name.trim())    e.name    = 'الاسم بالعربي مطلوب'
-    if (!form.repName.trim()) e.repName = 'اسم العرض مطلوب'
-    if (!form.email.trim())   e.email   = 'البريد الإلكتروني مطلوب'
-    else if (users.some(u => u.email.toLowerCase() === form.email.toLowerCase().trim()))
-                              e.email   = 'البريد الإلكتروني مستخدم بالفعل'
-    if (!form.password)       e.password = 'كلمة المرور مطلوبة'
-    else if (form.password.length < 6) e.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
+    if (!form.name.trim())                    e.name     = 'الاسم بالعربي مطلوب'
+    if (!form.repName.trim())                 e.repName  = 'اسم العرض مطلوب'
+    if (!form.username.trim())                e.username = 'اسم المستخدم مطلوب'
+    else if (!/^[a-zA-Z0-9_]+$/.test(form.username.trim()))
+                                              e.username = 'أحرف إنجليزية وأرقام وـ فقط'
+    else if (users.some(u => u.username?.toLowerCase() === form.username.toLowerCase().trim()))
+                                              e.username = 'اسم المستخدم مستخدم بالفعل'
+    if (form.email.trim() && users.some(u => u.email?.toLowerCase() === form.email.toLowerCase().trim()))
+                                              e.email    = 'البريد الإلكتروني مستخدم بالفعل'
+    if (!form.password)                       e.password = 'كلمة المرور مطلوبة'
+    else if (form.password.length < 6)        e.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -65,7 +69,8 @@ export default function UserManager() {
       name:     form.name.trim(),
       nameEn:   form.nameEn.trim() || form.name.trim(),
       repName:  form.repName.trim(),
-      email:    form.email.trim().toLowerCase(),
+      username: form.username.trim().toLowerCase(),
+      email:    form.email.trim().toLowerCase() || null,
       password: form.password,
       role:     form.role || 'sales',
     })
@@ -147,11 +152,16 @@ export default function UserManager() {
               {errors.repName && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.repName}</span>}
             </div>
             <div>
-              <FInput label="البريد الإلكتروني" required icon={Mail}
+              <FInput label="اسم المستخدم (للدخول)" required icon={AtSign}
+                value={form.username} onChange={e => upd('username', e.target.value)} placeholder="ahmed123" dir="ltr" autoCapitalize="none"/>
+              {errors.username && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.username}</span>}
+            </div>
+            <div>
+              <FInput label="البريد الإلكتروني (اختياري)" icon={Mail}
                 value={form.email} onChange={e => upd('email', e.target.value)} placeholder="ahmed@company.com" dir="ltr" type="email"/>
               {errors.email && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.email}</span>}
             </div>
-            <div style={{ gridColumn:'1/-1' }}>
+            <div>
               <FInput label="كلمة المرور" required icon={Lock}
                 value={form.password} onChange={e => upd('password', e.target.value)} placeholder="6 أحرف على الأقل" dir="ltr" type="password"/>
               {errors.password && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.password}</span>}
@@ -189,7 +199,7 @@ export default function UserManager() {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
-                {['المندوب','اسم العرض','البريد الإلكتروني','الصلاحية','إجراءات'].map((h, i) => (
+                {['المندوب','اسم العرض','اسم المستخدم','الصلاحية','إجراءات'].map((h, i) => (
                   <th key={h} style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i===0?'right':'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
                 ))}
               </tr>
@@ -213,7 +223,9 @@ export default function UserManager() {
                   <td style={{ padding:'12px 16px', textAlign:'center' }}>
                     <span style={{ fontSize:12, fontWeight:700, color:'#0f172a' }}>{u.repName}</span>
                   </td>
-                  <td style={{ padding:'12px 16px', textAlign:'center', color:'#475569', fontSize:12 }} dir="ltr">{u.email}</td>
+                  <td style={{ padding:'12px 16px', textAlign:'center' }}>
+                    <span style={{ fontSize:12, fontFamily:'monospace', padding:'2px 8px', borderRadius:6, background:'#f0f4fa', color:'#475569', border:'1px solid #e4eaf3' }} dir="ltr">{u.username || '—'}</span>
+                  </td>
                   <td style={{ padding:'12px 16px', textAlign:'center' }}>
                     {(() => { const b = ROLE_BADGE[u.role]; return (
                       <span style={{ fontSize:11, padding:'3px 10px', borderRadius:20, background:b.bg, color:b.color, border:`1px solid ${b.border}`, fontWeight:700 }}>{b.label}</span>

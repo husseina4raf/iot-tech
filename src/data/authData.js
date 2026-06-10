@@ -1,6 +1,7 @@
 export const USERS = [
   {
     id: 'u1',
+    username: 'israa',
     email: 'sales1@smarthome.com',
     password: 'sales123',
     role: 'sales',
@@ -11,6 +12,7 @@ export const USERS = [
   },
   {
     id: 'u2',
+    username: 'mohamed',
     email: 'sales2@smarthome.com',
     password: 'sales123',
     role: 'sales',
@@ -21,6 +23,7 @@ export const USERS = [
   },
   {
     id: 'u3',
+    username: 'admin',
     email: 'admin@smarthome.com',
     password: 'admin123',
     role: 'admin',
@@ -31,6 +34,7 @@ export const USERS = [
   },
   {
     id: 'u4',
+    username: 'superadmin',
     email: 'superadmin@smarthome.com',
     password: 'super123',
     role: 'super_admin',

@@ -28,12 +28,12 @@ export function AuthProvider({ children }) {
   // Dynamic sales reps list (single source of truth)
   const salesReps = users.filter(u => u.role === 'sales').map(u => u.repName)
 
-  const login = useCallback((email, password) => {
+  const login = useCallback((username, password) => {
     const list  = loadUsers()   // always read latest from storage
     const found = list.find(
-      u => u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password
+      u => u.username?.toLowerCase() === username.toLowerCase().trim() && u.password === password
     )
-    if (!found) return { success: false, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' }
+    if (!found) return { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
     const { password: _, ...safeUser } = found
     setUser(safeUser)
     localStorage.setItem('sl_session', JSON.stringify(safeUser))

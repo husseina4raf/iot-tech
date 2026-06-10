@@ -12,7 +12,14 @@ function loadSession() {
 function loadUsers() {
   try {
     const raw = localStorage.getItem(USERS_KEY)
-    return raw ? JSON.parse(raw) : USERS
+    if (!raw) return USERS
+    const stored = JSON.parse(raw)
+    // Migrate: add username to any stored user that doesn't have one yet
+    return stored.map(u => {
+      if (u.username) return u
+      const def = USERS.find(d => d.id === u.id || d.email === u.email)
+      return def ? { ...u, username: def.username } : u
+    })
   } catch { return USERS }
 }
 

@@ -145,9 +145,9 @@ export function OrdersProvider({ children }) {
             return { ...lot, qty: lot.qty - consume }
           }).filter(lot => lot.qty > 0)
           const newStock = Math.max(0, item.stock - soldQty)
-          const totalCost = newLots.reduce((s, l) => s + l.qty * l.costPrice, 0)
-          const avgCost = newStock > 0 ? Math.round(totalCost / newStock) : (item.costPrice || 0)
-          return { ...item, stock: newStock, lots: newLots, costPrice: avgCost }
+          // FIFO: costPrice = oldest remaining lot's cost
+          const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (item.costPrice || 0)
+          return { ...item, stock: newStock, lots: newLots, costPrice: fifoCost }
         }))
       }
       return updated
@@ -218,10 +218,10 @@ export function OrdersProvider({ children }) {
     }
     const updatedLots = [...(item.lots || []), newLot]
     const newStock    = updatedLots.reduce((s, l) => s + l.qty, 0)
-    const totalCost   = updatedLots.reduce((s, l) => s + l.qty * l.costPrice, 0)
-    const avgCost     = newStock > 0 ? Math.round(totalCost / newStock) : Number(costPrice)
+    // FIFO: costPrice = oldest lot's cost (first to be consumed)
+    const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
     setInventory(prev => prev.map(i => i.id === itemId
-      ? { ...i, lots: updatedLots, stock: newStock, costPrice: avgCost }
+      ? { ...i, lots: updatedLots, stock: newStock, costPrice: fifoCost }
       : i
     ))
     pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة دفعة', oldValue: `${item.stock} وحدة`, newValue: `+${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })

@@ -248,7 +248,7 @@ export default function InventoryManager() {
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
           <thead>
             <tr style={{ background:'#f8fafc' }}>
-              {['SKU','المنتج / الموديل','الماركة','التصنيف','سعر التكلفة','المخزون','الحالة','إجراءات'].map((h, i) => (
+              {['SKU','المنتج / الموديل','الماركة','التصنيف','تكلفة الدفعة الحالية','المخزون','الحالة','إجراءات'].map((h, i) => (
                 <th key={h} style={{ padding:'10px 12px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i===1?'right':'center', borderBottom:'1px solid #f0f4fa', whiteSpace:'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -356,8 +356,8 @@ export default function InventoryManager() {
                               <td colSpan={2} style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#1d4ed8', fontSize:12 }}>
                                 الإجمالي: {item.stock.toLocaleString()} وحدة متاحة
                               </td>
-                              <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#1d4ed8', fontSize:12 }} dir="ltr">
-                                متوسط التكلفة: {item.costPrice?.toLocaleString() || 0} LE
+                              <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669', fontSize:12 }} dir="ltr">
+                                تكلفة الدفعة الحالية: {(item.lots?.[0]?.costPrice ?? item.costPrice ?? 0).toLocaleString()} LE
                               </td>
                               <td/>
                             </tr>

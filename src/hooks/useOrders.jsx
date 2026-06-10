@@ -3,7 +3,6 @@ import { INITIAL_ORDERS, INITIAL_INVENTORY, INITIAL_AUDIT_LOG, INITIAL_TAX_INVOI
 
 const OrdersContext = createContext(null)
 
-// ── v3 keys: reset inventory to pick up cost prices ───────────────────────
 const KEYS = {
   orders:    'sl_orders_v2',
   inventory: 'sl_inventory_v3',
@@ -22,6 +21,20 @@ function load(key, fallback) {
   catch { return fallback }
 }
 
+// Lazy migration: add lots array to items that don't have it yet
+function migrateItem(item) {
+  if (item.lots) return item
+  const qty = Number(item.stock) || 0
+  const lots = qty > 0 ? [{
+    id: `lot-${item.id}-init`,
+    qty,
+    costPrice: Number(item.costPrice) || 0,
+    date: new Date().toISOString().split('T')[0],
+    note: 'رصيد أول المدة',
+  }] : []
+  return { ...item, lots }
+}
+
 export function OrdersProvider({ children }) {
   // On first mount: clear old v1 data if coming from a previous version
   useEffect(() => {
@@ -32,7 +45,7 @@ export function OrdersProvider({ children }) {
   }, [])
 
   const [orders,      setOrders]      = useState(() => load(KEYS.orders,    INITIAL_ORDERS))
-  const [inventory,   setInventory]   = useState(() => load(KEYS.inventory, INITIAL_INVENTORY))
+  const [inventory,   setInventory]   = useState(() => load(KEYS.inventory, INITIAL_INVENTORY).map(migrateItem))
   const [auditLog,    setAuditLog]    = useState(() => load(KEYS.audit,     INITIAL_AUDIT_LOG))
   const [taxInvoices, setTaxInvoices] = useState(() => load(KEYS.tax,       INITIAL_TAX_INVOICES))
 
@@ -121,7 +134,20 @@ export function OrdersProvider({ children }) {
             i.name.toLowerCase().includes(item.name.toLowerCase()) ||
             item.name.toLowerCase().includes(i.name.toLowerCase())
           )
-          return match ? { ...item, stock: Math.max(0, item.stock - match.quantity) } : item
+          if (!match) return item
+          const soldQty = Number(match.quantity) || 0
+          // Consume lots FIFO (oldest first)
+          let remaining = soldQty
+          const newLots = (item.lots || []).map(lot => {
+            if (remaining <= 0) return lot
+            const consume = Math.min(remaining, lot.qty)
+            remaining -= consume
+            return { ...lot, qty: lot.qty - consume }
+          }).filter(lot => lot.qty > 0)
+          const newStock = Math.max(0, item.stock - soldQty)
+          const totalCost = newLots.reduce((s, l) => s + l.qty * l.costPrice, 0)
+          const avgCost = newStock > 0 ? Math.round(totalCost / newStock) : (item.costPrice || 0)
+          return { ...item, stock: newStock, lots: newLots, costPrice: avgCost }
         }))
       }
       return updated
@@ -166,10 +192,39 @@ export function OrdersProvider({ children }) {
 
   // ── Inventory CRUD ────────────────────────────────────────────────────────
   const addInventoryItem = (item, user) => {
-    const newItem = { ...item, id: `inv-${Date.now()}` }
+    const qty = Number(item.stock) || 0
+    const initialLots = qty > 0 ? [{
+      id: `lot-${Date.now()}`,
+      qty,
+      costPrice: Number(item.costPrice) || 0,
+      date: new Date().toISOString().split('T')[0],
+      note: 'دفعة أولى',
+    }] : []
+    const newItem = { ...item, id: `inv-${Date.now()}`, lots: initialLots }
     setInventory(prev => [...prev, newItem])
     pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة صنف', oldValue: '—', newValue: `${item.stock} وحدة`, changedBy: user?.name || 'مجهول', note: '' })
     return newItem
+  }
+
+  const addStockLot = (itemId, { qty, costPrice, note }, user) => {
+    const item = inventory.find(i => i.id === itemId)
+    if (!item) return
+    const newLot = {
+      id: `lot-${Date.now()}`,
+      qty:       Number(qty),
+      costPrice: Number(costPrice),
+      date:      new Date().toISOString().split('T')[0],
+      note:      note || '',
+    }
+    const updatedLots = [...(item.lots || []), newLot]
+    const newStock    = updatedLots.reduce((s, l) => s + l.qty, 0)
+    const totalCost   = updatedLots.reduce((s, l) => s + l.qty * l.costPrice, 0)
+    const avgCost     = newStock > 0 ? Math.round(totalCost / newStock) : Number(costPrice)
+    setInventory(prev => prev.map(i => i.id === itemId
+      ? { ...i, lots: updatedLots, stock: newStock, costPrice: avgCost }
+      : i
+    ))
+    pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة دفعة', oldValue: `${item.stock} وحدة`, newValue: `+${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })
   }
 
   const updateInventoryItem = (id, data, user) => {
@@ -211,7 +266,7 @@ export function OrdersProvider({ children }) {
       orders, inventory, auditLog, taxInvoices,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
       getOrdersByRep, getOrdersByRepGrouped,
-      addInventoryItem, updateInventoryItem, deleteInventoryItem,
+      addInventoryItem, addStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,
     }}>
       {children}

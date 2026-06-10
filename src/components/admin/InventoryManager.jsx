@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw } from 'lucide-react'
+import React, { useState } from 'react'
+import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
@@ -34,7 +34,7 @@ const emptyForm = () => ({
 })
 
 export default function InventoryManager() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useOrders()
+  const { inventory, addInventoryItem, addStockLot, updateInventoryItem, deleteInventoryItem } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [showForm, setShowForm] = useState(false)
@@ -42,7 +42,9 @@ export default function InventoryManager() {
   const [form, setForm] = useState(emptyForm())
   const [adjustModal, setAdjustModal] = useState(null) // { id, name, currentStock }
   const [adjustQty, setAdjustQty] = useState('')
+  const [adjustCost, setAdjustCost] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
+  const [expandedLots, setExpandedLots] = useState({})
   const [filter, setFilter] = useState('')
   const [brandFilter, setBrandFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
@@ -76,11 +78,14 @@ export default function InventoryManager() {
   }
 
   const handleAdjust = () => {
-    if (!adjustQty || isNaN(adjustQty)) return toast('يرجى إدخال الكمية', 'error')
-    updateInventoryItem(adjustModal.id, { stock: Math.max(0, Number(adjustQty)), adjustNote }, user)
-    toast('تم تحديث المخزون ✓', 'success')
-    setAdjustModal(null); setAdjustQty(''); setAdjustNote('')
+    if (!adjustQty || isNaN(adjustQty) || Number(adjustQty) <= 0) return toast('يرجى إدخال كمية صحيحة', 'error')
+    if (!adjustCost || isNaN(adjustCost) || Number(adjustCost) <= 0) return toast('يرجى إدخال سعر التكلفة', 'error')
+    addStockLot(adjustModal.id, { qty: Number(adjustQty), costPrice: Number(adjustCost), note: adjustNote }, user)
+    toast('تم إضافة الدفعة ✓', 'success')
+    setAdjustModal(null); setAdjustQty(''); setAdjustCost(''); setAdjustNote('')
   }
+
+  const toggleLots = (id) => setExpandedLots(p => ({ ...p, [id]: !p[id] }))
 
   const filtered = inventory.filter(i => {
     const q = filter.toLowerCase()
@@ -169,22 +174,52 @@ export default function InventoryManager() {
         </div>
       )}
 
-      {/* Adjust stock modal */}
+      {/* Add lot modal */}
       {adjustModal && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ ...card, padding:24, width:380, direction:'rtl' }}>
-            <h3 style={{ fontSize:15, fontWeight:700, color:'#0f172a', marginBottom:4 }}>تسوية المخزون</h3>
-            <p style={{ fontSize:12, color:'#64748b', marginBottom:16 }}>{adjustModal.name} — المخزون الحالي: {adjustModal.currentStock} وحدة</p>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ ...card, padding:24, width:420, direction:'rtl' }}>
+            <h3 style={{ fontSize:15, fontWeight:700, color:'#0f172a', marginBottom:2, display:'flex', alignItems:'center', gap:8 }}>
+              <Plus size={16} color="#2563eb"/>إضافة دفعة شراء
+            </h3>
+            <p style={{ fontSize:12, color:'#64748b', marginBottom:4 }}>{adjustModal.name}</p>
+
+            {/* Existing lots summary */}
+            {adjustModal.lots?.length > 0 && (
+              <div style={{ marginBottom:16, borderRadius:8, border:'1px solid #f0f4fa', overflow:'hidden' }}>
+                <div style={{ padding:'6px 12px', background:'#f8fafc', fontSize:11, fontWeight:700, color:'#64748b' }}>الدفعات الحالية</div>
+                {adjustModal.lots.map((l, i) => (
+                  <div key={l.id} style={{ display:'flex', justifyContent:'space-between', padding:'7px 12px', fontSize:12, borderTop:'1px solid #f8fafc', background: i%2===0?'#fff':'#f8fafc' }}>
+                    <span style={{ color:'#475569' }}>{l.date} {l.note ? `— ${l.note}` : ''}</span>
+                    <span style={{ fontWeight:700, color:'#0f172a' }} dir="ltr">{l.qty} وحدة × {l.costPrice.toLocaleString()} LE</span>
+                  </div>
+                ))}
+                <div style={{ padding:'7px 12px', background:'#eff6ff', display:'flex', justifyContent:'space-between', fontSize:12, borderTop:'1px solid #bfdbfe' }}>
+                  <span style={{ color:'#1d4ed8', fontWeight:700 }}>الإجمالي الحالي</span>
+                  <span style={{ fontWeight:800, color:'#1d4ed8' }} dir="ltr">{adjustModal.currentStock} وحدة</span>
+                </div>
+              </div>
+            )}
+
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <FInput label="الكمية الجديدة *" type="number" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} placeholder="0" dir="ltr"/>
-              <FInput label="سبب التعديل" value={adjustNote} onChange={e => setAdjustNote(e.target.value)} placeholder="جرد / استلام شحنة / ..." />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <FInput label="الكمية المضافة *" type="number" value={adjustQty} onChange={e => setAdjustQty(e.target.value)} placeholder="0" dir="ltr"/>
+                <FInput label="سعر التكلفة للوحدة *" type="number" value={adjustCost} onChange={e => setAdjustCost(e.target.value)} placeholder="0" dir="ltr"/>
+              </div>
+              <FInput label="ملاحظة (اختياري)" value={adjustNote} onChange={e => setAdjustNote(e.target.value)} placeholder="مثال: شحنة يونيو 2025" />
             </div>
+
+            {adjustQty && adjustCost && !isNaN(adjustQty) && !isNaN(adjustCost) && (
+              <div style={{ marginTop:10, padding:'8px 12px', borderRadius:8, background:'#ecfdf5', border:'1px solid #a7f3d0', fontSize:12, color:'#065f46' }}>
+                ✓ ستُضاف <strong>{adjustQty} وحدة</strong> بتكلفة <strong>{Number(adjustCost).toLocaleString()} LE</strong> للوحدة
+              </div>
+            )}
+
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
-              <button onClick={() => { setAdjustModal(null); setAdjustQty(''); setAdjustNote('') }}
+              <button onClick={() => { setAdjustModal(null); setAdjustQty(''); setAdjustCost(''); setAdjustNote('') }}
                 style={{ padding:'8px 16px', borderRadius:8, border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>إلغاء</button>
               <button onClick={handleAdjust}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:8, border:'none', background:'#1d4ed8', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                <RotateCcw size={13}/>تحديث المخزون
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(37,99,235,0.3)' }}>
+                <Plus size={13}/>إضافة الدفعة
               </button>
             </div>
           </div>
@@ -204,8 +239,11 @@ export default function InventoryManager() {
           <tbody>
             {filtered.map(item => {
               const isLow = item.stock < (item.minStock || 5)
+              const lotsOpen = !!expandedLots[item.id]
+              const lotCount = (item.lots || []).length
               return (
-                <tr key={item.id} style={{ borderBottom:'1px solid #f8fafc' }}
+                <React.Fragment key={item.id}>
+                <tr style={{ borderBottom: lotsOpen ? 'none' : '1px solid #f8fafc' }}
                   onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                   {/* SKU */}
@@ -239,6 +277,13 @@ export default function InventoryManager() {
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:16, fontWeight:800, color: isLow ? '#e11d48' : '#0f172a' }}>{item.stock}</span>
                       <span style={{ fontSize:10, color:'#94a3b8' }}>وحدة</span>
+                      {lotCount > 0 && (
+                        <button onClick={() => toggleLots(item.id)}
+                          style={{ display:'flex', alignItems:'center', gap:2, padding:'2px 7px', borderRadius:5, border:`1px solid ${lotsOpen ? '#93c5fd' : '#bfdbfe'}`, background: lotsOpen ? '#eff6ff' : '#fff', color:'#1d4ed8', fontSize:10, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif', marginTop:2 }}>
+                          {lotsOpen ? <ChevronUp size={9}/> : <ChevronDown size={9}/>}
+                          {lotCount} دفعة
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td style={{ padding:'12px 16px', textAlign:'center' }}>
@@ -248,9 +293,9 @@ export default function InventoryManager() {
                   </td>
                   <td style={{ padding:'12px 16px' }}>
                     <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                      <button onClick={() => { setAdjustModal({ id: item.id, name: item.name, currentStock: item.stock }); setAdjustQty(String(item.stock)) }}
+                      <button onClick={() => { setAdjustModal({ id: item.id, name: item.name, currentStock: item.stock, lots: item.lots || [] }); setAdjustQty(''); setAdjustCost(''); setAdjustNote('') }}
                         style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                        <RotateCcw size={10}/>تسوية
+                        <Plus size={10}/>دفعة
                       </button>
                       <button onClick={() => openEdit(item)}
                         style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 9px', borderRadius:7, border:'1.5px solid #e4eaf3', background:'#f8fafc', color:'#475569', fontSize:11, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
@@ -263,6 +308,49 @@ export default function InventoryManager() {
                     </div>
                   </td>
                 </tr>
+                {lotsOpen && lotCount > 0 && (
+                  <tr style={{ background:'#f0f7ff' }}>
+                    <td colSpan={8} style={{ padding:'0 16px 12px 16px' }}>
+                      <div style={{ borderRadius:8, border:'1px solid #bfdbfe', overflow:'hidden', marginTop:2 }}>
+                        <div style={{ padding:'6px 14px', background:'#eff6ff', display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#1d4ed8' }}>دفعات الشراء — {item.name}</span>
+                          <span style={{ fontSize:11, color:'#60a5fa' }}>({lotCount} دفعة)</span>
+                        </div>
+                        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                          <thead>
+                            <tr style={{ background:'#dbeafe' }}>
+                              {['التاريخ','الكمية','سعر التكلفة للوحدة','ملاحظة'].map(h => (
+                                <th key={h} style={{ padding:'6px 14px', fontSize:11, fontWeight:700, color:'#1e40af', textAlign:'center', borderBottom:'1px solid #bfdbfe' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {item.lots.map((lot, idx) => (
+                              <tr key={lot.id} style={{ background: idx%2===0 ? '#fff' : '#f8fafc', borderBottom:'1px solid #e0f0ff' }}>
+                                <td style={{ padding:'7px 14px', textAlign:'center', color:'#475569' }}>{lot.date}</td>
+                                <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#0f172a' }}>{lot.qty.toLocaleString()} وحدة</td>
+                                <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">{lot.costPrice.toLocaleString()} LE</td>
+                                <td style={{ padding:'7px 14px', textAlign:'center', color:'#64748b', fontSize:11 }}>{lot.note || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
+                              <td colSpan={2} style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#1d4ed8', fontSize:12 }}>
+                                الإجمالي: {item.stock.toLocaleString()} وحدة متاحة
+                              </td>
+                              <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#1d4ed8', fontSize:12 }} dir="ltr">
+                                متوسط التكلفة: {item.costPrice?.toLocaleString() || 0} LE
+                              </td>
+                              <td/>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               )
             })}
           </tbody>

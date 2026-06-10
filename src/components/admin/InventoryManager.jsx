@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
@@ -40,7 +40,7 @@ const emptyForm = () => ({
 })
 
 export default function InventoryManager() {
-  const { inventory, addInventoryItem, addStockLot, updateInventoryItem, deleteInventoryItem } = useOrders()
+  const { inventory, addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [showForm, setShowForm] = useState(false)
@@ -51,6 +51,7 @@ export default function InventoryManager() {
   const [adjustCost, setAdjustCost] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
   const [expandedLots, setExpandedLots] = useState({})
+  const [editLot, setEditLot] = useState(null) // { itemId, lotId, qty, costPrice, note }
   const [filter, setFilter] = useState('')
   const [brandFilter, setBrandFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
@@ -103,6 +104,15 @@ export default function InventoryManager() {
   }
 
   const toggleLots = (id) => setExpandedLots(p => ({ ...p, [id]: !p[id] }))
+
+  const handleSaveLot = () => {
+    if (!editLot) return
+    if (!editLot.qty || Number(editLot.qty) <= 0) return toast('الكمية يجب أن تكون أكبر من 0', 'error')
+    if (!editLot.costPrice || Number(editLot.costPrice) <= 0) return toast('سعر التكلفة يجب أن يكون أكبر من 0', 'error')
+    updateStockLot(editLot.itemId, editLot.lotId, { qty: editLot.qty, costPrice: editLot.costPrice, note: editLot.note }, user)
+    toast('تم تعديل الدفعة ✓', 'success')
+    setEditLot(null)
+  }
 
   const filtered = inventory.filter(i => {
     const q = filter.toLowerCase()
@@ -336,20 +346,65 @@ export default function InventoryManager() {
                         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                           <thead>
                             <tr style={{ background:'#dbeafe' }}>
-                              {['التاريخ','الكمية','سعر التكلفة للوحدة','ملاحظة'].map(h => (
+                              {['التاريخ','الكمية','سعر التكلفة للوحدة','ملاحظة',''].map(h => (
                                 <th key={h} style={{ padding:'6px 14px', fontSize:11, fontWeight:700, color:'#1e40af', textAlign:'center', borderBottom:'1px solid #bfdbfe' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {item.lots.map((lot, idx) => (
-                              <tr key={lot.id} style={{ background: idx%2===0 ? '#fff' : '#f8fafc', borderBottom:'1px solid #e0f0ff' }}>
-                                <td style={{ padding:'7px 14px', textAlign:'center', color:'#475569' }}>{lot.date}</td>
-                                <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#0f172a' }}>{lot.qty.toLocaleString()} وحدة</td>
-                                <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">{lot.costPrice.toLocaleString()} LE</td>
-                                <td style={{ padding:'7px 14px', textAlign:'center', color:'#64748b', fontSize:11 }}>{lot.note || '—'}</td>
-                              </tr>
-                            ))}
+                            {item.lots.map((lot, idx) => {
+                              const isEditing = editLot?.itemId === item.id && editLot?.lotId === lot.id
+                              const bg = idx%2===0 ? '#fff' : '#f8fafc'
+                              const inStyle = { width:'100%', padding:'4px 8px', fontSize:12, border:'1.5px solid #93c5fd', borderRadius:6, background:'#fff', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
+                              return (
+                                <tr key={lot.id} style={{ background: isEditing ? '#fffbeb' : bg, borderBottom:'1px solid #e0f0ff' }}>
+                                  <td style={{ padding:'7px 14px', textAlign:'center', color:'#475569' }}>{lot.date}</td>
+                                  {isEditing ? (
+                                    <>
+                                      <td style={{ padding:'5px 10px' }}>
+                                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                          <input type="number" value={editLot.qty} onChange={e => setEditLot(p => ({ ...p, qty: e.target.value }))} style={{ ...inStyle, width:70 }} dir="ltr"/>
+                                          <span style={{ fontSize:11, color:'#64748b' }}>وحدة</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ padding:'5px 10px' }}>
+                                        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                                          <input type="number" value={editLot.costPrice} onChange={e => setEditLot(p => ({ ...p, costPrice: e.target.value }))} style={{ ...inStyle, width:80 }} dir="ltr"/>
+                                          <span style={{ fontSize:11, color:'#64748b' }}>LE</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ padding:'5px 10px' }}>
+                                        <input value={editLot.note} onChange={e => setEditLot(p => ({ ...p, note: e.target.value }))} style={inStyle} placeholder="ملاحظة..."/>
+                                      </td>
+                                      <td style={{ padding:'5px 10px', textAlign:'center' }}>
+                                        <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                                          <button onClick={handleSaveLot}
+                                            style={{ display:'flex', alignItems:'center', gap:3, padding:'4px 10px', borderRadius:6, border:'none', background:'#059669', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                                            <Check size={11}/>حفظ
+                                          </button>
+                                          <button onClick={() => setEditLot(null)}
+                                            style={{ display:'flex', alignItems:'center', gap:3, padding:'4px 8px', borderRadius:6, border:'1px solid #e4eaf3', background:'#fff', color:'#64748b', fontSize:11, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                                            <X size={11}/>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#0f172a' }}>{lot.qty.toLocaleString()} وحدة</td>
+                                      <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">{lot.costPrice.toLocaleString()} LE</td>
+                                      <td style={{ padding:'7px 14px', textAlign:'center', color:'#64748b', fontSize:11 }}>{lot.note || '—'}</td>
+                                      <td style={{ padding:'7px 14px', textAlign:'center' }}>
+                                        <button onClick={() => setEditLot({ itemId: item.id, lotId: lot.id, qty: lot.qty, costPrice: lot.costPrice, note: lot.note || '' })}
+                                          style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 9px', borderRadius:6, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                                          <Pencil size={10}/>تعديل
+                                        </button>
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
+                              )
+                            })}
                           </tbody>
                           <tfoot>
                             <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
@@ -359,7 +414,7 @@ export default function InventoryManager() {
                               <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669', fontSize:12 }} dir="ltr">
                                 تكلفة الدفعة الحالية: {(item.lots?.[0]?.costPrice ?? item.costPrice ?? 0).toLocaleString()} LE
                               </td>
-                              <td/>
+                              <td colSpan={2}/>
                             </tr>
                           </tfoot>
                         </table>

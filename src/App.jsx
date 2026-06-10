@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { OrdersProvider } from './hooks/useOrders'
 import { AuthProvider } from './hooks/useAuth'
+import { SettingsProvider } from './hooks/useSettings'
 import { ToastProvider } from './components/ui/Toast'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Layout from './components/layout/Layout'
@@ -14,6 +15,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <SettingsProvider>
         <OrdersProvider>
           <ToastProvider>
             <Routes>
@@ -55,6 +57,7 @@ export default function App() {
             </Routes>
           </ToastProvider>
         </OrdersProvider>
+        </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   )

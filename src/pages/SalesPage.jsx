@@ -1,19 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PlusCircle, FolderOpen, TrendingUp, Trophy } from 'lucide-react'
 import OrderForm from '../components/sales/OrderForm'
 import MonthlyInvoices from '../components/sales/MonthlyInvoices'
 import ProfitReport from '../components/sales/ProfitReport'
 import Leaderboard from '../components/sales/Leaderboard'
+import { useSettings } from '../hooks/useSettings'
 
-const tabs = [
-  { id:'new',         label:'طلب جديد',        icon:PlusCircle },
-  { id:'monthly',     label:'فواتيري',           icon:FolderOpen },
-  { id:'profit',      label:'تقرير الأرباح',    icon:TrendingUp },
-  { id:'leaderboard', label:'المتصدرون',         icon:Trophy },
+const BASE_TABS = [
+  { id:'new',         label:'طلب جديد',     icon:PlusCircle },
+  { id:'monthly',     label:'فواتيري',       icon:FolderOpen },
+  { id:'profit',      label:'تقرير الأرباح', icon:TrendingUp },
 ]
+const LEADERBOARD_TAB = { id:'leaderboard', label:'المتصدرون', icon:Trophy }
 
 export default function SalesPage() {
+  const { settings } = useSettings()
   const [tab, setTab] = useState('new')
+
+  const tabs = settings.leaderboardVisible ? [...BASE_TABS, LEADERBOARD_TAB] : BASE_TABS
+
+  // If leaderboard gets hidden while user is on that tab, redirect to new
+  useEffect(() => {
+    if (tab === 'leaderboard' && !settings.leaderboardVisible) setTab('new')
+  }, [settings.leaderboardVisible, tab])
+
   return (
     <div style={{ maxWidth:900, margin:'0 auto' }}>
       {/* Tabs */}

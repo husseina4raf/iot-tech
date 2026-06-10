@@ -227,6 +227,22 @@ export function OrdersProvider({ children }) {
     pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة دفعة', oldValue: `${item.stock} وحدة`, newValue: `+${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })
   }
 
+  const updateStockLot = (itemId, lotId, { qty, costPrice, note }, user) => {
+    const item = inventory.find(i => i.id === itemId)
+    if (!item) return
+    const oldLot = item.lots?.find(l => l.id === lotId)
+    const newLots = (item.lots || []).map(l =>
+      l.id === lotId ? { ...l, qty: Number(qty), costPrice: Number(costPrice), note: note ?? l.note } : l
+    )
+    const newStock = newLots.reduce((s, l) => s + l.qty, 0)
+    const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
+    setInventory(prev => prev.map(i => i.id === itemId
+      ? { ...i, lots: newLots, stock: newStock, costPrice: fifoCost }
+      : i
+    ))
+    pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'تعديل دفعة', oldValue: `${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue: `${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })
+  }
+
   const updateInventoryItem = (id, data, user) => {
     const old = inventory.find(i => i.id === id)
     setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data } : i))
@@ -266,7 +282,7 @@ export function OrdersProvider({ children }) {
       orders, inventory, auditLog, taxInvoices,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
       getOrdersByRep, getOrdersByRepGrouped,
-      addInventoryItem, addStockLot, updateInventoryItem, deleteInventoryItem,
+      addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,
     }}>
       {children}

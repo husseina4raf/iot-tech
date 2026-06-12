@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { History, Search, Filter, ArrowLeftRight, Edit3, Package, FileText, PlusCircle } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
+import Pagination from '../ui/Pagination'
+
+const PAGE_SIZE = 15
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -17,6 +20,7 @@ export default function AuditLog() {
   const [search, setSearch]     = useState('')
   const [typeFilter, setType]   = useState('')
   const [repFilter, setRep]     = useState('')
+  const [page, setPage]         = useState(1)
 
   const allReps = [...new Set(auditLog.map(e => e.changedBy).filter(Boolean))]
 
@@ -28,6 +32,9 @@ export default function AuditLog() {
       (!repFilter   || e.changedBy === repFilter)
     )
   })
+
+  useEffect(() => setPage(1), [search, typeFilter, repFilter])
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
@@ -73,12 +80,12 @@ export default function AuditLog() {
           </div>
         ) : (
           <div>
-            {filtered.map((entry, i) => {
+            {paged.map((entry, i) => {
               const cfg = typeConfig[entry.type] || typeConfig.order_edit
               const Icon = cfg.icon
               return (
                 <div key={entry.id}
-                  style={{ display:'flex', alignItems:'flex-start', gap:14, padding:'14px 20px', borderBottom: i < filtered.length - 1 ? '1px solid #f8fafc' : 'none' }}
+                  style={{ display:'flex', alignItems:'flex-start', gap:14, padding:'14px 20px', borderBottom: i < paged.length - 1 ? '1px solid #f8fafc' : 'none' }}
                   onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
 
@@ -130,6 +137,7 @@ export default function AuditLog() {
             })}
           </div>
         )}
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>
     </div>
   )

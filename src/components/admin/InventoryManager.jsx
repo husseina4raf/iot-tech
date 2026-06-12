@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
 import { INVENTORY_CATEGORIES, INVENTORY_BRANDS } from '../../data/mockData'
+import Pagination from '../ui/Pagination'
+
+const PAGE_SIZE = 10
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 const iStyle = { width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
@@ -71,6 +74,7 @@ export default function InventoryManager() {
   const [filter, setFilter] = useState('')
   const [brandFilter, setBrandFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
+  const [page, setPage] = useState(1)
 
   const [errors, setErrors] = useState({})
 
@@ -138,6 +142,9 @@ export default function InventoryManager() {
       (!catFilter   || i.category === catFilter)
     )
   })
+
+  useEffect(() => setPage(1), [filter, brandFilter, catFilter])
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const lowStock = inventory.filter(i => i.stock < (i.minStock || 5))
 
@@ -275,7 +282,7 @@ export default function InventoryManager() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(item => {
+            {paged.map(item => {
               const isLow = item.stock < (item.minStock || 5)
               const lotsOpen = !!expandedLots[item.id]
               const lotCount = (item.lots || []).length
@@ -444,6 +451,7 @@ export default function InventoryManager() {
             <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد منتجات تطابق البحث</p>
           </div>
         )}
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>
     </div>
   )

@@ -1,5 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, FileText, Check, Trash2, Eye, AlertCircle, Search, X } from 'lucide-react'
+import Pagination from '../ui/Pagination'
+
+const PAGE_SIZE = 10
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
@@ -12,6 +15,7 @@ export default function TaxInvoices() {
   const toast = useToast()
   const fileRef = useRef()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ orderId:'', clientName:'', taxNumber:'', amount:'', notes:'' })
   const [selectedFile, setSelectedFile] = useState(null)
@@ -69,6 +73,9 @@ export default function TaxInvoices() {
   )
   const pending  = taxInvoices.filter(i => !i.verified).length
   const verified = taxInvoices.filter(i => i.verified).length
+
+  useEffect(() => setPage(1), [search])
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
@@ -220,10 +227,10 @@ export default function TaxInvoices() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((inv, i) => {
+              {paged.map((inv, i) => {
                 const linkedOrder = orders.find(o => o.id === inv.orderId)
                 return (
-                  <tr key={inv.id} style={{ borderBottom: i<filtered.length-1?'1px solid #f8fafc':'none' }}
+                  <tr key={inv.id} style={{ borderBottom: i<paged.length-1?'1px solid #f8fafc':'none' }}
                     onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
 
                     {/* Tax invoice file */}
@@ -285,6 +292,7 @@ export default function TaxInvoices() {
             </tbody>
           </table>
         )}
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>
     </div>
   )

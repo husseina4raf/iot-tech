@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 import OrderCard from './OrderCard'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { ORDER_STATUSES } from '../../data/mockData'
+import Pagination from '../ui/Pagination'
+
+const PAGE_SIZE = 10
 
 const pill = {
   'بانتظار الموافقة': ['#fff7ed','#fed7aa','#c2410c'],
@@ -21,6 +24,7 @@ export default function OrdersList() {
   const [status, setStatus] = useState('')
   const [rep,    setRep]    = useState('')
   const [focused, setFocused] = useState(false)
+  const [page, setPage] = useState(1)
 
   const filtered = useMemo(()=>orders
     .filter(o=>{
@@ -29,6 +33,9 @@ export default function OrdersList() {
         &&(!status||o.status===status)&&(!rep||o.salesRep===rep)
     }).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)),
   [orders,search,status,rep])
+
+  useEffect(() => setPage(1), [search, status, rep])
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const clear = ()=>{setSearch('');setStatus('');setRep('')}
   const hasFilter = search||status||rep
@@ -83,7 +90,10 @@ export default function OrdersList() {
             <p style={{ fontSize:14, fontWeight:500, color:'#94a3b8', marginBottom:8 }}>لا توجد طلبات تطابق البحث</p>
             <button onClick={clear} style={{ fontSize:13, color:'#2563eb', background:'none', border:'none', cursor:'pointer', fontFamily:'Cairo,sans-serif', fontWeight:600 }}>مسح الفلتر</button>
           </div>
-        ) : filtered.map(o=><OrderCard key={o.id} order={o}/>)}
+        ) : paged.map(o=><OrderCard key={o.id} order={o}/>)}
+      </div>
+      <div style={{ marginTop:8, background:'#fff', borderRadius:12, border:'1px solid #e4eaf3' }}>
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>
     </div>
   )

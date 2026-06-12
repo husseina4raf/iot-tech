@@ -84,8 +84,8 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {/* Status dropdown — only before approval */}
-          {!['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && (
+          {/* Dropdown — waiting for approval only */}
+          {order.status === 'بانتظار الموافقة' && (
             <div style={{ position:'relative' }}>
               <select value={order.status} onChange={e=>onStatus(e.target.value)} dir="rtl"
                 style={{ appearance:'none', padding:'7px 12px 7px 28px', fontSize:12, fontWeight:600, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', cursor:'pointer', outline:'none', fontFamily:'Cairo,sans-serif' }}
@@ -96,7 +96,8 @@ export default function OrderCard({ order }) {
             </div>
           )}
 
-          {[
+          {/* Print buttons — approved orders only */}
+          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && [
             { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
             { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },
           ].map(btn => {

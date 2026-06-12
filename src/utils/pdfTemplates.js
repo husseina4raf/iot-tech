@@ -63,58 +63,58 @@ const BASE_CSS = `
     * { box-sizing:border-box; margin:0; padding:0; }
     body { ${FONT} color:#000; }
     .page { width:794px; background:#fff; padding:0; }
-    /* Header */
-    .header { background:#1a1a1a; padding:28px 40px; text-align:center; }
-    .header h1 { color:#fff; font-size:26px; font-weight:800; letter-spacing:1px; margin-bottom:4px; }
-    .header .sub { color:#ccc; font-size:13px; font-weight:600; margin-bottom:6px; }
-    .header .contact { color:#999; font-size:11px; }
+    /* Header — بيضاء مع حد سفلي */
+    .header { background:#fff; border-bottom:2px solid #000; padding:20px 40px; text-align:center; }
+    .header h1 { color:#000; font-size:24px; font-weight:800; letter-spacing:1px; margin-bottom:4px; }
+    .header .sub { color:#333; font-size:12px; font-weight:600; margin-bottom:4px; }
+    .header .contact { color:#555; font-size:10px; }
     /* Doc title */
-    .doc-title { text-align:center; padding:20px 40px 0; }
-    .doc-title h2 { font-size:20px; font-weight:800; color:#000; margin-bottom:4px; }
-    .doc-title .sub2 { font-size:12px; color:#555; }
+    .doc-title { text-align:center; padding:16px 40px 0; }
+    .doc-title h2 { font-size:18px; font-weight:800; color:#000; margin-bottom:4px; border-bottom:1px solid #000; display:inline-block; padding-bottom:4px; }
+    .doc-title .sub2 { font-size:11px; color:#555; margin-top:4px; }
     /* Info grid */
-    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:20px 40px; }
-    .info-box { background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:14px 18px; }
-    .info-row { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; }
+    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 40px; }
+    .info-box { background:#fff; border:1px solid #000; border-radius:6px; padding:12px 16px; }
+    .info-row { display:flex; justify-content:space-between; margin-bottom:6px; font-size:12px; }
     .info-row:last-child { margin-bottom:0; }
     .info-label { color:#555; }
     .info-val { font-weight:700; color:#000; direction:rtl; text-align:right; }
     /* Table */
-    .tbl-wrap { padding:0 40px 20px; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    thead tr { background:#1a1a1a; }
-    thead th { padding:11px 14px; color:#fff; font-weight:700; text-align:center; }
-    thead th:first-child { text-align:right; }
-    tbody tr:nth-child(even) { background:#f5f5f5; }
-    tbody td { padding:11px 14px; border-bottom:1px solid #e8e8e8; color:#000; text-align:center; }
-    tbody td:first-child { text-align:right; font-weight:600; direction:rtl; }
-    tfoot tr { background:#e8e8e8; }
-    tfoot td { padding:11px 14px; font-weight:800; color:#000; font-size:14px; }
+    .tbl-wrap { padding:0 40px 16px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; border:1px solid #000; }
+    thead tr { background:#fff; border-bottom:2px solid #000; }
+    thead th { padding:9px 12px; color:#000; font-weight:800; text-align:center; border-left:1px solid #ccc; }
+    thead th:first-child { text-align:right; border-left:none; }
+    tbody tr { border-bottom:1px solid #ccc; }
+    tbody td { padding:9px 12px; color:#000; text-align:center; border-left:1px solid #ccc; }
+    tbody td:first-child { text-align:right; font-weight:600; direction:rtl; border-left:none; }
+    tfoot tr { border-top:2px solid #000; }
+    tfoot td { padding:10px 12px; font-weight:800; color:#000; font-size:13px; }
     /* Totals */
-    .totals { display:flex; justify-content:flex-end; padding:0 40px 20px; }
-    .totals-box { min-width:260px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; overflow:hidden; }
-    .total-row { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; border-bottom:1px solid #e8e8e8; }
+    .totals { display:flex; justify-content:flex-end; padding:0 40px 16px; }
+    .totals-box { min-width:260px; border:1px solid #000; border-radius:6px; overflow:hidden; }
+    .total-row { display:flex; justify-content:space-between; padding:8px 14px; font-size:12px; border-bottom:1px solid #ccc; }
     .total-row .tl { color:#555; }
     .total-row .tv { font-weight:700; color:#000; direction:ltr; }
-    .total-grand { display:flex; justify-content:space-between; padding:12px 16px; background:#1a1a1a; }
-    .total-grand .tl { color:#fff; font-weight:700; font-size:13px; }
-    .total-grand .tv { color:#fff; font-weight:800; font-size:15px; direction:ltr; }
+    .total-grand { display:flex; justify-content:space-between; padding:10px 14px; border-top:2px solid #000; }
+    .total-grand .tl { color:#000; font-weight:800; font-size:13px; }
+    .total-grand .tv { color:#000; font-weight:800; font-size:15px; direction:ltr; }
     /* Warranty */
-    .warranty { margin:0 40px 20px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:14px 18px; }
-    .warranty h4 { color:#000; font-size:12px; font-weight:800; margin-bottom:8px; }
-    .warranty p  { color:#333; font-size:11px; margin-bottom:4px; direction:rtl; line-height:1.6; }
+    .warranty { margin:0 40px 16px; border:1px solid #000; border-radius:6px; padding:12px 16px; }
+    .warranty h4 { color:#000; font-size:11px; font-weight:800; margin-bottom:6px; }
+    .warranty p  { color:#333; font-size:10px; margin-bottom:4px; direction:rtl; line-height:1.6; }
     /* Stamp */
-    .stamps { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:0 40px 30px; }
-    .stamp-box { border:1px dashed #bbb; border-radius:10px; padding:40px 20px 16px; text-align:center; }
-    .stamp-lbl { color:#777; font-size:11px; }
-    /* Footer */
-    .footer { background:#1a1a1a; padding:10px 40px; text-align:center; color:#aaa; font-size:10px; }
+    .stamps { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:0 40px 24px; }
+    .stamp-box { border:1px solid #000; border-radius:6px; padding:40px 20px 14px; text-align:center; }
+    .stamp-lbl { color:#555; font-size:11px; }
+    /* Footer — بدون خلفية */
+    .footer { border-top:1px solid #000; padding:8px 40px; text-align:center; color:#555; font-size:10px; }
     /* Notes */
-    .notes { margin:0 40px 16px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:12px 16px; }
+    .notes { margin:0 40px 14px; border:1px solid #000; border-radius:6px; padding:10px 14px; }
     .notes h4 { color:#000; font-size:11px; font-weight:700; margin-bottom:4px; }
-    .notes p  { color:#333; font-size:12px; direction:rtl; }
+    .notes p  { color:#333; font-size:11px; direction:rtl; }
     /* Amount in words */
-    .words { margin:0 40px 16px; padding:10px 16px; border-radius:8px; background:#f5f5f5; border:1px solid #ddd; font-size:11px; direction:rtl; color:#333; }
+    .words { margin:0 40px 14px; padding:8px 14px; border-radius:6px; border:1px solid #000; font-size:11px; direction:rtl; color:#333; }
   </style>
 `
 
@@ -203,10 +203,10 @@ export async function generateDispatchPDF(order) {
         <tbody>${itemsRows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="5" style="text-align:right;direction:rtl;color:#1d4ed8;font-weight:800">
+            <td colspan="5" style="text-align:right;direction:rtl;color:#000;font-weight:800">
               ${order.vatPercent > 0 ? `الإجمالي الكلي (شامل ${order.vatPercent}% ضريبة)` : 'الإجمالي الكلي (بدون القيمة المضافة)'}
             </td>
-            <td style="color:#1d4ed8;font-weight:800">${order.total.toLocaleString()} LE</td>
+            <td style="color:#000;font-weight:800">${order.total.toLocaleString()} LE</td>
           </tr>
         </tfoot>
       </table>

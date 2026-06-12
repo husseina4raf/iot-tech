@@ -61,60 +61,60 @@ const FONT = `font-family:'Cairo',Arial,'Noto Sans Arabic',sans-serif;`
 const BASE_CSS = `
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { ${FONT} color:#1e293b; }
+    body { ${FONT} color:#000; }
     .page { width:794px; background:#fff; padding:0; }
     /* Header */
-    .header { background:linear-gradient(135deg,#0d1b3e,#1a2f6b); padding:28px 40px; text-align:center; }
+    .header { background:#1a1a1a; padding:28px 40px; text-align:center; }
     .header h1 { color:#fff; font-size:26px; font-weight:800; letter-spacing:1px; margin-bottom:4px; }
-    .header .sub { color:#f97316; font-size:13px; font-weight:600; margin-bottom:6px; }
-    .header .contact { color:#94a3b8; font-size:11px; }
+    .header .sub { color:#ccc; font-size:13px; font-weight:600; margin-bottom:6px; }
+    .header .contact { color:#999; font-size:11px; }
     /* Doc title */
     .doc-title { text-align:center; padding:20px 40px 0; }
-    .doc-title h2 { font-size:20px; font-weight:800; color:#0d1b3e; margin-bottom:4px; }
-    .doc-title .sub2 { font-size:12px; color:#64748b; }
+    .doc-title h2 { font-size:20px; font-weight:800; color:#000; margin-bottom:4px; }
+    .doc-title .sub2 { font-size:12px; color:#555; }
     /* Info grid */
     .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:20px 40px; }
-    .info-box { background:#f8fafc; border:1px solid #e4eaf3; border-radius:10px; padding:14px 18px; }
+    .info-box { background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:14px 18px; }
     .info-row { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; }
     .info-row:last-child { margin-bottom:0; }
-    .info-label { color:#64748b; }
-    .info-val { font-weight:700; color:#0f172a; direction:rtl; text-align:right; }
+    .info-label { color:#555; }
+    .info-val { font-weight:700; color:#000; direction:rtl; text-align:right; }
     /* Table */
     .tbl-wrap { padding:0 40px 20px; }
     table { width:100%; border-collapse:collapse; font-size:13px; }
-    thead tr { background:#0d1b3e; }
+    thead tr { background:#1a1a1a; }
     thead th { padding:11px 14px; color:#fff; font-weight:700; text-align:center; }
     thead th:first-child { text-align:right; }
-    tbody tr:nth-child(even) { background:#f8fafc; }
-    tbody td { padding:11px 14px; border-bottom:1px solid #f0f4fa; color:#1e293b; text-align:center; }
+    tbody tr:nth-child(even) { background:#f5f5f5; }
+    tbody td { padding:11px 14px; border-bottom:1px solid #e8e8e8; color:#000; text-align:center; }
     tbody td:first-child { text-align:right; font-weight:600; direction:rtl; }
-    tfoot tr { background:#e8f0fe; }
-    tfoot td { padding:11px 14px; font-weight:800; color:#1d4ed8; font-size:14px; }
+    tfoot tr { background:#e8e8e8; }
+    tfoot td { padding:11px 14px; font-weight:800; color:#000; font-size:14px; }
     /* Totals */
     .totals { display:flex; justify-content:flex-end; padding:0 40px 20px; }
-    .totals-box { min-width:260px; background:#f8fafc; border:1px solid #e4eaf3; border-radius:10px; overflow:hidden; }
-    .total-row { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; border-bottom:1px solid #f0f4fa; }
-    .total-row .tl { color:#64748b; }
-    .total-row .tv { font-weight:700; color:#0f172a; direction:ltr; }
-    .total-grand { display:flex; justify-content:space-between; padding:12px 16px; background:#0d1b3e; }
+    .totals-box { min-width:260px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; overflow:hidden; }
+    .total-row { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; border-bottom:1px solid #e8e8e8; }
+    .total-row .tl { color:#555; }
+    .total-row .tv { font-weight:700; color:#000; direction:ltr; }
+    .total-grand { display:flex; justify-content:space-between; padding:12px 16px; background:#1a1a1a; }
     .total-grand .tl { color:#fff; font-weight:700; font-size:13px; }
-    .total-grand .tv { color:#f97316; font-weight:800; font-size:15px; direction:ltr; }
+    .total-grand .tv { color:#fff; font-weight:800; font-size:15px; direction:ltr; }
     /* Warranty */
-    .warranty { margin:0 40px 20px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:14px 18px; }
-    .warranty h4 { color:#92400e; font-size:12px; font-weight:800; margin-bottom:8px; }
-    .warranty p  { color:#78350f; font-size:11px; margin-bottom:4px; direction:rtl; line-height:1.6; }
+    .warranty { margin:0 40px 20px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:14px 18px; }
+    .warranty h4 { color:#000; font-size:12px; font-weight:800; margin-bottom:8px; }
+    .warranty p  { color:#333; font-size:11px; margin-bottom:4px; direction:rtl; line-height:1.6; }
     /* Stamp */
     .stamps { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:0 40px 30px; }
-    .stamp-box { border:1px dashed #cbd5e1; border-radius:10px; padding:40px 20px 16px; text-align:center; }
-    .stamp-lbl { color:#94a3b8; font-size:11px; }
+    .stamp-box { border:1px dashed #bbb; border-radius:10px; padding:40px 20px 16px; text-align:center; }
+    .stamp-lbl { color:#777; font-size:11px; }
     /* Footer */
-    .footer { background:#0d1b3e; padding:10px 40px; text-align:center; color:#475569; font-size:10px; }
+    .footer { background:#1a1a1a; padding:10px 40px; text-align:center; color:#aaa; font-size:10px; }
     /* Notes */
-    .notes { margin:0 40px 16px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 16px; }
-    .notes h4 { color:#1d4ed8; font-size:11px; font-weight:700; margin-bottom:4px; }
-    .notes p  { color:#1e293b; font-size:12px; direction:rtl; }
+    .notes { margin:0 40px 16px; background:#f5f5f5; border:1px solid #ddd; border-radius:10px; padding:12px 16px; }
+    .notes h4 { color:#000; font-size:11px; font-weight:700; margin-bottom:4px; }
+    .notes p  { color:#333; font-size:12px; direction:rtl; }
     /* Amount in words */
-    .words { margin:0 40px 16px; padding:10px 16px; border-radius:8px; background:#f0fdf4; border:1px solid #a7f3d0; font-size:11px; direction:rtl; color:#065f46; }
+    .words { margin:0 40px 16px; padding:10px 16px; border-radius:8px; background:#f5f5f5; border:1px solid #ddd; font-size:11px; direction:rtl; color:#333; }
   </style>
 `
 

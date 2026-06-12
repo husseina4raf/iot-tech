@@ -71,8 +71,7 @@ export function OrdersProvider({ children }) {
 
   const addOrder = (orderData, user) => {
     const serial = getNextSerial()
-    // Sales reps need team leader approval; admin/super_admin bypass directly to جديد
-    const initialStatus = user?.role === 'sales' ? 'بانتظار الموافقة' : 'جديد'
+    const initialStatus = 'جديد'
     const newOrder = {
       ...orderData,
       id: `ORD-${serial}`,

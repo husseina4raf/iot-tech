@@ -83,8 +83,8 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {/* Approve / Reject — waiting only */}
-          {order.status === 'بانتظار الموافقة' && (
+          {/* Approve / Reject — team_leader on جديد orders */}
+          {order.status === 'جديد' && user?.role === 'team_leader' && (
             <>
               <button onClick={onApprove}
                 style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'none', background:'#059669', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}>
@@ -97,8 +97,8 @@ export default function OrderCard({ order }) {
             </>
           )}
 
-          {/* Print buttons — approved orders only */}
-          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && [
+          {/* Print buttons — admin/super_admin on approved orders */}
+          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && [
             { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
             { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },
           ].map(btn => {

@@ -133,7 +133,19 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
   const { user, salesReps } = useAuth()
   const { inventory } = useOrders()
   const isSalesRep = user?.role === 'sales'
-  const upd = (f,v) => { setForm(p=>({...p,[f]:v})); setErrors(p=>({...p,[f]:''})) }
+  const VAT_FIXED = 14
+  const upd = (f,v) => {
+    setForm(p => {
+      const next = { ...p, [f]: v }
+      if (f === 'invoiceType') {
+        const vatRate = v === 'فاتورة ضريبية' ? VAT_FIXED : 0
+        const vat = Math.round(next.subtotal * (vatRate / 100))
+        return { ...next, vatPercent: vatRate, vatAmount: vat, total: next.subtotal + vat }
+      }
+      return next
+    })
+    setErrors(p => ({ ...p, [f]: '' }))
+  }
 
   // Look up cost price from inventory by product name
   const getCostPrice = (name) => {
@@ -164,9 +176,9 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
       u.total=pr*qt; return u
     })
     const sub=items.reduce((s,i)=>s+(i.total||0),0)
-    const VAT_FIXED = 14
-    const vat=Math.round(sub*(VAT_FIXED/100))
-    return {...p,items,subtotal:sub,vatPercent:VAT_FIXED,vatAmount:vat,total:sub+vat}
+    const vatRate = p.invoiceType === 'فاتورة ضريبية' ? VAT_FIXED : 0
+    const vat=Math.round(sub*(vatRate/100))
+    return {...p,items,subtotal:sub,vatPercent:vatRate,vatAmount:vat,total:sub+vat}
   })
 
   const iStyle = { width:'100%', padding:'9px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }
@@ -271,16 +283,23 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                 <span>{l}</span><span style={{ fontWeight:600, color:'#0f172a' }} dir="ltr">{v}</span>
               </div>
             ))}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13, color:'#64748b', marginBottom:12 }}>
-              <span style={{ display:'flex', alignItems:'center', gap:5 }}>
-                ضريبة القيمة المضافة
-                <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#f0f4fa', color:'#94a3b8', border:'1px solid #e4eaf3', fontWeight:600 }}>ثابت</span>
-              </span>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color:'#0f172a', padding:'4px 8px', borderRadius:6, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>14%</span>
-                <span style={{fontSize:12,fontWeight:600,color:'#64748b'}} dir="ltr">({form.vatAmount.toLocaleString()} LE)</span>
+            {form.invoiceType === 'فاتورة ضريبية' ? (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13, color:'#64748b', marginBottom:12 }}>
+                <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  ضريبة القيمة المضافة
+                  <span style={{ fontSize:10, padding:'1px 7px', borderRadius:20, background:'#f0f4fa', color:'#94a3b8', border:'1px solid #e4eaf3', fontWeight:600 }}>ثابت</span>
+                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:12, fontWeight:800, color:'#0f172a', padding:'4px 8px', borderRadius:6, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>14%</span>
+                  <span style={{fontSize:12,fontWeight:600,color:'#64748b'}} dir="ltr">({form.vatAmount.toLocaleString()} LE)</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:12, color:'#94a3b8', marginBottom:12, padding:'5px 8px', borderRadius:7, background:'#f8fafc', border:'1px solid #f0f4fa' }}>
+                <span>القيمة المضافة</span>
+                <span style={{ fontStyle:'italic' }}>بدون القيمة المضافة</span>
+              </div>
+            )}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:10, borderTop:'2px solid #e4eaf3' }}>
               <span style={{ display:'flex', alignItems:'center', gap:6, fontWeight:700, fontSize:14, color:'#0f172a' }}>
                 <Calculator size={15} color="#2563eb"/>الإجمالي

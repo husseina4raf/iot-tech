@@ -204,7 +204,7 @@ export async function generateDispatchPDF(order) {
         <tfoot>
           <tr>
             <td colspan="5" style="text-align:right;direction:rtl;color:#1d4ed8;font-weight:800">
-              الإجمالي الكلي (شامل ${order.vatPercent}% ضريبة)
+              ${order.vatPercent > 0 ? `الإجمالي الكلي (شامل ${order.vatPercent}% ضريبة)` : 'الإجمالي الكلي (بدون القيمة المضافة)'}
             </td>
             <td style="color:#1d4ed8;font-weight:800">${order.total.toLocaleString()} LE</td>
           </tr>
@@ -215,7 +215,7 @@ export async function generateDispatchPDF(order) {
     <div class="totals">
       <div class="totals-box">
         <div class="total-row"><span class="tl">المجموع الجزئي</span><span class="tv">${order.subtotal.toLocaleString()} LE</span></div>
-        ${order.vatPercent > 0 ? `<div class="total-row"><span class="tl">ضريبة القيمة المضافة (${order.vatPercent}%)</span><span class="tv">${order.vatAmount.toLocaleString()} LE</span></div>` : ''}
+        ${order.vatPercent > 0 ? `<div class="total-row"><span class="tl">ضريبة القيمة المضافة (${order.vatPercent}%)</span><span class="tv">${order.vatAmount.toLocaleString()} LE</span></div>` : `<div class="total-row" style="color:#94a3b8;font-style:italic"><span class="tl">بدون القيمة المضافة</span><span class="tv">—</span></div>`}
         <div class="total-grand"><span class="tl">الإجمالي النهائي</span><span class="tv">${order.total.toLocaleString()} LE</span></div>
       </div>
     </div>
@@ -308,7 +308,7 @@ export async function generateInvoicePDF(order) {
     <div class="totals">
       <div class="totals-box">
         <div class="total-row"><span class="tl">المجموع الجزئي / Subtotal</span><span class="tv">${order.subtotal.toLocaleString()} LE</span></div>
-        ${order.vatPercent > 0 ? `<div class="total-row"><span class="tl">ضريبة ${order.vatPercent}% / VAT</span><span class="tv">${order.vatAmount.toLocaleString()} LE</span></div>` : ''}
+        ${order.vatPercent > 0 ? `<div class="total-row"><span class="tl">ضريبة ${order.vatPercent}% / VAT</span><span class="tv">${order.vatAmount.toLocaleString()} LE</span></div>` : `<div class="total-row" style="color:#94a3b8;font-style:italic"><span class="tl">بدون القيمة المضافة / No VAT</span><span class="tv">—</span></div>`}
         <div class="total-grand"><span class="tl">الإجمالي / TOTAL</span><span class="tv">${order.total.toLocaleString()} LE</span></div>
       </div>
     </div>

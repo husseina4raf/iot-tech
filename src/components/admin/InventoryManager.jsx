@@ -34,6 +34,22 @@ function FSelect({ label, children, ...props }) {
   )
 }
 
+function FCombo({ label, options, ...props }) {
+  const [f, setF] = useState(false)
+  const id = `dl-${label?.replace(/\s+/g,'')}`
+  return (
+    <div>
+      {label && <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:5 }}>{label}</label>}
+      <input list={id} {...props}
+        style={{ ...iStyle, ...(f ? focusStyle : {}) }}
+        onFocus={() => setF(true)} onBlur={() => setF(false)} />
+      <datalist id={id}>
+        {options.map(o => <option key={o} value={o}/>)}
+      </datalist>
+    </div>
+  )
+}
+
 const emptyForm = () => ({
   sku: '', name: '', nameAr: '', brand: '', stock: '', minStock: '3', price: '', costPrice: '',
   category: INVENTORY_CATEGORIES[0], supplier: '', notes: ''
@@ -175,13 +191,8 @@ export default function InventoryManager() {
             <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
             <FInput label="اسم الموديل (EN)" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
             <FInput label="اسم الموديل (AR)" value={form.nameAr} onChange={e => upd('nameAr', e.target.value)} placeholder="قفل ذكي XYZ" />
-            <FSelect label="الماركة / البراند" value={form.brand} onChange={e => upd('brand', e.target.value)}>
-              <option value="">اختر الماركة</option>
-              {INVENTORY_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-            </FSelect>
-            <FSelect label="التصنيف" value={form.category} onChange={e => upd('category', e.target.value)}>
-              {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </FSelect>
+            <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
+            <FCombo label="التصنيف" options={INVENTORY_CATEGORIES} value={form.category} onChange={e => upd('category', e.target.value)} placeholder="اختر أو اكتب تصنيف جديد" />
             <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
             <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
             <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>

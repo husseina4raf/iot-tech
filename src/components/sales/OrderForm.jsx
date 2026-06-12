@@ -15,7 +15,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     company: '', clientName: '', mobile: '', whatsapp: '',
     address: '', locationLink: '',
     items: [{ id: Date.now().toString(), name: '', sku: '', model: '', price: 0, quantity: 1, total: 0 }],
-    subtotal: 0, vatPercent: 14, vatAmount: 0, total: 0,
+    subtotal: 0, vatPercent: 0, vatAmount: 0, total: 0,
     invoiceType: 'بيان اسعار', invoiceName: '', taxNumber: '',
     notes: '', paymentMethod: '',
     dateRaw: new Date().toISOString().split('T')[0],

@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard } from 'lucide-react'
+import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { generateDispatchPDF, generateInvoicePDF } from '../../utils/pdfTemplates'
-import { ORDER_STATUSES } from '../../data/mockData'
 
 const accent = {
   'بانتظار الموافقة':'#f97316',
@@ -23,14 +22,14 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { updateOrderStatus } = useOrders()
+  const { approveOrder, rejectOrder } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
-
   const [pdfLoading, setPdfLoading] = useState('')
 
-  const onStatus = s => { updateOrderStatus(order.id, s, user); toast(`تم تغيير الحالة إلى "${s}"`, 'success') }
+  const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
+  const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
 
   const onDispatch = async () => {
     setPdfLoading('dispatch')
@@ -84,16 +83,18 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {/* Dropdown — waiting for approval only */}
+          {/* Approve / Reject — waiting only */}
           {order.status === 'بانتظار الموافقة' && (
-            <div style={{ position:'relative' }}>
-              <select value={order.status} onChange={e=>onStatus(e.target.value)} dir="rtl"
-                style={{ appearance:'none', padding:'7px 12px 7px 28px', fontSize:12, fontWeight:600, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', cursor:'pointer', outline:'none', fontFamily:'Cairo,sans-serif' }}
-                onFocus={e=>e.target.style.borderColor='#2563eb'} onBlur={e=>e.target.style.borderColor='#e4eaf3'}>
-                {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-              <ChevronDown size={11} style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', pointerEvents:'none' }} />
-            </div>
+            <>
+              <button onClick={onApprove}
+                style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'none', background:'#059669', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}>
+                <Check size={13}/>موافقة
+              </button>
+              <button onClick={onReject}
+                style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                <X size={13}/>رفض
+              </button>
+            </>
           )}
 
           {/* Print buttons — approved orders only */}

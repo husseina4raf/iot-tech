@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X } from 'lucide-react'
+import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
@@ -30,6 +30,20 @@ export default function OrderCard({ order }) {
 
   const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
   const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
+
+  const onCalendar = () => {
+    const title   = encodeURIComponent(`تركيب SmartLock — ${order.clientName} (${order.company})`)
+    const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
+    const details = encodeURIComponent(
+      `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}\n\nالأصناف:\n${items}` +
+      (order.notes ? `\n\nملاحظات: ${order.notes}` : '')
+    )
+    const location = encodeURIComponent(order.address || '')
+    window.open(
+      `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`,
+      '_blank'
+    )
+  }
 
   const onDispatch = async () => {
     setPdfLoading('dispatch')
@@ -97,24 +111,32 @@ export default function OrderCard({ order }) {
             </>
           )}
 
-          {/* Print buttons — admin/super_admin on approved orders */}
-          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && [
-            { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
-            { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },
-          ].map(btn => {
-            const busy = pdfLoading === btn.key
-            return (
-              <button key={btn.label} onClick={btn.fn} disabled={!!pdfLoading}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', cursor: busy?'wait':'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', background:btn.bg, color:'#fff', boxShadow:btn.shadow||'none', opacity: pdfLoading && !busy ? 0.6 : 1 }}
-                onMouseEnter={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.hover }}
-                onMouseLeave={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.bg }}>
-                {busy
-                  ? <span style={{ width:12,height:12,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite',display:'inline-block' }} />
-                  : <btn.icon size={13}/>}
-                {busy ? 'جارٍ الإنشاء...' : btn.label}
-              </button>
-            )
-          })}
+          {/* Print + Calendar — admin/super_admin on approved orders */}
+          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && (<>
+            {[
+              { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
+              { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },
+            ].map(btn => {
+              const busy = pdfLoading === btn.key
+              return (
+                <button key={btn.label} onClick={btn.fn} disabled={!!pdfLoading}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', cursor: busy?'wait':'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', background:btn.bg, color:'#fff', boxShadow:btn.shadow||'none', opacity: pdfLoading && !busy ? 0.6 : 1 }}
+                  onMouseEnter={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.hover }}
+                  onMouseLeave={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.bg }}>
+                  {busy
+                    ? <span style={{ width:12,height:12,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite',display:'inline-block' }} />
+                    : <btn.icon size={13}/>}
+                  {busy ? 'جارٍ الإنشاء...' : btn.label}
+                </button>
+              )
+            })}
+            <button onClick={onCalendar}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}
+              onMouseEnter={e=>{ e.currentTarget.style.background='#d1fae5' }}
+              onMouseLeave={e=>{ e.currentTarget.style.background='#ecfdf5' }}>
+              <Calendar size={13}/>جدولة التركيب
+            </button>
+          </>)}
 
           <button onClick={()=>setExpanded(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:'1.5px solid #e4eaf3', background: expanded?'#f0f4fa':'#fff', color:'#475569', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', marginRight:'auto' }}>
             <ChevronDown size={11} style={{ transition:'transform 0.2s', transform: expanded?'rotate(180deg)':'none' }} />

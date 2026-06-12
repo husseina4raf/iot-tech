@@ -84,14 +84,17 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          <div style={{ position:'relative' }}>
-            <select value={order.status} onChange={e=>onStatus(e.target.value)} dir="rtl"
-              style={{ appearance:'none', padding:'7px 12px 7px 28px', fontSize:12, fontWeight:600, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', cursor:'pointer', outline:'none', fontFamily:'Cairo,sans-serif' }}
-              onFocus={e=>e.target.style.borderColor='#2563eb'} onBlur={e=>e.target.style.borderColor='#e4eaf3'}>
-              {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-            <ChevronDown size={11} style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', pointerEvents:'none' }} />
-          </div>
+          {/* Status dropdown — only before approval */}
+          {!['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && (
+            <div style={{ position:'relative' }}>
+              <select value={order.status} onChange={e=>onStatus(e.target.value)} dir="rtl"
+                style={{ appearance:'none', padding:'7px 12px 7px 28px', fontSize:12, fontWeight:600, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', cursor:'pointer', outline:'none', fontFamily:'Cairo,sans-serif' }}
+                onFocus={e=>e.target.style.borderColor='#2563eb'} onBlur={e=>e.target.style.borderColor='#e4eaf3'}>
+                {ORDER_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+              <ChevronDown size={11} style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', pointerEvents:'none' }} />
+            </div>
+          )}
 
           {[
             { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },

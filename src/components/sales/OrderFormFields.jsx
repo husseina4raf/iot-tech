@@ -321,7 +321,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
             onChange={e=>{const d=e.target.value;setForm(p=>({...p,dateRaw:d,date:d?d.split('-').reverse().join('-'):''}))}}/>
           {form.invoiceType==='فاتورة ضريبية'&&<>
             <FInput label="الاسم على الفاتورة" placeholder="اسم الشركة" value={form.invoiceName} onChange={e=>upd('invoiceName',e.target.value)}/>
-            <FInput label="الرقم الضريبي" placeholder="123456789" value={form.taxNumber} onChange={e=>upd('taxNumber',e.target.value)} dir="ltr"/>
+            <FInput label="الرقم الضريبي" required placeholder="123456789" error={errors.taxNumber} value={form.taxNumber} onChange={e=>upd('taxNumber',e.target.value)} dir="ltr"/>
           </>}
           <FTextarea label="ملاحظات" style={{gridColumn:'1/-1'}} placeholder="أي ملاحظات إضافية..." rows={3} value={form.notes} onChange={e=>upd('notes',e.target.value)}/>
         </div>

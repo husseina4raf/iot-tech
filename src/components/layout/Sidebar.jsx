@@ -40,7 +40,7 @@ export default function Sidebar() {
             <Lock size={17} color="#fff" />
           </div>
           <div>
-            <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:15, lineHeight:1.3 }}>SmartLock Pro</div>
+            <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:15, lineHeight:1.3 }}>IoT Tech</div>
             <div style={{ color:'#475569', fontSize:11, marginTop:1 }}>إدارة المبيعات</div>
           </div>
         </div>

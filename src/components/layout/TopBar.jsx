@@ -27,10 +27,6 @@ export default function TopBar() {
       </div>
 
       <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-        <span style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:20, background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', letterSpacing:'0.04em' }}>
-          DEMO
-        </span>
-
         <div style={{ position:'relative' }}>
           <button style={{
             width:34, height:34, borderRadius:8, background:'#f7f9fc', border:'1px solid #e4eaf3',

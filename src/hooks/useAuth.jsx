@@ -1,79 +1,143 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { USERS, ROLE_ROUTES, ROLE_LABELS } from '../data/authData'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import { ROLE_ROUTES, ROLE_LABELS } from '../data/authData'
 
 const AuthContext = createContext(null)
-const USERS_KEY = 'sl_users_v1'
 
-function loadSession() {
-  try { return JSON.parse(localStorage.getItem('sl_session')) ?? null }
-  catch { return null }
-}
+const INITIAL_USERS = [
+  { username: 'israa',      password: 'sales123', name: 'إسراء عبداللطيف', role: 'sales',       repName: 'إسراء' },
+  { username: 'mohamed',    password: 'sales123', name: 'محمد أحمد',        role: 'sales',       repName: 'محمد'  },
+  { username: 'teamlead',   password: 'lead123',  name: 'قائد الفريق',      role: 'team_leader', repName: null    },
+  { username: 'admin',      password: 'admin123', name: 'مدير العمليات',    role: 'admin',       repName: null    },
+  { username: 'superadmin', password: 'super123', name: 'المدير العام',     role: 'super_admin', repName: null    },
+]
 
-function loadUsers() {
-  try {
-    const raw = localStorage.getItem(USERS_KEY)
-    if (!raw) return USERS
-    const stored = JSON.parse(raw)
-    // Migrate: add username to any stored user that doesn't have one yet
-    return stored.map(u => {
-      if (u.username) return u
-      const def = USERS.find(d => d.id === u.id || d.email === u.email)
-      return def ? { ...u, username: def.username } : u
-    })
-  } catch { return USERS }
+function mapProfile(row) {
+  return {
+    id:      row.id,
+    name:    row.name,
+    username: row.username,
+    role:    row.role,
+    repName: row.rep_name,
+    active:  row.active,
+  }
 }
 
 export function AuthProvider({ children }) {
-  const [user,  setUser]  = useState(loadSession)
-  const [users, setUsers] = useState(loadUsers)
+  const [user,    setUser]    = useState(null)
+  const [users,   setUsers]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
 
-  // Persist users list whenever it changes
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    return data ? mapProfile(data) : null
+  }
+
+  const fetchUsers = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*').order('created_at')
+    if (data) setUsers(data.map(mapProfile))
+  }, [])
+
+  // Seed initial users once (first run only)
+  const seedIfEmpty = async () => {
+    if (localStorage.getItem('app_seeded_v1')) return
+    setSeeding(true)
+    for (const u of INITIAL_USERS) {
+      const email = `${u.username}@iottech.app`
+      const { data: authData, error } = await supabase.auth.signUp({ email, password: u.password })
+      if (!error && authData?.user) {
+        await supabase.from('profiles').insert({
+          id:       authData.user.id,
+          name:     u.name,
+          username: u.username,
+          role:     u.role,
+          rep_name: u.repName || null,
+          active:   true,
+        })
+      }
+    }
+    localStorage.setItem('app_seeded_v1', '1')
+    setSeeding(false)
+    await fetchUsers()
+  }
+
   useEffect(() => {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users))
-  }, [users])
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id)
+        setUser(profile)
+      }
+      await seedIfEmpty()
+      await fetchUsers()
+      setLoading(false)
+    })
 
-  // Dynamic sales reps list (single source of truth)
-  const salesReps = users.filter(u => u.role === 'sales').map(u => u.repName)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id)
+        setUser(profile)
+      } else {
+        setUser(null)
+      }
+    })
 
-  const login = useCallback((username, password) => {
-    const list  = loadUsers()   // always read latest from storage
-    const found = list.find(
-      u => u.username?.toLowerCase() === username.toLowerCase().trim() && u.password === password
-    )
-    if (!found) return { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
-    const { password: _, ...safeUser } = found
-    setUser(safeUser)
-    localStorage.setItem('sl_session', JSON.stringify(safeUser))
-    return { success: true, user: safeUser }
+    return () => subscription.unsubscribe()
   }, [])
 
-  const logout = useCallback(() => {
+  const salesReps = users.filter(u => u.role === 'sales' && u.active).map(u => u.repName)
+
+  const login = async (username, password) => {
+    const email = `${username.toLowerCase().trim()}@iottech.app`
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
+    const profile = await fetchProfile(data.user.id)
+    if (profile) setUser(profile)
+    return { success: true, user: profile }
+  }
+
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
-    localStorage.removeItem('sl_session')
-  }, [])
+  }
 
   const canAccess = useCallback((path) => {
     if (!user) return false
     return ROLE_ROUTES[user.role]?.some(r => path.startsWith(r)) ?? false
   }, [user])
 
-  const addUser = useCallback((data) => {
-    // data: { name, nameEn, email, password, repName, role? }
-    const newUser = {
-      id:     `u-${Date.now()}`,
-      role:   data.role || 'sales',
-      avatar: data.name?.[0] ?? '؟',
-      ...data,
-    }
-    setUsers(prev => [...prev, newUser])
-    return newUser
-  }, [])
+  const addUser = async ({ name, username, password, role, repName }) => {
+    const email = `${username.toLowerCase().trim()}@iottech.app`
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
+    if (authError) throw new Error(authError.message)
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id:       authData.user.id,
+      name,
+      username: username.toLowerCase().trim(),
+      role,
+      rep_name: repName || null,
+      active:   true,
+    })
+    if (profileError) throw new Error(profileError.message)
+    await fetchUsers()
+  }
 
-  const deleteUser = useCallback((userId) => {
-    setUsers(prev => prev.filter(u => u.id !== userId))
-  }, [])
+  const deleteUser = async (userId) => {
+    await supabase.from('profiles').update({ active: false }).eq('id', userId)
+    await fetchUsers()
+  }
 
   const defaultRoute = user ? (ROLE_ROUTES[user.role]?.[0] ?? '/login') : '/login'
+
+  if (loading || seeding) {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', fontFamily:'Cairo,sans-serif', color:'#475569', gap:12 }}>
+        <div style={{ width:32, height:32, border:'3px solid #e4eaf3', borderTopColor:'#2563eb', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+        <span style={{ fontSize:14 }}>{seeding ? 'جارٍ إعداد النظام لأول مرة...' : 'جارٍ التحميل...'}</span>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    )
+  }
 
   return (
     <AuthContext.Provider value={{

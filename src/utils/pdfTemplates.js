@@ -163,9 +163,9 @@ export async function generateDispatchPDF(order) {
     ${BASE_CSS}
 
     <div class="header">
-      <h1>SmartLock Pro</h1>
+      <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@smartlockpro.eg &nbsp;|&nbsp; www.smartlockpro.eg</div>
+      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@iottech.eg &nbsp;|&nbsp; www.iottech.eg</div>
     </div>
 
     <div class="doc-title">
@@ -238,7 +238,7 @@ export async function generateDispatchPDF(order) {
       <div class="stamp-box"><div class="stamp-lbl">ختم الشركة / Company Stamp</div></div>
     </div>
 
-    <div class="footer">SmartLock Pro — Smart Home &amp; Security Solutions — Egypt — Tel: 01000000000</div>
+    <div class="footer">IoT Tech — Smart Home &amp; Security Solutions — Egypt</div>
   </div>`
 
   await renderHtmlToPDF(html, `dispatch-${order.serialNumber}.pdf`)
@@ -264,9 +264,9 @@ export async function generateInvoicePDF(order) {
     ${BASE_CSS}
 
     <div class="header">
-      <h1>SmartLock Pro</h1>
+      <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@smartlockpro.eg &nbsp;|&nbsp; www.smartlockpro.eg</div>
+      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@iottech.eg &nbsp;|&nbsp; www.iottech.eg</div>
     </div>
 
     <div class="doc-title">
@@ -324,7 +324,7 @@ export async function generateInvoicePDF(order) {
       <div class="stamp-box"><div class="stamp-lbl">ختم الشركة / Company Stamp</div></div>
     </div>
 
-    <div class="footer">SmartLock Pro — Smart Home &amp; Security Solutions — Egypt — Tel: 01000000000</div>
+    <div class="footer">IoT Tech — Smart Home &amp; Security Solutions — Egypt</div>
   </div>`
 
   await renderHtmlToPDF(html, `invoice-${order.serialNumber}.pdf`)

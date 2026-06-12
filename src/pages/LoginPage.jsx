@@ -2,13 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import { USERS, ROLE_LABELS, ROLE_ROUTES } from '../data/authData'
-
-const roleStyle = {
-  sales:       { dot: '#60a5fa', label: '#3b82f6' },
-  admin:       { dot: '#34d399', label: '#10b981' },
-  super_admin: { dot: '#a78bfa', label: '#8b5cf6' },
-}
+import { ROLE_ROUTES } from '../data/authData'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -25,11 +19,10 @@ export default function LoginPage() {
     setError('')
     if (!username.trim() || !password) { setError('يرجى إدخال اسم المستخدم وكلمة المرور'); return }
     setLoading(true)
-    await new Promise(r => setTimeout(r, 450))
-    const result = login(username, password)
+    const result = await login(username, password)
     setLoading(false)
     if (!result.success) { setError(result.error) }
-    else { navigate(ROLE_ROUTES[result.user.role]?.[0] ?? '/dashboard', { replace: true }) }
+    else { navigate(ROLE_ROUTES[result.user?.role]?.[0] ?? '/admin', { replace: true }) }
   }
 
   const fieldStyle = (name) => ({
@@ -83,9 +76,9 @@ export default function LoginPage() {
             }}>
               <Lock size={24} color="#fff" />
             </div>
-            <div style={{ color:'#fff', fontWeight:700, fontSize:20, lineHeight:1.3 }}>SmartLock Pro</div>
+            <div style={{ color:'#fff', fontWeight:700, fontSize:20, lineHeight:1.3 }}>IoT Tech</div>
             <div style={{ color:'rgba(255,255,255,0.6)', fontSize:13, marginTop:4 }}>
-              Smart Home OS — نظام إدارة المبيعات
+              نظام إدارة المبيعات
             </div>
           </div>
 
@@ -154,39 +147,10 @@ export default function LoginPage() {
             </form>
           </div>
 
-          {/* Demo accounts */}
-          <div style={{ padding:'0 32px 28px' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-              <div style={{ flex:1, height:1, background:'#e8eef6' }} />
-              <span style={{ fontSize:11, color:'#94a3b8', fontWeight:600, whiteSpace:'nowrap' }}>حسابات تجريبية</span>
-              <div style={{ flex:1, height:1, background:'#e8eef6' }} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {USERS.map(u => {
-                const rs = roleStyle[u.role]
-                return (
-                  <button key={u.id} type="button" onClick={() => { setUsername(u.username); setPassword(u.password); setError('') }}
-                    style={{
-                      textAlign:'right', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e8eef6',
-                      background:'#f7f9fc', cursor:'pointer', transition:'all 0.15s', fontFamily:'Cairo, sans-serif',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor=rs.label; e.currentTarget.style.background='#fff' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor='#e8eef6'; e.currentTarget.style.background='#f7f9fc' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
-                      <div style={{ width:6, height:6, borderRadius:'50%', background:rs.dot, flexShrink:0 }} />
-                      <span style={{ fontSize:12, fontWeight:700, color:'#0f172a' }}>{u.name}</span>
-                    </div>
-                    <div style={{ fontSize:11, color:'#94a3b8', paddingRight:12 }}>{ROLE_LABELS[u.role]}</div>
-                    <div style={{ fontSize:11, color:'#60a5fa', paddingRight:12, fontFamily:'monospace', marginTop:1 }}>{u.username}</div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
         </div>
 
         <p style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.25)', marginTop:20 }}>
-          DEMO VERSION — SmartLock Pro © 2024
+          IoT Tech © 2025
         </p>
       </div>
 

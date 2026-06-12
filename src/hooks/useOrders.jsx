@@ -1,279 +1,307 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { INITIAL_ORDERS, INITIAL_INVENTORY, INITIAL_AUDIT_LOG, INITIAL_TAX_INVOICES } from '../data/mockData'
+import { supabase } from '../lib/supabase'
 
 const OrdersContext = createContext(null)
 
-const KEYS = {
-  orders:    'sl_orders_v2',
-  inventory: 'sl_inventory_v3',
-  audit:     'sl_audit_v2',
-  tax:       'sl_tax_v2',
-  version:   'sl_data_version',
-}
-const DATA_VERSION = '3'
+// ── DB row → app object (snake_case → camelCase) ──────────────────────────────
+const mapOrder = r => ({
+  id: r.id, serialNumber: r.serial_number,
+  clientName: r.client_name, company: r.company,
+  mobile: r.mobile, whatsapp: r.whatsapp,
+  address: r.address, locationLink: r.location_link,
+  salesRep: r.sales_rep, items: r.items || [],
+  subtotal: r.subtotal, vatPercent: r.vat_percent,
+  vatAmount: r.vat_amount, total: r.total,
+  invoiceType: r.invoice_type, invoiceName: r.invoice_name,
+  taxNumber: r.tax_number, notes: r.notes,
+  paymentMethod: r.payment_method, date: r.date, time: r.time,
+  status: r.status, createdAt: r.created_at, updatedAt: r.updated_at,
+  editHistory: r.edit_history || [],
+})
 
-function clearOldData() {
-  ['sl_orders','sl_inventory','sl_audit','sl_tax','sl_inventory_v2'].forEach(k => localStorage.removeItem(k))
-}
+const mapItem = r => ({
+  id: r.id, name: r.name, sku: r.sku, model: r.model,
+  brand: r.brand, category: r.category,
+  price: r.price, costPrice: r.cost_price,
+  stock: r.stock, lots: r.lots || [],
+  description: r.description, warranty: r.warranty,
+})
 
-function load(key, fallback) {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback }
-  catch { return fallback }
-}
+const mapAudit = r => ({
+  id: r.id, type: r.type, orderId: r.order_id,
+  orderRef: r.order_ref, field: r.field,
+  oldValue: r.old_value, newValue: r.new_value,
+  changedBy: r.changed_by, note: r.note, changedAt: r.changed_at,
+})
 
-// Lazy migration: add lots array to items that don't have it yet
-function migrateItem(item) {
-  if (item.lots) return item
-  const qty = Number(item.stock) || 0
-  const lots = qty > 0 ? [{
-    id: `lot-${item.id}-init`,
-    qty,
-    costPrice: Number(item.costPrice) || 0,
-    date: new Date().toISOString().split('T')[0],
-    note: 'رصيد أول المدة',
-  }] : []
-  return { ...item, lots }
-}
+const mapTax = r => ({
+  id: r.id, orderId: r.order_id, clientName: r.client_name,
+  filename: r.filename, amount: r.amount, invoiceDate: r.invoice_date,
+  uploadedAt: r.uploaded_at, uploadedBy: r.uploaded_by, verified: r.verified,
+})
 
 export function OrdersProvider({ children }) {
-  // On first mount: clear old v1 data if coming from a previous version
+  const [orders,      setOrders]      = useState([])
+  const [inventory,   setInventory]   = useState([])
+  const [auditLog,    setAuditLog]    = useState([])
+  const [taxInvoices, setTaxInvoices] = useState([])
+
+  // ── Initial fetch ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (localStorage.getItem(KEYS.version) !== DATA_VERSION) {
-      clearOldData()
-      localStorage.setItem(KEYS.version, DATA_VERSION)
-    }
+    Promise.all([
+      supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('inventory').select('*').order('created_at'),
+      supabase.from('audit_log').select('*').order('changed_at', { ascending: false }),
+      supabase.from('tax_invoices').select('*').order('uploaded_at', { ascending: false }),
+    ]).then(([o, inv, al, ti]) => {
+      setOrders((o.data || []).map(mapOrder))
+      setInventory((inv.data || []).map(mapItem))
+      setAuditLog((al.data || []).map(mapAudit))
+      setTaxInvoices((ti.data || []).map(mapTax))
+    })
+
+    // ── Real-time subscriptions ───────────────────────────────────────────────
+    const ch = supabase.channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, p => {
+        if (p.eventType === 'INSERT') setOrders(prev => [mapOrder(p.new), ...prev])
+        if (p.eventType === 'UPDATE') setOrders(prev => prev.map(o => o.id === p.new.id ? mapOrder(p.new) : o))
+        if (p.eventType === 'DELETE') setOrders(prev => prev.filter(o => o.id !== p.old.id))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, p => {
+        if (p.eventType === 'INSERT') setInventory(prev => [...prev, mapItem(p.new)])
+        if (p.eventType === 'UPDATE') setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
+        if (p.eventType === 'DELETE') setInventory(prev => prev.filter(i => i.id !== p.old.id))
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log' }, p => {
+        setAuditLog(prev => [mapAudit(p.new), ...prev])
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tax_invoices' }, p => {
+        if (p.eventType === 'INSERT') setTaxInvoices(prev => [mapTax(p.new), ...prev])
+        if (p.eventType === 'UPDATE') setTaxInvoices(prev => prev.map(i => i.id === p.new.id ? mapTax(p.new) : i))
+        if (p.eventType === 'DELETE') setTaxInvoices(prev => prev.filter(i => i.id !== p.old.id))
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(ch)
   }, [])
 
-  const [orders,      setOrders]      = useState(() => load(KEYS.orders,    INITIAL_ORDERS))
-  const [inventory,   setInventory]   = useState(() => load(KEYS.inventory, INITIAL_INVENTORY).map(migrateItem))
-  const [auditLog,    setAuditLog]    = useState(() => load(KEYS.audit,     INITIAL_AUDIT_LOG))
-  const [taxInvoices, setTaxInvoices] = useState(() => load(KEYS.tax,       INITIAL_TAX_INVOICES))
-
-  useEffect(() => { localStorage.setItem(KEYS.orders,    JSON.stringify(orders))      }, [orders])
-  useEffect(() => { localStorage.setItem(KEYS.inventory, JSON.stringify(inventory))   }, [inventory])
-  useEffect(() => { localStorage.setItem(KEYS.audit,     JSON.stringify(auditLog))    }, [auditLog])
-  useEffect(() => { localStorage.setItem(KEYS.tax,       JSON.stringify(taxInvoices)) }, [taxInvoices])
-
-  // ── Audit helper ──────────────────────────────────────────────────────────
-  const pushAudit = useCallback((entry) => {
-    setAuditLog(prev => [{
-      id: `al-${Date.now()}`,
-      changedAt: new Date().toISOString(),
-      ...entry,
-    }, ...prev])
+  // ── Audit helper ──────────────────────────────────────────────────────────────
+  const pushAudit = useCallback(async (entry) => {
+    await supabase.from('audit_log').insert({
+      id:         `al-${Date.now()}`,
+      changed_at: new Date().toISOString(),
+      type:       entry.type,
+      order_id:   entry.orderId   || null,
+      order_ref:  entry.orderRef  || null,
+      field:      entry.field     || null,
+      old_value:  entry.oldValue  || null,
+      new_value:  entry.newValue  || null,
+      changed_by: entry.changedBy || null,
+      note:       entry.note      || null,
+    })
   }, [])
 
-  // ── Orders ────────────────────────────────────────────────────────────────
+  // ── Orders ────────────────────────────────────────────────────────────────────
   const getNextSerial = () => {
     const nums = orders.map(o => parseInt(o.serialNumber, 10)).filter(Boolean)
-    return String(nums.length ? Math.max(...nums) + 1 : 20240009)
+    return String(nums.length ? Math.max(...nums) + 1 : 20240001)
   }
 
-  const addOrder = (orderData, user) => {
+  const addOrder = async (orderData, user) => {
     const serial = getNextSerial()
-    const initialStatus = 'جديد'
-    const newOrder = {
-      ...orderData,
-      id: `ORD-${serial}`,
-      serialNumber: serial,
-      status: initialStatus,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      editHistory: [],
+    const row = {
+      id: `ORD-${serial}`, serial_number: serial,
+      client_name: orderData.clientName, company: orderData.company,
+      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
+      address: orderData.address, location_link: orderData.locationLink,
+      sales_rep: orderData.salesRep, items: orderData.items,
+      subtotal: orderData.subtotal, vat_percent: orderData.vatPercent,
+      vat_amount: orderData.vatAmount, total: orderData.total,
+      invoice_type: orderData.invoiceType, invoice_name: orderData.invoiceName,
+      tax_number: orderData.taxNumber, notes: orderData.notes,
+      payment_method: orderData.paymentMethod,
+      date: orderData.date, time: orderData.time,
+      status: 'جديد',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      edit_history: [],
     }
-    setOrders(prev => [newOrder, ...prev])
-    pushAudit({
-      type: 'order_create',
-      orderId: newOrder.id,
+    await supabase.from('orders').insert(row)
+    await pushAudit({
+      type: 'order_create', orderId: row.id,
       orderRef: `${orderData.clientName} — ${orderData.company}`,
-      field: 'إنشاء طلب',
-      oldValue: '—',
+      field: 'إنشاء طلب', oldValue: '—',
       newValue: `${orderData.total?.toLocaleString()} LE`,
       changedBy: user?.name || orderData.salesRep || 'مجهول',
-      note: '',
     })
-    return newOrder
+    return mapOrder(row)
   }
 
-  const updateOrder = (id, orderData, user) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id !== id) return o
-      const updated = {
-        ...o,
-        ...orderData,
-        updatedAt: new Date().toISOString(),
-        editHistory: [...(o.editHistory || []), {
-          editedAt: new Date().toISOString(),
-          editedBy: user?.name || 'مجهول',
-          note: 'تم التعديل',
-        }],
-      }
-      return updated
-    }))
+  const updateOrder = async (id, orderData, user) => {
     const order = orders.find(o => o.id === id)
-    pushAudit({
-      type: 'order_edit',
-      orderId: id,
+    const editHistory = [...(order?.editHistory || []), {
+      editedAt: new Date().toISOString(),
+      editedBy: user?.name || 'مجهول',
+      note: 'تم التعديل',
+    }]
+    await supabase.from('orders').update({
+      client_name: orderData.clientName, company: orderData.company,
+      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
+      address: orderData.address, location_link: orderData.locationLink,
+      sales_rep: orderData.salesRep, items: orderData.items,
+      subtotal: orderData.subtotal, vat_percent: orderData.vatPercent,
+      vat_amount: orderData.vatAmount, total: orderData.total,
+      invoice_type: orderData.invoiceType, invoice_name: orderData.invoiceName,
+      tax_number: orderData.taxNumber, notes: orderData.notes,
+      payment_method: orderData.paymentMethod,
+      date: orderData.date, time: orderData.time,
+      updated_at: new Date().toISOString(),
+      edit_history: editHistory,
+    }).eq('id', id)
+    await pushAudit({
+      type: 'order_edit', orderId: id,
       orderRef: `${order?.clientName} — ${order?.company}`,
       field: 'تعديل الطلب',
       oldValue: `${order?.total?.toLocaleString()} LE`,
       newValue: `${orderData.total?.toLocaleString()} LE`,
       changedBy: user?.name || 'مجهول',
-      note: '',
     })
   }
 
-  const updateOrderStatus = (id, status, user) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id !== id) return o
-      const updated = { ...o, status, updatedAt: new Date().toISOString() }
-      if (status === 'تم الصرف') {
-        setInventory(inv => inv.map(item => {
-          const match = o.items.find(i =>
-            i.name.toLowerCase().includes(item.name.toLowerCase()) ||
-            item.name.toLowerCase().includes(i.name.toLowerCase())
-          )
-          if (!match) return item
-          const soldQty = Number(match.quantity) || 0
-          // Consume lots FIFO (oldest first)
-          let remaining = soldQty
-          const newLots = (item.lots || []).map(lot => {
-            if (remaining <= 0) return lot
-            const consume = Math.min(remaining, lot.qty)
-            remaining -= consume
-            return { ...lot, qty: lot.qty - consume }
-          }).filter(lot => lot.qty > 0)
-          const newStock = Math.max(0, item.stock - soldQty)
-          // FIFO: costPrice = oldest remaining lot's cost
-          const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (item.costPrice || 0)
-          return { ...item, stock: newStock, lots: newLots, costPrice: fifoCost }
-        }))
-      }
-      return updated
-    }))
+  const updateOrderStatus = async (id, status, user) => {
     const order = orders.find(o => o.id === id)
-    pushAudit({
-      type: 'status_change',
-      orderId: id,
+    await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+
+    if (status === 'تم الصرف' && order) {
+      for (const item of order.items) {
+        const invItem = inventory.find(i =>
+          i.name.toLowerCase().includes(item.name.toLowerCase()) ||
+          item.name.toLowerCase().includes(i.name.toLowerCase())
+        )
+        if (!invItem) continue
+        const soldQty = Number(item.quantity) || 0
+        let remaining = soldQty
+        const newLots = (invItem.lots || []).map(lot => {
+          if (remaining <= 0) return lot
+          const consume = Math.min(remaining, lot.qty)
+          remaining -= consume
+          return { ...lot, qty: lot.qty - consume }
+        }).filter(lot => lot.qty > 0)
+        const newStock = Math.max(0, invItem.stock - soldQty)
+        const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (invItem.costPrice || 0)
+        await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
+      }
+    }
+
+    await pushAudit({
+      type: 'status_change', orderId: id,
       orderRef: `${order?.clientName} — ${order?.company}`,
-      field: 'الحالة',
-      oldValue: order?.status || '—',
-      newValue: status,
+      field: 'الحالة', oldValue: order?.status || '—', newValue: status,
       changedBy: user?.name || 'مجهول',
-      note: '',
     })
   }
 
-  const approveOrder = (id, user) => updateOrderStatus(id, 'جديد', user)
+  const approveOrder = (id, user) => updateOrderStatus(id, 'موافق عليه', user)
   const rejectOrder  = (id, user) => updateOrderStatus(id, 'مرفوض', user)
 
   const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep)
 
-  // Orders grouped by month for a given rep
   const getOrdersByRepGrouped = (rep) => {
-    const repOrders = orders
-      .filter(o => o.salesRep === rep)
+    const repOrders = orders.filter(o => o.salesRep === rep)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-
     const grouped = {}
     repOrders.forEach(o => {
-      const parts = o.date?.split('-') // DD-MM-YYYY
+      const parts = o.date?.split('-')
       if (!parts || parts.length < 3) return
-      const key  = `${parts[2]}-${parts[1]}`  // YYYY-MM
-      const label = new Date(parts[2], parts[1] - 1, 1)
-        .toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' })
+      const key   = `${parts[2]}-${parts[1]}`
+      const label = new Date(parts[2], parts[1] - 1, 1).toLocaleDateString('ar-EG', { year:'numeric', month:'long' })
       if (!grouped[key]) grouped[key] = { label, key, orders: [] }
       grouped[key].orders.push(o)
     })
-    // Return sorted desc by key
     return Object.values(grouped).sort((a, b) => b.key.localeCompare(a.key))
   }
 
-  // ── Inventory CRUD ────────────────────────────────────────────────────────
-  const addInventoryItem = (item, user) => {
-    const qty = Number(item.stock) || 0
-    const initialLots = qty > 0 ? [{
-      id: `lot-${Date.now()}`,
-      qty,
-      costPrice: Number(item.costPrice) || 0,
-      date: new Date().toISOString().split('T')[0],
-      note: 'دفعة أولى',
-    }] : []
-    const newItem = { ...item, id: `inv-${Date.now()}`, lots: initialLots }
-    setInventory(prev => [...prev, newItem])
-    pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة صنف', oldValue: '—', newValue: `${item.stock} وحدة`, changedBy: user?.name || 'مجهول', note: '' })
-    return newItem
+  // ── Inventory ─────────────────────────────────────────────────────────────────
+  const addInventoryItem = async (item, user) => {
+    const qty  = Number(item.stock) || 0
+    const lots = qty > 0 ? [{ id:`lot-${Date.now()}`, qty, costPrice:Number(item.costPrice)||0, date:new Date().toISOString().split('T')[0], note:'دفعة أولى' }] : []
+    const row  = {
+      id:`inv-${Date.now()}`, name:item.name, sku:item.sku||null,
+      model:item.model||null, brand:item.brand||null, category:item.category||null,
+      price:Number(item.price)||0, cost_price:Number(item.costPrice)||0,
+      stock:qty, lots, description:item.description||null, warranty:item.warranty||null,
+    }
+    await supabase.from('inventory').insert(row)
+    await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة صنف', oldValue:'—', newValue:`${qty} وحدة`, changedBy:user?.name||'مجهول' })
   }
 
-  const addStockLot = (itemId, { qty, costPrice, note }, user) => {
+  const addStockLot = async (itemId, { qty, costPrice, note }, user) => {
     const item = inventory.find(i => i.id === itemId)
     if (!item) return
-    const newLot = {
-      id: `lot-${Date.now()}`,
-      qty:       Number(qty),
-      costPrice: Number(costPrice),
-      date:      new Date().toISOString().split('T')[0],
-      note:      note || '',
-    }
-    const updatedLots = [...(item.lots || []), newLot]
-    const newStock    = updatedLots.reduce((s, l) => s + l.qty, 0)
-    // FIFO: costPrice = oldest lot's cost (first to be consumed)
+    const newLot      = { id:`lot-${Date.now()}`, qty:Number(qty), costPrice:Number(costPrice), date:new Date().toISOString().split('T')[0], note:note||'' }
+    const updatedLots = [...(item.lots||[]), newLot]
+    const newStock    = updatedLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
-    setInventory(prev => prev.map(i => i.id === itemId
-      ? { ...i, lots: updatedLots, stock: newStock, costPrice: fifoCost }
-      : i
-    ))
-    pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'إضافة دفعة', oldValue: `${item.stock} وحدة`, newValue: `+${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })
+    await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة دفعة', oldValue:`${item.stock} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
-  const updateStockLot = (itemId, lotId, { qty, costPrice, note }, user) => {
-    const item = inventory.find(i => i.id === itemId)
+  const updateStockLot = async (itemId, lotId, { qty, costPrice, note }, user) => {
+    const item    = inventory.find(i => i.id === itemId)
     if (!item) return
-    const oldLot = item.lots?.find(l => l.id === lotId)
-    const newLots = (item.lots || []).map(l =>
-      l.id === lotId ? { ...l, qty: Number(qty), costPrice: Number(costPrice), note: note ?? l.note } : l
-    )
-    const newStock = newLots.reduce((s, l) => s + l.qty, 0)
+    const oldLot  = item.lots?.find(l => l.id === lotId)
+    const newLots  = (item.lots||[]).map(l => l.id===lotId ? {...l, qty:Number(qty), costPrice:Number(costPrice), note:note??l.note} : l)
+    const newStock = newLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
-    setInventory(prev => prev.map(i => i.id === itemId
-      ? { ...i, lots: newLots, stock: newStock, costPrice: fifoCost }
-      : i
-    ))
-    pushAudit({ type: 'inventory', orderId: null, orderRef: item.name, field: 'تعديل دفعة', oldValue: `${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue: `${qty} وحدة × ${costPrice} LE`, changedBy: user?.name || 'مجهول', note: note || '' })
+    await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    await pushAudit({ type:'inventory', orderRef:item.name, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
-  const updateInventoryItem = (id, data, user) => {
+  const updateInventoryItem = async (id, data, user) => {
     const old = inventory.find(i => i.id === id)
-    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data } : i))
-    if (old && data.stock !== undefined && data.stock !== old.stock) {
-      pushAudit({ type: 'inventory', orderId: null, orderRef: old.name, field: 'تعديل المخزون', oldValue: `${old.stock} وحدة`, newValue: `${data.stock} وحدة`, changedBy: user?.name || 'مجهول', note: data.adjustNote || '' })
-    }
+    const upd = {}
+    if (data.name        !== undefined) upd.name        = data.name
+    if (data.sku         !== undefined) upd.sku         = data.sku
+    if (data.model       !== undefined) upd.model       = data.model
+    if (data.brand       !== undefined) upd.brand       = data.brand
+    if (data.category    !== undefined) upd.category    = data.category
+    if (data.price       !== undefined) upd.price       = data.price
+    if (data.costPrice   !== undefined) upd.cost_price  = data.costPrice
+    if (data.description !== undefined) upd.description = data.description
+    if (data.warranty    !== undefined) upd.warranty    = data.warranty
+    if (Object.keys(upd).length) await supabase.from('inventory').update(upd).eq('id', id)
+    if (old && data.stock !== undefined && data.stock !== old.stock)
+      await pushAudit({ type:'inventory', orderRef:old.name, field:'تعديل المخزون', oldValue:`${old.stock} وحدة`, newValue:`${data.stock} وحدة`, changedBy:user?.name||'مجهول', note:data.adjustNote||'' })
   }
 
-  const deleteInventoryItem = (id, user) => {
+  const deleteInventoryItem = async (id, user) => {
     const item = inventory.find(i => i.id === id)
-    setInventory(prev => prev.filter(i => i.id !== id))
-    pushAudit({ type: 'inventory', orderId: null, orderRef: item?.name || id, field: 'حذف صنف', oldValue: `${item?.stock} وحدة`, newValue: '—', changedBy: user?.name || 'مجهول', note: '' })
+    await supabase.from('inventory').delete().eq('id', id)
+    await pushAudit({ type:'inventory', orderRef:item?.name||id, field:'حذف صنف', oldValue:`${item?.stock} وحدة`, newValue:'—', changedBy:user?.name||'مجهول' })
   }
 
-  // ── Tax Invoices ──────────────────────────────────────────────────────────
-  const addTaxInvoice = (invoice, user) => {
-    const newInv = { ...invoice, id: `ti-${Date.now()}`, uploadedAt: new Date().toISOString(), uploadedBy: user?.name || 'مجهول', verified: false }
-    setTaxInvoices(prev => [newInv, ...prev])
-    pushAudit({ type: 'tax_invoice', orderId: invoice.orderId, orderRef: invoice.clientName, field: 'رفع فاتورة ضريبية', oldValue: '—', newValue: invoice.filename, changedBy: user?.name || 'مجهول', note: '' })
-    return newInv
+  // ── Tax Invoices ──────────────────────────────────────────────────────────────
+  const addTaxInvoice = async (invoice, user) => {
+    const row = {
+      id:`ti-${Date.now()}`, order_id:invoice.orderId||null,
+      client_name:invoice.clientName, filename:invoice.filename,
+      amount:invoice.amount||null, invoice_date:invoice.invoiceDate||null,
+      uploaded_at:new Date().toISOString(), uploaded_by:user?.name||'مجهول', verified:false,
+    }
+    await supabase.from('tax_invoices').insert(row)
+    await pushAudit({ type:'tax_invoice', orderId:invoice.orderId, orderRef:invoice.clientName, field:'رفع فاتورة ضريبية', oldValue:'—', newValue:invoice.filename, changedBy:user?.name||'مجهول' })
+    return mapTax(row)
   }
 
-  const verifyTaxInvoice = (id, user) => {
-    setTaxInvoices(prev => prev.map(i => i.id === id ? { ...i, verified: true } : i))
+  const verifyTaxInvoice = async (id, user) => {
     const inv = taxInvoices.find(i => i.id === id)
-    pushAudit({ type: 'tax_invoice', orderId: null, orderRef: inv?.clientName || id, field: 'اعتماد فاتورة', oldValue: 'غير معتمدة', newValue: 'معتمدة', changedBy: user?.name || 'مجهول', note: '' })
+    await supabase.from('tax_invoices').update({ verified:true }).eq('id', id)
+    await pushAudit({ type:'tax_invoice', orderRef:inv?.clientName||id, field:'اعتماد فاتورة', oldValue:'غير معتمدة', newValue:'معتمدة', changedBy:user?.name||'مجهول' })
   }
 
-  const deleteTaxInvoice = (id, user) => {
+  const deleteTaxInvoice = async (id, user) => {
     const inv = taxInvoices.find(i => i.id === id)
-    setTaxInvoices(prev => prev.filter(i => i.id !== id))
-    pushAudit({ type: 'tax_invoice', orderId: null, orderRef: inv?.clientName || id, field: 'حذف فاتورة ضريبية', oldValue: inv?.filename || '—', newValue: '—', changedBy: user?.name || 'مجهول', note: '' })
+    await supabase.from('tax_invoices').delete().eq('id', id)
+    await pushAudit({ type:'tax_invoice', orderRef:inv?.clientName||id, field:'حذف فاتورة ضريبية', oldValue:inv?.filename||'—', newValue:'—', changedBy:user?.name||'مجهول' })
   }
 
   return (

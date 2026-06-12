@@ -32,7 +32,7 @@ export default function OrderCard({ order }) {
   const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
 
   const onCalendar = () => {
-    const title   = encodeURIComponent(`تركيب SmartLock — ${order.clientName} (${order.company})`)
+    const title   = encodeURIComponent(`تركيب IoT Tech — ${order.clientName} (${order.company})`)
     const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}\n\nالأصناف:\n${items}` +

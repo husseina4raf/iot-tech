@@ -10,6 +10,12 @@ export default function Layout({ children }) {
         <main style={{ flex:1, overflowY:'auto', padding:24 }}>
           {children}
         </main>
+        <footer style={{
+          textAlign:'center', padding:'10px 24px', fontSize:11, color:'#94a3b8',
+          borderTop:'1px solid #e4eaf3', background:'#fff', flexShrink:0,
+        }}>
+          © 2025 <strong style={{ color:'#0f172a' }}>IoT Tech</strong> — جميع الحقوق محفوظة &nbsp;|&nbsp; Developed by <strong style={{ color:'#2563eb' }}>H.Tech</strong>
+        </footer>
       </div>
     </div>
   )

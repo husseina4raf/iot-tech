@@ -1,6 +1,12 @@
+import { useState } from 'react'
 import { TrendingUp, Package } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
+
+const MONTHS_AR = [
+  'يناير','فبراير','مارس','أبريل','مايو','يونيو',
+  'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
+]
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -15,8 +21,22 @@ export default function ProfitReport() {
   const { orders, inventory } = useOrders()
   const { user } = useAuth()
 
+  const now = new Date()
+  const [year,   setYear]   = useState(now.getFullYear())
+  const [month,  setMonth]  = useState(now.getMonth())
+  const [period, setPeriod] = useState('month')
+  const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - i)
+
   const repName = user?.repName
-  const repOrders = repName ? orders.filter(o => o.salesRep === repName) : []
+  const repOrders = repName ? orders.filter(o => {
+    if (o.salesRep !== repName) return false
+    if (period === 'month') {
+      const parts = o.date?.split('-')
+      if (!parts || parts.length < 3) return false
+      return parseInt(parts[2], 10) === year && parseInt(parts[1], 10) - 1 === month
+    }
+    return true
+  }) : []
 
   // Aggregate per product
   const productMap = {}
@@ -46,6 +66,33 @@ export default function ProfitReport() {
 
   return (
     <div>
+      {/* Period filter */}
+      <div style={{ ...card, padding:'14px 20px', marginBottom:16, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:6 }}>
+          {[{ val:'month', label:'هذا الشهر' }, { val:'all', label:'كل الوقت' }].map(opt => (
+            <button key={opt.val} onClick={() => setPeriod(opt.val)}
+              style={{ padding:'6px 14px', borderRadius:8, border:`1.5px solid ${period===opt.val?'#2563eb':'#e4eaf3'}`, background: period===opt.val?'#eff6ff':'#fff', color: period===opt.val?'#1d4ed8':'#64748b', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', transition:'all 0.15s' }}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {period === 'month' && (
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <select value={month} onChange={e => setMonth(Number(e.target.value))} dir="rtl"
+              style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+              {MONTHS_AR.map((m, i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+            <select value={year} onChange={e => setYear(Number(e.target.value))} dir="ltr"
+              style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        )}
+        <span style={{ fontSize:12, color:'#94a3b8', marginRight:'auto' }}>
+          {period === 'month' ? `${MONTHS_AR[month]} ${year}` : 'جميع الفواتير'}
+        </span>
+      </div>
+
       {/* Summary cards */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
         {[

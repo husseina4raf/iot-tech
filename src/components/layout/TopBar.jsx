@@ -1,5 +1,6 @@
+import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Bell } from 'lucide-react'
+import { Bell, Package, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 
 const pages = {
@@ -8,11 +9,35 @@ const pages = {
   '/admin':     { ar:'الإدارة',       en:'Orders Administration' },
 }
 
+const STATUS_CONFIG = {
+  'بانتظار الموافقة': { color:'#f59e0b', bg:'#fffbeb', icon: Clock },
+  'جديد':             { color:'#2563eb', bg:'#eff6ff', icon: Package },
+  'موافق عليه':       { color:'#059669', bg:'#ecfdf5', icon: CheckCircle },
+  'مرفوض':            { color:'#e11d48', bg:'#fff1f2', icon: XCircle },
+}
+
 export default function TopBar() {
   const { pathname } = useLocation()
-  const { orders } = useOrders()
-  const page = pages[pathname] || pages['/dashboard']
-  const newCount = orders.filter(o => o.status === 'جديد').length
+  const { orders }   = useOrders()
+  const page         = pages[pathname] || pages['/dashboard']
+
+  const [open, setOpen] = useState(false)
+  const ref             = useRef(null)
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Notifications = pending + new orders (latest 10)
+  const notifs = orders
+    .filter(o => o.status === 'بانتظار الموافقة' || o.status === 'جديد')
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 10)
+
+  const count = notifs.length
 
   return (
     <header dir="rtl" style={{
@@ -27,24 +52,102 @@ export default function TopBar() {
       </div>
 
       <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-        <div style={{ position:'relative' }}>
-          <button style={{
-            width:34, height:34, borderRadius:8, background:'#f7f9fc', border:'1px solid #e4eaf3',
-            display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background='#eef2f9'}
-          onMouseLeave={e => e.currentTarget.style.background='#f7f9fc'}>
-            <Bell size={15} color="#64748b" />
-          </button>
-          {newCount > 0 && (
-            <span style={{
-              position:'absolute', top:-4, right:-4, width:17, height:17, borderRadius:'50%',
-              background:'#2563eb', color:'#fff', fontSize:9, fontWeight:700,
+
+        {/* Bell */}
+        <div ref={ref} style={{ position:'relative' }}>
+          <button
+            onClick={() => setOpen(v => !v)}
+            style={{
+              width:34, height:34, borderRadius:8,
+              background: open ? '#eff6ff' : '#f7f9fc',
+              border: open ? '1px solid #bfdbfe' : '1px solid #e4eaf3',
               display:'flex', alignItems:'center', justifyContent:'center',
-              border:'2px solid #fff',
+              cursor:'pointer', transition:'all 0.15s',
             }}>
-              {newCount > 9 ? '9+' : newCount}
+            <Bell size={15} color={open ? '#2563eb' : '#64748b'} />
+          </button>
+
+          {/* Badge */}
+          {count > 0 && (
+            <span style={{
+              position:'absolute', top:-5, right:-5, minWidth:18, height:18,
+              borderRadius:9, background:'#e11d48', color:'#fff',
+              fontSize:10, fontWeight:700, padding:'0 4px',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              border:'2px solid #fff', pointerEvents:'none',
+            }}>
+              {count > 9 ? '9+' : count}
             </span>
+          )}
+
+          {/* Dropdown */}
+          {open && (
+            <div style={{
+              position:'absolute', top:42, left:0, width:320, zIndex:1000,
+              background:'#fff', borderRadius:14, border:'1px solid #e4eaf3',
+              boxShadow:'0 8px 32px rgba(15,23,42,0.15)', overflow:'hidden',
+              animation:'fadeDown 0.15s ease-out',
+            }}>
+              {/* Header */}
+              <div style={{ padding:'14px 16px', borderBottom:'1px solid #f0f4fa', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>الإشعارات</span>
+                {count > 0 && (
+                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, background:'#eff6ff', color:'#2563eb' }}>
+                    {count} طلب يحتاج متابعة
+                  </span>
+                )}
+              </div>
+
+              {/* List */}
+              <div style={{ maxHeight:340, overflowY:'auto' }}>
+                {notifs.length === 0 ? (
+                  <div style={{ padding:'32px 16px', textAlign:'center' }}>
+                    <Bell size={28} color="#cbd5e1" style={{ marginBottom:8 }} />
+                    <div style={{ fontSize:13, color:'#94a3b8', fontWeight:600 }}>لا توجد إشعارات جديدة</div>
+                  </div>
+                ) : (
+                  notifs.map(order => {
+                    const cfg  = STATUS_CONFIG[order.status] || STATUS_CONFIG['جديد']
+                    const Icon = cfg.icon
+                    return (
+                      <div key={order.id} style={{
+                        display:'flex', alignItems:'flex-start', gap:12,
+                        padding:'12px 16px', borderBottom:'1px solid #f8fafc',
+                        transition:'background 0.1s', cursor:'default',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                      onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                        <div style={{ width:34, height:34, borderRadius:9, background:cfg.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <Icon size={15} color={cfg.color}/>
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                            {order.clientName || '—'}
+                            {order.company ? ` — ${order.company}` : ''}
+                          </div>
+                          <div style={{ fontSize:11, color:'#64748b', marginBottom:4 }}>
+                            {order.salesRep && `المندوب: ${order.salesRep} · `}
+                            {order.serialNumber && `#${order.serialNumber}`}
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, background:cfg.bg, color:cfg.color }}>
+                            {order.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:10, color:'#cbd5e1', whiteSpace:'nowrap', flexShrink:0 }}>
+                          {order.date || ''}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              {count === 0 && (
+                <div style={{ padding:'10px 16px', borderTop:'1px solid #f0f4fa', textAlign:'center', fontSize:11, color:'#94a3b8' }}>
+                  كل الطلبات تمت معالجتها ✓
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -52,6 +155,13 @@ export default function TopBar() {
           {new Date().toLocaleDateString('ar-EG', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}
         </div>
       </div>
+
+      <style>{`
+        @keyframes fadeDown {
+          from { opacity:0; transform:translateY(-6px) }
+          to   { opacity:1; transform:translateY(0) }
+        }
+      `}</style>
     </header>
   )
 }

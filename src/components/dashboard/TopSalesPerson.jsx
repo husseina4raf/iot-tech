@@ -9,7 +9,7 @@ const rankColor = ['#1d4ed8','#6d28d9','#047857','#475569']
 export default function TopSalesPerson() {
   const { orders } = useOrders()
   const board = SALES_REPS.map(rep=>{
-    const ro=orders.filter(o=>o.salesRep===rep)
+    const ro=orders.filter(o=>o.salesRep===rep && o.status==='تم التحصيل')
     return { name:rep, count:ro.length, total:ro.reduce((s,o)=>s+o.total,0) }
   }).sort((a,b)=>b.total-a.total)
   const max = board[0]?.total||1

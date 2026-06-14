@@ -10,6 +10,7 @@ const accent = {
   'بانتظار الموافقة':'#f97316',
   'جديد':'#2563eb', 'موافق عليه':'#059669',
   'تم الصرف':'#d97706', 'مكتمل':'#7c3aed',
+  'تم التحصيل':'#10b981',
   'مرفوض':'#e11d48',
 }
 
@@ -22,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -30,17 +31,35 @@ export default function OrderCard({ order }) {
 
   const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
   const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
+  const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
 
   const onCalendar = () => {
     const title   = encodeURIComponent(`تركيب IoT Tech — ${order.clientName} (${order.company})`)
     const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
-      `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}\n\nالأصناف:\n${items}` +
+      `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +
+      (order.time ? `\nوقت التركيب: ${order.time}` : '') +
+      `\n\nالأصناف:\n${items}` +
       (order.notes ? `\n\nملاحظات: ${order.notes}` : '')
     )
     const location = encodeURIComponent(order.address || '')
+    // Build dates param if we have a date
+    const parts = (order.date || '').split('-')
+    let datesParam = ''
+    if (parts.length === 3) {
+      const ymd = `${parts[2]}${parts[1]}${parts[0]}`
+      if (order.time && order.time.includes(':')) {
+        const [h, m] = order.time.split(':')
+        const start = `${ymd}T${h.padStart(2,'0')}${m.padStart(2,'0')}00`
+        const endH  = String(parseInt(h, 10) + 2).padStart(2, '0')
+        const end   = `${ymd}T${endH}${m.padStart(2,'0')}00`
+        datesParam  = `&dates=${start}/${end}`
+      } else {
+        datesParam = `&dates=${ymd}/${ymd}`
+      }
+    }
     window.open(
-      `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`,
+      `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}${datesParam}`,
       '_blank'
     )
   }
@@ -111,8 +130,16 @@ export default function OrderCard({ order }) {
             </>
           )}
 
+          {/* تم التحصيل — admin/super_admin on مكتمل orders */}
+          {order.status === 'مكتمل' && ['admin','super_admin'].includes(user?.role) && (
+            <button onClick={onCollect}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#10b981', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(16,185,129,0.35)' }}>
+              <Check size={13}/>تم التحصيل
+            </button>
+          )}
+
           {/* Print + Calendar — admin/super_admin on approved orders */}
-          {['موافق عليه','تم الصرف','مكتمل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && (<>
+          {['موافق عليه','تم الصرف','مكتمل','تم التحصيل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && (<>
             {[
               { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
               { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },

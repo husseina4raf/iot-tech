@@ -74,7 +74,7 @@ export default function UserManager() {
       password: form.password,
       role:     form.role || 'sales',
     })
-    const roleLabel = form.role === 'team_leader' ? 'قائد الفريق' : 'المندوب'
+    const roleLabel = form.role === 'team_leader' ? 'قائد الفريق' : form.role === 'admin' ? 'المدير' : 'المندوب'
     toast(`تم إضافة ${roleLabel} بنجاح ✓`, 'success')
     setShowForm(false)
     setForm(emptyForm())
@@ -124,6 +124,9 @@ export default function UserManager() {
             {[
               { val:'sales',       label:'مندوب مبيعات', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
               { val:'team_leader', label:'قائد فريق',    color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc' },
+              ...(currentUser?.role === 'super_admin' ? [
+                { val:'admin', label:'مدير', color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+              ] : []),
             ].map(opt => {
               const active = form.role === opt.val
               return (

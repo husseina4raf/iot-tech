@@ -13,6 +13,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
   const emptyForm = () => ({
     company: '', clientName: '', mobile: '', whatsapp: '',
+    governorate: '', city: '', district: '', street: '', buildingNo: '',
     address: '', locationLink: '',
     items: [{ id: Date.now().toString(), name: '', sku: '', model: '', price: 0, quantity: 1, total: 0 }],
     subtotal: 0, vatPercent: 0, vatAmount: 0, total: 0,
@@ -28,6 +29,9 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     if (editOrder) {
       return {
         ...editOrder,
+        governorate: '', city: '', district: '',
+        street: editOrder.address || '',
+        buildingNo: '',
         dateRaw: editOrder.date ? editOrder.date.split('-').reverse().join('-') : new Date().toISOString().split('T')[0],
       }
     }
@@ -39,16 +43,35 @@ export default function OrderForm({ editOrder = null, onSaved }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     const errs = {}
-    if (!form.company.trim())                    errs.company    = 'اسم الشركة أو العميل مطلوب'
-    if (!form.clientName.trim())                 errs.clientName = 'اسم العميل مطلوب'
-    if (!form.salesRep)                          errs.salesRep   = 'يرجى اختيار مندوب المبيعات'
-    if (form.items.some(i => !i.name.trim()))    errs.items      = 'يرجى إدخال أسماء جميع الأصناف'
-    if (form.total <= 0)                         errs.items      = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
+    const phoneRegex = /^01[0-9]{9}$/
+
+    if (!form.company.trim())     errs.company    = 'اسم الشركة أو العميل مطلوب'
+    if (!form.clientName.trim())  errs.clientName = 'اسم العميل مطلوب'
+    if (!form.salesRep)           errs.salesRep   = 'يرجى اختيار مندوب المبيعات'
+
+    if (!form.mobile.trim()) {
+      errs.mobile = 'رقم الموبايل مطلوب'
+    } else if (!phoneRegex.test(form.mobile.trim())) {
+      errs.mobile = 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
+    }
+    if (form.whatsapp.trim() && !phoneRegex.test(form.whatsapp.trim())) {
+      errs.whatsapp = 'رقم واتساب غير صحيح — 01XXXXXXXXX'
+    }
+
+    if (!form.street?.trim() && !form.city?.trim() && !form.governorate?.trim()) {
+      errs.address = 'يرجى إدخال العنوان (المحافظة أو المدينة أو الشارع على الأقل)'
+    }
+
+    if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
+    if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
     if (form.invoiceType === 'فاتورة ضريبية' && !form.taxNumber?.trim()) errs.taxNumber = 'الرقم الضريبي مطلوب للفاتورة الضريبية'
+
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
     setErrors({})
-    const { dateRaw, ...orderData } = form
+    const { dateRaw, governorate, city, district, street, buildingNo, ...rest } = form
+    const addressParts = [governorate, city, district, street, buildingNo].filter(Boolean)
+    const orderData = { ...rest, address: addressParts.join(' — ') }
 
     if (isEdit) {
       updateOrder(editOrder.id, orderData, user)

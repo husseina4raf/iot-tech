@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Trash2, Calculator, Lock, Search, Package, AlertTriangle } from 'lucide-react'
-import { INVOICE_TYPES } from '../../data/mockData'
+import { Plus, Trash2, Calculator, Lock, Search, Package, AlertTriangle, Clock } from 'lucide-react'
+import { INVOICE_TYPES, PAYMENT_METHODS } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import { useOrders } from '../../hooks/useOrders'
 
@@ -212,10 +212,27 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
               {salesReps.map(r=><option key={r} value={r}>{r}</option>)}
             </FSelect>
           )}
-          <FInput label="موبايل" placeholder="01XXXXXXXXX" value={form.mobile} onChange={e=>upd('mobile',e.target.value)} dir="ltr"/>
-          <FInput label="واتساب" placeholder="01XXXXXXXXX" value={form.whatsapp} onChange={e=>upd('whatsapp',e.target.value)} dir="ltr"/>
-          <FTextarea label="العنوان" style={{gridColumn:'1/-1'}} placeholder="العنوان بالتفصيل" rows={2} value={form.address} onChange={e=>upd('address',e.target.value)} />
-          <FInput label="رابط الموقع" style={{gridColumn:'1/-1'}} placeholder="https://maps.google.com/..." value={form.locationLink} onChange={e=>upd('locationLink',e.target.value)} dir="ltr"/>
+          <FInput label="موبايل" required error={errors.mobile} placeholder="01XXXXXXXXX" value={form.mobile} onChange={e=>upd('mobile',e.target.value)} dir="ltr"/>
+          <FInput label="واتساب" error={errors.whatsapp} placeholder="01XXXXXXXXX" value={form.whatsapp} onChange={e=>upd('whatsapp',e.target.value)} dir="ltr"/>
+
+          {/* Address — 5 split fields */}
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+              العنوان <span style={{color:'#e11d48'}}> *</span>
+            </label>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
+              <FInput placeholder="المحافظة" value={form.governorate||''} onChange={e=>upd('governorate',e.target.value)} />
+              <FInput placeholder="المدينة" value={form.city||''} onChange={e=>upd('city',e.target.value)} />
+              <FInput placeholder="المنطقة / الحي" value={form.district||''} onChange={e=>upd('district',e.target.value)} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:10 }}>
+              <FInput placeholder="الشارع" value={form.street||''} onChange={e=>upd('street',e.target.value)} />
+              <FInput placeholder="رقم المبنى" value={form.buildingNo||''} onChange={e=>upd('buildingNo',e.target.value)} />
+            </div>
+            {errors.address && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:4 }}>{errors.address}</span>}
+          </div>
+
+          <FInput label="رابط الموقع على الخريطة" style={{gridColumn:'1/-1'}} placeholder="https://maps.google.com/..." value={form.locationLink} onChange={e=>upd('locationLink',e.target.value)} dir="ltr"/>
         </div>
       </div>
 
@@ -312,17 +329,34 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
 
       {/* 3. Invoice */}
       <div style={card}>
-        <SectionTitle n="٣">بيانات الفاتورة</SectionTitle>
+        <SectionTitle n="٣">بيانات الفاتورة والتركيب</SectionTitle>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
           <FSelect label="نوع الفاتورة" required value={form.invoiceType} onChange={e=>upd('invoiceType',e.target.value)}>
             {INVOICE_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
           </FSelect>
-          <FInput label="التاريخ" required type="date" value={form.dateRaw} dir="ltr"
-            onChange={e=>{const d=e.target.value;setForm(p=>({...p,dateRaw:d,date:d?d.split('-').reverse().join('-'):''}))}}/>
-          {form.invoiceType==='فاتورة ضريبية'&&<>
-            <FInput label="الاسم على الفاتورة" placeholder="اسم الشركة" value={form.invoiceName} onChange={e=>upd('invoiceName',e.target.value)}/>
+          <FInput label="الفاتورة باسم مين" placeholder="اسم الشركة أو الشخص" value={form.invoiceName} onChange={e=>upd('invoiceName',e.target.value)}/>
+          {form.invoiceType==='فاتورة ضريبية'&&
             <FInput label="الرقم الضريبي" required placeholder="123456789" error={errors.taxNumber} value={form.taxNumber} onChange={e=>upd('taxNumber',e.target.value)} dir="ltr"/>
-          </>}
+          }
+          <FSelect label="طريقة الدفع" value={form.paymentMethod} onChange={e=>upd('paymentMethod',e.target.value)}>
+            <option value="">اختر طريقة الدفع</option>
+            {PAYMENT_METHODS.map(m=><option key={m} value={m}>{m}</option>)}
+          </FSelect>
+          <FInput label="تاريخ التركيب" required type="date" value={form.dateRaw} dir="ltr"
+            onChange={e=>{const d=e.target.value;setForm(p=>({...p,dateRaw:d,date:d?d.split('-').reverse().join('-'):''}))}}/>
+          <div>
+            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+              وقت التركيب
+              <span style={{ marginRight:6, fontSize:10, color:'#94a3b8', fontWeight:400 }}>(يظهر في الكالندر فقط)</span>
+            </label>
+            <div style={{ position:'relative' }}>
+              <Clock size={13} color="#94a3b8" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
+              <input type="time" value={form.time} onChange={e=>upd('time',e.target.value)} dir="ltr"
+                style={{ width:'100%', padding:'10px 36px 10px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', boxSizing:'border-box' }}
+                onFocus={e=>{e.target.style.borderColor='#2563eb';e.target.style.background='#fff'}}
+                onBlur={e=>{e.target.style.borderColor='#e4eaf3';e.target.style.background='#f8fafc'}} />
+            </div>
+          </div>
           <FTextarea label="ملاحظات" style={{gridColumn:'1/-1'}} placeholder="أي ملاحظات إضافية..." rows={3} value={form.notes} onChange={e=>upd('notes',e.target.value)}/>
         </div>
       </div>

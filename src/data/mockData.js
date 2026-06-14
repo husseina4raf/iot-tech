@@ -3,7 +3,7 @@
 // Import from authData wherever you need the rep list
 export { SALES_REPS } from './authData'
 
-export const ORDER_STATUSES  = ['بانتظار الموافقة', 'جديد', 'موافق عليه', 'تم الصرف', 'مكتمل', 'مرفوض']
+export const ORDER_STATUSES  = ['بانتظار الموافقة', 'جديد', 'موافق عليه', 'تم الصرف', 'مكتمل', 'تم التحصيل', 'مرفوض']
 export const PAYMENT_METHODS = ['كاش', 'انستاباي', 'تحويل']
 export const INVOICE_TYPES   = ['بيان اسعار', 'فاتورة ضريبية']
 

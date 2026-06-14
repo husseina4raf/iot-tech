@@ -30,7 +30,7 @@ export default function Leaderboard() {
     const repUser = users.find(u => u.repName === rep)
     const repOrders = orders.filter(o => {
       if (o.salesRep !== rep) return false
-      if (o.status === 'مرفوض' || o.status === 'بانتظار الموافقة') return false
+      if (o.status !== 'تم التحصيل') return false
       if (period === 'month') {
         // Order date format: DD-MM-YYYY
         const parts = o.date?.split('-')
@@ -87,7 +87,7 @@ export default function Leaderboard() {
         )}
 
         <span style={{ fontSize:12, color:'#94a3b8', marginRight:'auto' }}>
-          {period === 'month' ? `${MONTHS_AR[month]} ${year}` : 'جميع الفواتير المعتمدة'}
+          {period === 'month' ? `${MONTHS_AR[month]} ${year}` : 'جميع الطلبات المحصّلة'}
         </span>
       </div>
 

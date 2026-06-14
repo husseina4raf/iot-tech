@@ -7,11 +7,11 @@ export default function StatsCards() {
   const total = orders.length
   const sales = orders.reduce((s,o)=>s+o.total,0)
   const week  = orders.filter(o=>new Date(o.createdAt)>=weekAgo).length
-  const closed= orders.filter(o=>['تم الصرف','مكتمل'].includes(o.status)).length
+  const closed= orders.filter(o=>o.status==='تم التحصيل').length
   const rate  = total>0 ? Math.round((closed/total)*100) : 0
 
   const cards = [
-    { icon:ShoppingBag, label:'إجمالي الأوردرات', value:total,    sub:`${closed} مكتمل`,            iconBg:'linear-gradient(135deg,#2563eb,#1d4ed8)', tint:'#eff6ff', tintBorder:'#bfdbfe', valColor:'#1d4ed8' },
+    { icon:ShoppingBag, label:'إجمالي الأوردرات', value:total,    sub:`${closed} تم التحصيل`,            iconBg:'linear-gradient(135deg,#2563eb,#1d4ed8)', tint:'#eff6ff', tintBorder:'#bfdbfe', valColor:'#1d4ed8' },
     { icon:TrendingUp,  label:'إجمالي المبيعات',  value:`${(sales/1000).toFixed(1)}K`, suffix:'LE', sub:'إجمالي القيمة', iconBg:'linear-gradient(135deg,#7c3aed,#6d28d9)', tint:'#f5f3ff', tintBorder:'#ddd6fe', valColor:'#6d28d9' },
     { icon:CalendarDays,label:'أوردرات الأسبوع',  value:week,     sub:'آخر 7 أيام',                 iconBg:'linear-gradient(135deg,#059669,#047857)', tint:'#ecfdf5', tintBorder:'#a7f3d0', valColor:'#047857' },
     { icon:Target,      label:'معدل الإغلاق',     value:`${rate}%`,sub:`${closed} من ${total} طلب`, iconBg:'linear-gradient(135deg,#0891b2,#0e7490)', tint:'#ecfeff', tintBorder:'#a5f3fc', valColor:'#0e7490' },

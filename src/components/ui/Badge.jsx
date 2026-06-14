@@ -3,12 +3,14 @@ const map = {
   approved:   { bg:'#ecfdf5', color:'#065f46', border:'#a7f3d0' },
   dispatched: { bg:'#fffbeb', color:'#92400e', border:'#fde68a' },
   completed:  { bg:'#f5f3ff', color:'#4c1d95', border:'#ddd6fe' },
+  collected:  { bg:'#ecfdf5', color:'#065f46', border:'#6ee7b7' },
   default:    { bg:'#f8fafc', color:'#475569', border:'#e2e8f0' },
   warning:    { bg:'#fff1f2', color:'#9f1239', border:'#fecdd3' },
   orange:     { bg:'#fff7ed', color:'#9a3412', border:'#fed7aa' },
 }
 const statusMap = {
   'جديد':'new', 'موافق عليه':'approved', 'تم الصرف':'dispatched', 'مكتمل':'completed',
+  'تم التحصيل':'collected',
   'بانتظار الموافقة':'orange', 'مرفوض':'warning',
 }
 

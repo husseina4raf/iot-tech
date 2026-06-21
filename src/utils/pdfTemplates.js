@@ -178,7 +178,6 @@ export async function generateDispatchPDF(order) {
         <div class="info-row"><span class="info-label">رقم الإذن:</span> <span class="info-val">${order.serialNumber}</span></div>
         <div class="info-row"><span class="info-label">التاريخ:</span>   <span class="info-val">${order.date}</span></div>
         <div class="info-row"><span class="info-label">الوقت:</span>     <span class="info-val">${order.time}</span></div>
-        <div class="info-row"><span class="info-label">الدفع:</span>     <span class="info-val">${payMap[order.paymentMethod] || order.paymentMethod}</span></div>
       </div>
       <div class="info-box">
         <div class="info-row"><span class="info-label">اسم الشركة / العميل:</span> <span class="info-val">${order.company}</span></div>
@@ -278,7 +277,6 @@ export async function generateInvoicePDF(order) {
       <div class="info-box">
         <div class="info-row"><span class="info-label">رقم الفاتورة:</span>  <span class="info-val">${order.serialNumber}</span></div>
         <div class="info-row"><span class="info-label">التاريخ:</span>        <span class="info-val">${order.date}</span></div>
-        <div class="info-row"><span class="info-label">طريقة الدفع:</span>   <span class="info-val">${payMap[order.paymentMethod] || order.paymentMethod}</span></div>
         <div class="info-row"><span class="info-label">المندوب:</span>        <span class="info-val">${order.salesRep}</span></div>
       </div>
       <div class="info-box">

@@ -125,6 +125,8 @@ export function OrdersProvider({ children }) {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       edit_history: [],
     }
+    // Optimistic update — add to local state immediately
+    setOrders(prev => [mapOrder(row), ...prev])
     await supabase.from('orders').insert(row)
     await pushAudit({
       type: 'order_create', orderId: row.id,
@@ -143,7 +145,7 @@ export function OrdersProvider({ children }) {
       editedBy: user?.name || 'مجهول',
       note: 'تم التعديل',
     }]
-    await supabase.from('orders').update({
+    const updatedRow = {
       client_name: orderData.clientName, company: orderData.company,
       mobile: orderData.mobile, whatsapp: orderData.whatsapp,
       address: orderData.address, location_link: orderData.locationLink,
@@ -156,7 +158,22 @@ export function OrdersProvider({ children }) {
       date: orderData.date, time: orderData.time,
       updated_at: new Date().toISOString(),
       edit_history: editHistory,
-    }).eq('id', id)
+    }
+    // Optimistic update — reflect edit immediately
+    setOrders(prev => prev.map(o => o.id === id ? {
+      ...o,
+      clientName: orderData.clientName, company: orderData.company,
+      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
+      address: orderData.address, locationLink: orderData.locationLink,
+      salesRep: orderData.salesRep, items: orderData.items,
+      subtotal: orderData.subtotal, vatPercent: orderData.vatPercent,
+      vatAmount: orderData.vatAmount, total: orderData.total,
+      invoiceType: orderData.invoiceType, invoiceName: orderData.invoiceName,
+      taxNumber: orderData.taxNumber, notes: orderData.notes,
+      paymentMethod: orderData.paymentMethod, date: orderData.date, time: orderData.time,
+      updatedAt: new Date().toISOString(), editHistory: editHistory,
+    } : o))
+    await supabase.from('orders').update(updatedRow).eq('id', id)
     await pushAudit({
       type: 'order_edit', orderId: id,
       orderRef: `${order?.clientName} — ${order?.company}`,
@@ -169,6 +186,8 @@ export function OrdersProvider({ children }) {
 
   const updateOrderStatus = async (id, status, user) => {
     const order = orders.find(o => o.id === id)
+    // Optimistic update — change status immediately in local state
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
     await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
 
     if (status === 'تم الصرف' && order) {

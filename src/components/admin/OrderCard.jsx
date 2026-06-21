@@ -40,6 +40,10 @@ export default function OrderCard({ order }) {
       `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +
       (order.time ? `\nوقت التركيب: ${order.time}` : '') +
       `\n\nالأصناف:\n${items}` +
+      `\n\nالإجمالي: ${order.total?.toLocaleString()} LE` +
+      (order.invoiceType ? `\nنوع الفاتورة: ${order.invoiceType}` : '') +
+      (order.invoiceName ? `\nالفاتورة باسم: ${order.invoiceName}` : '') +
+      (order.paymentMethod ? `\nطريقة الدفع: ${order.paymentMethod}` : '') +
       (order.notes ? `\n\nملاحظات: ${order.notes}` : '')
     )
     const location = encodeURIComponent(order.address || '')

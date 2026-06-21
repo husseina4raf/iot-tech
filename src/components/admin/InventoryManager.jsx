@@ -202,7 +202,9 @@ export default function InventoryManager() {
               <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
               <FCombo label="التصنيف" options={INVENTORY_CATEGORIES} value={form.category} onChange={e => upd('category', e.target.value)} placeholder="اختر أو اكتب تصنيف جديد" />
               <FInput label="سعر التكلفة (LE)" required error={errors.costPrice} type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
-              <FInput label="سعر البيع (LE)" type="number" value={form.price} onChange={e => upd('price', e.target.value)} placeholder="0" dir="ltr"/>
+
+              <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
+              <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>
               <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>

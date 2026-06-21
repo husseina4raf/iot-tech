@@ -21,7 +21,8 @@ const ALL_TABS = [
 ]
 
 export default function AdminPage() {
-  const [tab, setTab] = useState('orders')
+  const [tab, setTab] = useState(() => localStorage.getItem('admin_tab') || 'orders')
+  const changeTab = (id) => { setTab(id); localStorage.setItem('admin_tab', id) }
   const { auditLog, taxInvoices } = useOrders()
   const { user } = useAuth()
 
@@ -37,7 +38,7 @@ export default function AdminPage() {
           const active = tab === id
           const isSettings = id === 'settings'
           return (
-            <button key={id} onClick={() => setTab(id)}
+            <button key={id} onClick={() => changeTab(id)}
               style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px', borderRadius:10, border:'none', background: active ? (isSettings ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : 'linear-gradient(135deg,#1d4ed8,#2563eb)') : 'transparent', color: active?'#fff':'#64748b', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow: active ? (isSettings ? '0 3px 10px rgba(124,58,237,0.3)' : '0 3px 10px rgba(37,99,235,0.3)') : 'none', transition:'all 0.15s', whiteSpace:'nowrap', position:'relative', marginRight: isSettings ? 'auto' : 0 }}
               onMouseEnter={e => { if(!active) e.currentTarget.style.background='#f0f4fa' }}
               onMouseLeave={e => { if(!active) e.currentTarget.style.background='transparent' }}>

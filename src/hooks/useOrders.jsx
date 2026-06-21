@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 import { mapOrder, mapItem, mapAudit, mapTax } from '../lib/mappers'
@@ -16,6 +16,8 @@ export function OrdersProvider({ children }) {
   const [loading,       setLoading]       = useState(true)
   const [hasMoreOrders, setHasMoreOrders] = useState(false)
   const [ordersPage,    setOrdersPage]    = useState(0)
+  // Tracks inventory item IDs we just wrote to — blocks stale real-time events
+  const pendingInvWrites = useRef(new Set())
 
   const loadMoreOrders = useCallback(async () => {
     const next = ordersPage + 1
@@ -62,7 +64,8 @@ export function OrdersProvider({ children }) {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, p => {
         if (p.eventType === 'INSERT') setInventory(prev => prev.some(i => i.id === p.new.id) ? prev : [...prev, mapItem(p.new)])
-        if (p.eventType === 'UPDATE') setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
+        // Skip UPDATE events for items we just wrote — our confirmed state is already correct
+        if (p.eventType === 'UPDATE' && !pendingInvWrites.current.has(p.new.id)) setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
         if (p.eventType === 'DELETE') setInventory(prev => prev.filter(i => i.id !== p.old.id))
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log' }, p => {
@@ -266,6 +269,12 @@ export function OrdersProvider({ children }) {
     return Object.values(grouped).sort((a, b) => b.key.localeCompare(a.key))
   }
 
+  // ── Inventory write-lock helper ───────────────────────────────────────────────
+  // Marks an item as "we just wrote" so real-time UPDATE events from earlier
+  // operations can't race ahead and overwrite our fresh confirmed state.
+  const lockInv  = (id) => pendingInvWrites.current.add(id)
+  const unlockInv = (id) => setTimeout(() => pendingInvWrites.current.delete(id), 3000)
+
   // ── Inventory ─────────────────────────────────────────────────────────────────
   const addInventoryItem = async (item, user) => {
     const qty  = Number(item.stock) || 0
@@ -290,9 +299,14 @@ export function OrdersProvider({ children }) {
     const updatedLots = [...(item.lots||[]), newLot]
     const newStock    = updatedLots.reduce((s,l)=>s+(Number(l.qty)||0), 0)
     const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
+    lockInv(itemId)
     setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:updatedLots, stock:newStock, costPrice:fifoCost } : i))
     const { error: lotErr } = await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
-    if (lotErr) { console.error('addStockLot:', lotErr); toast('فشل إضافة الدفعة — ' + lotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); return }
+    if (lotErr) { console.error('addStockLot:', lotErr); toast('فشل إضافة الدفعة — ' + lotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); unlockInv(itemId); return }
+    // Force-confirm from DB so no stale real-time event can overwrite our result
+    const { data: confirmed } = await supabase.from('inventory').select('*').eq('id', itemId).single()
+    if (confirmed) setInventory(prev => prev.map(i => i.id === itemId ? mapItem(confirmed) : i))
+    unlockInv(itemId)
     await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة دفعة', oldValue:`${item.stock} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
@@ -303,9 +317,13 @@ export function OrdersProvider({ children }) {
     const newLots  = (item.lots||[]).map(l => l.id===lotId ? {...l, qty:Number(qty), costPrice:Number(costPrice), note:note??l.note} : l)
     const newStock = newLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
+    lockInv(itemId)
     setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:newLots, stock:newStock, costPrice:fifoCost } : i))
     const { error: updLotErr } = await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
-    if (updLotErr) { console.error('updateStockLot:', updLotErr); toast('فشل تعديل الدفعة — ' + updLotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); return }
+    if (updLotErr) { console.error('updateStockLot:', updLotErr); toast('فشل تعديل الدفعة — ' + updLotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); unlockInv(itemId); return }
+    const { data: confirmedLot } = await supabase.from('inventory').select('*').eq('id', itemId).single()
+    if (confirmedLot) setInventory(prev => prev.map(i => i.id === itemId ? mapItem(confirmedLot) : i))
+    unlockInv(itemId)
     await pushAudit({ type:'inventory', orderRef:item.name, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
@@ -322,11 +340,15 @@ export function OrdersProvider({ children }) {
     if (data.stock       !== undefined) upd.stock       = data.stock
     if (data.description !== undefined) upd.description = data.description
     if (data.warranty    !== undefined) upd.warranty    = data.warranty
+    lockInv(id)
     setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data, costPrice: data.costPrice ?? i.costPrice } : i))
     if (Object.keys(upd).length) {
       const { error: itmErr } = await supabase.from('inventory').update(upd).eq('id', id)
-      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast('فشل تعديل المنتج — ' + itmErr.message, 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); return }
+      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast('فشل تعديل المنتج — ' + itmErr.message, 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); unlockInv(id); return }
+      const { data: confirmedItem } = await supabase.from('inventory').select('*').eq('id', id).single()
+      if (confirmedItem) setInventory(prev => prev.map(i => i.id === id ? mapItem(confirmedItem) : i))
     }
+    unlockInv(id)
     if (old && data.stock !== undefined && data.stock !== old.stock)
       await pushAudit({ type:'inventory', orderRef:old.name, field:'تعديل المخزون', oldValue:`${old.stock} وحدة`, newValue:`${data.stock} وحدة`, changedBy:user?.name||'مجهول', note:data.adjustNote||'' })
   }

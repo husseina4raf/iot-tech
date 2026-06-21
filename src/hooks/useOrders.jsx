@@ -63,26 +63,40 @@ export function OrdersProvider({ children }) {
     // ── Real-time subscriptions ───────────────────────────────────────────────
     const ch = supabase.channel('db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, p => {
-        if (p.eventType === 'INSERT') setOrders(prev => [mapOrder(p.new), ...prev])
+        // Skip INSERT if already added optimistically
+        if (p.eventType === 'INSERT') setOrders(prev => prev.some(o => o.id === p.new.id) ? prev : [mapOrder(p.new), ...prev])
         if (p.eventType === 'UPDATE') setOrders(prev => prev.map(o => o.id === p.new.id ? mapOrder(p.new) : o))
         if (p.eventType === 'DELETE') setOrders(prev => prev.filter(o => o.id !== p.old.id))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, p => {
-        if (p.eventType === 'INSERT') setInventory(prev => [...prev, mapItem(p.new)])
+        if (p.eventType === 'INSERT') setInventory(prev => prev.some(i => i.id === p.new.id) ? prev : [...prev, mapItem(p.new)])
         if (p.eventType === 'UPDATE') setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
         if (p.eventType === 'DELETE') setInventory(prev => prev.filter(i => i.id !== p.old.id))
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log' }, p => {
-        setAuditLog(prev => [mapAudit(p.new), ...prev])
+        setAuditLog(prev => prev.some(a => a.id === p.new.id) ? prev : [mapAudit(p.new), ...prev])
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tax_invoices' }, p => {
-        if (p.eventType === 'INSERT') setTaxInvoices(prev => [mapTax(p.new), ...prev])
+        if (p.eventType === 'INSERT') setTaxInvoices(prev => prev.some(i => i.id === p.new.id) ? prev : [mapTax(p.new), ...prev])
         if (p.eventType === 'UPDATE') setTaxInvoices(prev => prev.map(i => i.id === p.new.id ? mapTax(p.new) : i))
         if (p.eventType === 'DELETE') setTaxInvoices(prev => prev.filter(i => i.id !== p.old.id))
       })
       .subscribe()
 
-    return () => supabase.removeChannel(ch)
+    // ── Refetch when user returns to the tab (handles dropped real-time) ────────
+    const refetch = () => {
+      supabase.from('orders').select('*').order('created_at', { ascending: false })
+        .then(({ data }) => data && setOrders(data.map(mapOrder)))
+      supabase.from('inventory').select('*').order('created_at')
+        .then(({ data }) => data && setInventory(data.map(mapItem)))
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible') refetch() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      supabase.removeChannel(ch)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   // ── Audit helper ──────────────────────────────────────────────────────────────

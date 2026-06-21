@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Calculator, Lock, Search, Package, AlertTriangle, Clock } from 'lucide-react'
-import { INVOICE_TYPES, PAYMENT_METHODS } from '../../data/mockData'
+import { INVOICE_TYPES, PAYMENT_METHODS, EGYPT_GOVERNORATES, EGYPT_CITIES } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import { useOrders } from '../../hooks/useOrders'
 
@@ -223,8 +223,19 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
               العنوان <span style={{color:'#e11d48'}}> *</span>
             </label>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
-              <FInput placeholder="المحافظة" value={form.governorate||''} onChange={e=>{upd('governorate',e.target.value);setErrors(p=>({...p,address:''}))}} />
-              <FInput placeholder="المدينة" value={form.city||''} onChange={e=>{upd('city',e.target.value);setErrors(p=>({...p,address:''}))}} />
+              <select value={form.governorate||''} onChange={e=>{upd('governorate',e.target.value);upd('city','');setErrors(p=>({...p,address:''}))}}
+                style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color: form.governorate ? '#0f172a' : '#9ca3af', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+                <option value="">المحافظة</option>
+                {EGYPT_GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <div>
+                <input list="city-list" placeholder="المدينة / المركز" value={form.city||''}
+                  onChange={e=>{upd('city',e.target.value);setErrors(p=>({...p,address:''}))}}
+                  style={{ width:'100%', padding:'9px 12px', fontSize:13, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', boxSizing:'border-box' }} />
+                <datalist id="city-list">
+                  {(EGYPT_CITIES[form.governorate] || []).map(c => <option key={c} value={c}/>)}
+                </datalist>
+              </div>
               <FInput placeholder="المنطقة / الحي" value={form.district||''} onChange={e=>upd('district',e.target.value)} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:10 }}>

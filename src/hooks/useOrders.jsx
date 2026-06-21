@@ -1,63 +1,55 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
+import { mapOrder, mapItem, mapAudit, mapTax } from '../lib/mappers'
 
 const OrdersContext = createContext(null)
 
-// ── DB row → app object (snake_case → camelCase) ──────────────────────────────
-const mapOrder = r => ({
-  id: r.id, serialNumber: r.serial_number,
-  clientName: r.client_name, company: r.company,
-  mobile: r.mobile, whatsapp: r.whatsapp,
-  address: r.address, locationLink: r.location_link,
-  salesRep: r.sales_rep, items: r.items || [],
-  subtotal: r.subtotal, vatPercent: r.vat_percent,
-  vatAmount: r.vat_amount, total: r.total,
-  invoiceType: r.invoice_type, invoiceName: r.invoice_name,
-  taxNumber: r.tax_number, notes: r.notes,
-  paymentMethod: r.payment_method, date: r.date, time: r.time,
-  status: r.status, createdAt: r.created_at, updatedAt: r.updated_at,
-  editHistory: r.edit_history || [],
-})
-
-const mapItem = r => ({
-  id: r.id, name: r.name, sku: r.sku, model: r.model,
-  brand: r.brand, category: r.category,
-  price: r.price, costPrice: r.cost_price,
-  stock: r.stock, lots: r.lots || [],
-  description: r.description, warranty: r.warranty,
-})
-
-const mapAudit = r => ({
-  id: r.id, type: r.type, orderId: r.order_id,
-  orderRef: r.order_ref, field: r.field,
-  oldValue: r.old_value, newValue: r.new_value,
-  changedBy: r.changed_by, note: r.note, changedAt: r.changed_at,
-})
-
-const mapTax = r => ({
-  id: r.id, orderId: r.order_id, clientName: r.client_name,
-  filename: r.filename, amount: r.amount, invoiceDate: r.invoice_date,
-  uploadedAt: r.uploaded_at, uploadedBy: r.uploaded_by, verified: r.verified,
-})
+const PAGE_SIZE = 100
 
 export function OrdersProvider({ children }) {
+  const toast = useToast()
   const [orders,      setOrders]      = useState([])
   const [inventory,   setInventory]   = useState([])
   const [auditLog,    setAuditLog]    = useState([])
   const [taxInvoices, setTaxInvoices] = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [hasMoreOrders, setHasMoreOrders] = useState(false)
+  const [ordersPage,    setOrdersPage]    = useState(0)
+
+  const loadMoreOrders = useCallback(async () => {
+    const next = ordersPage + 1
+    const from = next * PAGE_SIZE
+    const { data, error } = await supabase
+      .from('orders').select('*').order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) { console.error('loadMoreOrders:', error); toast('خطأ في تحميل المزيد من الطلبات', 'error'); return }
+    setOrders(prev => {
+      const ids = new Set(prev.map(o => o.id))
+      return [...prev, ...(data || []).filter(r => !ids.has(r.id)).map(mapOrder)]
+    })
+    setHasMoreOrders((data || []).length === PAGE_SIZE)
+    setOrdersPage(next)
+  }, [ordersPage, toast])
 
   // ── Initial fetch ─────────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('orders').select('*').order('created_at', { ascending: false }).range(0, PAGE_SIZE - 1),
       supabase.from('inventory').select('*').order('created_at'),
       supabase.from('audit_log').select('*').order('changed_at', { ascending: false }),
       supabase.from('tax_invoices').select('*').order('uploaded_at', { ascending: false }),
     ]).then(([o, inv, al, ti]) => {
+      if (o.error)   { console.error('orders fetch:', o.error);   toast('خطأ في تحميل الطلبات', 'error') }
+      if (inv.error) { console.error('inventory fetch:', inv.error) }
+      if (al.error)  { console.error('audit fetch:', al.error) }
+      if (ti.error)  { console.error('tax fetch:', ti.error) }
       setOrders((o.data || []).map(mapOrder))
+      setHasMoreOrders((o.data || []).length === PAGE_SIZE)
       setInventory((inv.data || []).map(mapItem))
       setAuditLog((al.data || []).map(mapAudit))
       setTaxInvoices((ti.data || []).map(mapTax))
+      setLoading(false)
     })
 
     // ── Real-time subscriptions ───────────────────────────────────────────────
@@ -141,7 +133,13 @@ export function OrdersProvider({ children }) {
     }
     // Optimistic update — add to local state immediately
     setOrders(prev => [mapOrder(row), ...prev])
-    await supabase.from('orders').insert(row)
+    const { error: insertErr } = await supabase.from('orders').insert(row)
+    if (insertErr) {
+      console.error('addOrder:', insertErr)
+      toast('فشل حفظ الطلب — ' + insertErr.message, 'error')
+      setOrders(prev => prev.filter(o => o.id !== row.id))
+      return
+    }
     await pushAudit({
       type: 'order_create', orderId: row.id,
       orderRef: `${orderData.clientName} — ${orderData.company}`,
@@ -187,7 +185,12 @@ export function OrdersProvider({ children }) {
       paymentMethod: orderData.paymentMethod, date: orderData.date, time: orderData.time,
       updatedAt: new Date().toISOString(), editHistory: editHistory,
     } : o))
-    await supabase.from('orders').update(updatedRow).eq('id', id)
+    const { error: updateErr } = await supabase.from('orders').update(updatedRow).eq('id', id)
+    if (updateErr) {
+      console.error('updateOrder:', updateErr)
+      toast('فشل تحديث الطلب — ' + updateErr.message, 'error')
+      return
+    }
     await pushAudit({
       type: 'order_edit', orderId: id,
       orderRef: `${order?.clientName} — ${order?.company}`,
@@ -202,7 +205,13 @@ export function OrdersProvider({ children }) {
     const order = orders.find(o => o.id === id)
     // Optimistic update — change status immediately in local state
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
-    await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    if (statusErr) {
+      console.error('updateOrderStatus:', statusErr)
+      toast('فشل تحديث الحالة — ' + statusErr.message, 'error')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order?.status } : o))
+      return
+    }
 
     if (status === 'تم الصرف' && order) {
       for (const item of order.items) {
@@ -221,7 +230,11 @@ export function OrdersProvider({ children }) {
         }).filter(lot => lot.qty > 0)
         const newStock = Math.max(0, invItem.stock - soldQty)
         const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (invItem.costPrice || 0)
-        await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
+        const { error: stockErr } = await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
+        if (stockErr) {
+          console.error('updateOrderStatus — inventory deduction:', stockErr)
+          toast(`فشل خصم المخزون للمنتج "${invItem.name}" — ${stockErr.message}`, 'error')
+        }
       }
     }
 
@@ -263,7 +276,8 @@ export function OrdersProvider({ children }) {
       price:Number(item.price)||0, cost_price:Number(item.costPrice)||0,
       stock:qty, lots, description:item.description||null, warranty:item.warranty||null,
     }
-    await supabase.from('inventory').insert(row)
+    const { error: invErr } = await supabase.from('inventory').insert(row)
+    if (invErr) { console.error('addInventoryItem:', invErr); toast('فشل إضافة المنتج — ' + invErr.message, 'error'); return }
     await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة صنف', oldValue:'—', newValue:`${qty} وحدة`, changedBy:user?.name||'مجهول' })
   }
 
@@ -277,7 +291,8 @@ export function OrdersProvider({ children }) {
     const newStock    = updatedLots.reduce((s,l)=>s+(Number(l.qty)||0), 0)
     const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
     setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:updatedLots, stock:newStock, costPrice:fifoCost } : i))
-    await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    const { error: lotErr } = await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    if (lotErr) { console.error('addStockLot:', lotErr); toast('فشل إضافة الدفعة — ' + lotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); return }
     await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة دفعة', oldValue:`${item.stock} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
@@ -289,7 +304,8 @@ export function OrdersProvider({ children }) {
     const newStock = newLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
     setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:newLots, stock:newStock, costPrice:fifoCost } : i))
-    await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    const { error: updLotErr } = await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
+    if (updLotErr) { console.error('updateStockLot:', updLotErr); toast('فشل تعديل الدفعة — ' + updLotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); return }
     await pushAudit({ type:'inventory', orderRef:item.name, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
 
@@ -306,16 +322,20 @@ export function OrdersProvider({ children }) {
     if (data.stock       !== undefined) upd.stock       = data.stock
     if (data.description !== undefined) upd.description = data.description
     if (data.warranty    !== undefined) upd.warranty    = data.warranty
-    // Optimistic update
     setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data, costPrice: data.costPrice ?? i.costPrice } : i))
-    if (Object.keys(upd).length) await supabase.from('inventory').update(upd).eq('id', id)
+    if (Object.keys(upd).length) {
+      const { error: itmErr } = await supabase.from('inventory').update(upd).eq('id', id)
+      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast('فشل تعديل المنتج — ' + itmErr.message, 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); return }
+    }
     if (old && data.stock !== undefined && data.stock !== old.stock)
       await pushAudit({ type:'inventory', orderRef:old.name, field:'تعديل المخزون', oldValue:`${old.stock} وحدة`, newValue:`${data.stock} وحدة`, changedBy:user?.name||'مجهول', note:data.adjustNote||'' })
   }
 
   const deleteInventoryItem = async (id, user) => {
     const item = inventory.find(i => i.id === id)
-    await supabase.from('inventory').delete().eq('id', id)
+    setInventory(prev => prev.filter(i => i.id !== id))
+    const { error: delInvErr } = await supabase.from('inventory').delete().eq('id', id)
+    if (delInvErr) { console.error('deleteInventoryItem:', delInvErr); toast('فشل حذف المنتج — ' + delInvErr.message, 'error'); setInventory(prev => [...prev, item]); return }
     await pushAudit({ type:'inventory', orderRef:item?.name||id, field:'حذف صنف', oldValue:`${item?.stock} وحدة`, newValue:'—', changedBy:user?.name||'مجهول' })
   }
 
@@ -327,26 +347,32 @@ export function OrdersProvider({ children }) {
       amount:invoice.amount||null, invoice_date:invoice.invoiceDate||null,
       uploaded_at:new Date().toISOString(), uploaded_by:user?.name||'مجهول', verified:false,
     }
-    await supabase.from('tax_invoices').insert(row)
+    const { error: taxErr } = await supabase.from('tax_invoices').insert(row)
+    if (taxErr) { console.error('addTaxInvoice:', taxErr); toast('فشل رفع الفاتورة الضريبية — ' + taxErr.message, 'error'); return null }
     await pushAudit({ type:'tax_invoice', orderId:invoice.orderId, orderRef:invoice.clientName, field:'رفع فاتورة ضريبية', oldValue:'—', newValue:invoice.filename, changedBy:user?.name||'مجهول' })
     return mapTax(row)
   }
 
   const verifyTaxInvoice = async (id, user) => {
     const inv = taxInvoices.find(i => i.id === id)
-    await supabase.from('tax_invoices').update({ verified:true }).eq('id', id)
+    setTaxInvoices(prev => prev.map(i => i.id === id ? { ...i, verified:true } : i))
+    const { error: verErr } = await supabase.from('tax_invoices').update({ verified:true }).eq('id', id)
+    if (verErr) { console.error('verifyTaxInvoice:', verErr); toast('فشل اعتماد الفاتورة — ' + verErr.message, 'error'); setTaxInvoices(prev => prev.map(i => i.id === id ? { ...i, verified:false } : i)); return }
     await pushAudit({ type:'tax_invoice', orderRef:inv?.clientName||id, field:'اعتماد فاتورة', oldValue:'غير معتمدة', newValue:'معتمدة', changedBy:user?.name||'مجهول' })
   }
 
   const deleteTaxInvoice = async (id, user) => {
     const inv = taxInvoices.find(i => i.id === id)
-    await supabase.from('tax_invoices').delete().eq('id', id)
+    setTaxInvoices(prev => prev.filter(i => i.id !== id))
+    const { error: delTaxErr } = await supabase.from('tax_invoices').delete().eq('id', id)
+    if (delTaxErr) { console.error('deleteTaxInvoice:', delTaxErr); toast('فشل حذف الفاتورة — ' + delTaxErr.message, 'error'); setTaxInvoices(prev => [...prev, inv]); return }
     await pushAudit({ type:'tax_invoice', orderRef:inv?.clientName||id, field:'حذف فاتورة ضريبية', oldValue:inv?.filename||'—', newValue:'—', changedBy:user?.name||'مجهول' })
   }
 
   return (
     <OrdersContext.Provider value={{
-      orders, inventory, auditLog, taxInvoices,
+      orders, inventory, auditLog, taxInvoices, loading,
+      hasMoreOrders, loadMoreOrders,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,

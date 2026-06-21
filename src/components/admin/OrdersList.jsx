@@ -5,6 +5,7 @@ import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { ORDER_STATUSES } from '../../data/mockData'
 import Pagination from '../ui/Pagination'
+import { SkeletonList } from '../ui/Skeleton'
 
 const PAGE_SIZE = 10
 
@@ -19,7 +20,7 @@ const pill = {
 }
 
 export default function OrdersList() {
-  const { orders } = useOrders()
+  const { orders, loading, hasMoreOrders, loadMoreOrders } = useOrders()
   const { salesReps } = useAuth()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -85,7 +86,7 @@ export default function OrdersList() {
 
       {/* List */}
       <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {filtered.length===0 ? (
+        {loading ? <SkeletonList count={6} /> : filtered.length===0 ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:60, borderRadius:14, background:'#fff', border:'1px solid #e4eaf3' }}>
             <Search size={36} color="#e4eaf3" style={{marginBottom:12}} />
             <p style={{ fontSize:14, fontWeight:500, color:'#94a3b8', marginBottom:8 }}>لا توجد طلبات تطابق البحث</p>
@@ -96,6 +97,13 @@ export default function OrdersList() {
       <div style={{ marginTop:8, background:'#fff', borderRadius:12, border:'1px solid #e4eaf3' }}>
         <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>
+      {hasMoreOrders && !hasFilter && (
+        <div style={{ textAlign:'center', marginTop:12 }}>
+          <button onClick={loadMoreOrders} style={{ padding:'10px 28px', borderRadius:8, border:'1.5px solid #2563eb', background:'#eff6ff', color:'#1d4ed8', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+            تحميل المزيد من الطلبات
+          </button>
+        </div>
+      )}
     </div>
   )
 }

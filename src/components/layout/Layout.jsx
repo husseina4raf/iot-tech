@@ -14,7 +14,7 @@ export default function Layout({ children }) {
           textAlign:'center', padding:'10px 24px', fontSize:11, color:'#94a3b8',
           borderTop:'1px solid #e4eaf3', background:'#fff', flexShrink:0,
         }}>
-          © 2026 <strong style={{ color:'#0f172a' }}>IoT Tech</strong> — All rights reserved &nbsp;|&nbsp; Developed by <strong style={{ color:'#2563eb' }}>H.Tech</strong>
+          © 2026 <strong style={{ color:'#0f172a' }}>IoT Tech</strong> — All rights reserved &nbsp;|&nbsp; Developed by <strong style={{ color:'#2563eb' }}>Nexus</strong>
         </footer>
       </div>
     </div>

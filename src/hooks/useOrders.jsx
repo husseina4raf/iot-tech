@@ -268,11 +268,13 @@ export function OrdersProvider({ children }) {
   }
 
   const addStockLot = async (itemId, { qty, costPrice, note }, user) => {
-    const item = inventory.find(i => i.id === itemId)
+    // Always fetch fresh data from Supabase to avoid stale local state
+    const { data: fresh } = await supabase.from('inventory').select('*').eq('id', itemId).single()
+    const item = fresh ? mapItem(fresh) : inventory.find(i => i.id === itemId)
     if (!item) return
     const newLot      = { id:`lot-${Date.now()}`, qty:Number(qty), costPrice:Number(costPrice), date:new Date().toISOString().split('T')[0], note:note||'' }
     const updatedLots = [...(item.lots||[]), newLot]
-    const newStock    = updatedLots.reduce((s,l)=>s+l.qty, 0)
+    const newStock    = updatedLots.reduce((s,l)=>s+(Number(l.qty)||0), 0)
     const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
     setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:updatedLots, stock:newStock, costPrice:fifoCost } : i))
     await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)

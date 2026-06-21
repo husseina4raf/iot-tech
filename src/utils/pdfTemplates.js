@@ -110,11 +110,11 @@ const BASE_CSS = `
     /* Footer — بدون خلفية */
     .footer { border-top:1px solid #000; padding:8px 40px; text-align:center; color:#555; font-size:10px; }
     /* Notes */
-    .notes { margin:0 40px 14px; border:1px solid #000; border-radius:6px; padding:10px 14px; }
-    .notes h4 { color:#000; font-size:11px; font-weight:700; margin-bottom:4px; }
-    .notes p  { color:#333; font-size:11px; direction:rtl; }
+    .notes { margin:0 40px 14px; border:1px solid #000; border-radius:6px; padding:14px 16px; }
+    .notes h4 { color:#000; font-size:13px; font-weight:700; margin-bottom:6px; }
+    .notes p  { color:#333; font-size:13px; direction:rtl; }
     /* Amount in words */
-    .words { margin:0 40px 14px; padding:8px 14px; border-radius:6px; border:1px solid #000; font-size:11px; direction:rtl; color:#333; }
+    .words { margin:0 40px 14px; padding:12px 16px; border-radius:6px; border:1px solid #000; font-size:13px; direction:rtl; color:#333; }
   </style>
 `
 

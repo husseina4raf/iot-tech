@@ -20,9 +20,11 @@ function FInput({ label, required, error, style={}, ...props }) {
   const errStyle = error ? { borderColor:'#e11d48', background:'#fff7f7' } : {}
   return (
     <div style={style}>
-      <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
-        {label}{required&&<span style={{color:'#e11d48'}}> *</span>}
-      </label>
+      {label != null && (
+        <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+          {label}{required&&<span style={{color:'#e11d48'}}> *</span>}
+        </label>
+      )}
       <input {...props} style={{ width:'100%', padding:'10px 12px', fontSize:13, border:`1.5px solid ${f?'#2563eb': error?'#e11d48':'#e4eaf3'}`, borderRadius:8, background:f?'#fff': error?'#fff7f7':'#f8fafc', color:'#0f172a', outline:'none', boxShadow:f?'0 0 0 3px rgba(37,99,235,0.1)':'none', transition:'all 0.15s', fontFamily:'Cairo,sans-serif', ...errStyle }}
         onFocus={()=>setF(true)} onBlur={()=>setF(false)} />
       {error && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{error}</span>}
@@ -221,12 +223,12 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
               العنوان <span style={{color:'#e11d48'}}> *</span>
             </label>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
-              <FInput placeholder="المحافظة" value={form.governorate||''} onChange={e=>upd('governorate',e.target.value)} />
-              <FInput placeholder="المدينة" value={form.city||''} onChange={e=>upd('city',e.target.value)} />
+              <FInput placeholder="المحافظة" value={form.governorate||''} onChange={e=>{upd('governorate',e.target.value);setErrors(p=>({...p,address:''}))}} />
+              <FInput placeholder="المدينة" value={form.city||''} onChange={e=>{upd('city',e.target.value);setErrors(p=>({...p,address:''}))}} />
               <FInput placeholder="المنطقة / الحي" value={form.district||''} onChange={e=>upd('district',e.target.value)} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:10 }}>
-              <FInput placeholder="الشارع" value={form.street||''} onChange={e=>upd('street',e.target.value)} />
+              <FInput placeholder="الشارع" value={form.street||''} onChange={e=>{upd('street',e.target.value);setErrors(p=>({...p,address:''}))}} />
               <FInput placeholder="رقم المبنى" value={form.buildingNo||''} onChange={e=>upd('buildingNo',e.target.value)} />
             </div>
             {errors.address && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:4 }}>{errors.address}</span>}

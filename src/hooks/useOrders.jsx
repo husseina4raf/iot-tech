@@ -299,8 +299,11 @@ export function OrdersProvider({ children }) {
     if (data.category    !== undefined) upd.category    = data.category
     if (data.price       !== undefined) upd.price       = data.price
     if (data.costPrice   !== undefined) upd.cost_price  = data.costPrice
+    if (data.stock       !== undefined) upd.stock       = data.stock
     if (data.description !== undefined) upd.description = data.description
     if (data.warranty    !== undefined) upd.warranty    = data.warranty
+    // Optimistic update
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data, costPrice: data.costPrice ?? i.costPrice } : i))
     if (Object.keys(upd).length) await supabase.from('inventory').update(upd).eq('id', id)
     if (old && data.stock !== undefined && data.stock !== old.stock)
       await pushAudit({ type:'inventory', orderRef:old.name, field:'تعديل المخزون', oldValue:`${old.stock} وحدة`, newValue:`${data.stock} وحدة`, changedBy:user?.name||'مجهول', note:data.adjustNote||'' })

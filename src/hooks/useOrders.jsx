@@ -121,7 +121,7 @@ export function OrdersProvider({ children }) {
       tax_number: orderData.taxNumber, notes: orderData.notes,
       payment_method: orderData.paymentMethod,
       date: orderData.date, time: orderData.time,
-      status: 'جديد',
+      status: 'بانتظار الموافقة',
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       edit_history: [],
     }

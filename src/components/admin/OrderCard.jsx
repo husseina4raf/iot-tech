@@ -116,8 +116,8 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {/* Approve / Reject — team_leader on جديد orders */}
-          {order.status === 'جديد' && user?.role === 'team_leader' && (
+          {/* Approve / Reject — team_leader on pending orders */}
+          {order.status === 'بانتظار الموافقة' && user?.role === 'team_leader' && (
             <>
               <button onClick={onApprove}
                 style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'none', background:'#059669', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}>
@@ -130,13 +130,27 @@ export default function OrderCard({ order }) {
             </>
           )}
 
-          {/* تم التحصيل — admin/super_admin on مكتمل orders */}
-          {order.status === 'مكتمل' && ['admin','super_admin'].includes(user?.role) && (
-            <button onClick={onCollect}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#10b981', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(16,185,129,0.35)' }}>
-              <Check size={13}/>تم التحصيل
-            </button>
-          )}
+          {/* Admin status-advance buttons */}
+          {['admin','super_admin'].includes(user?.role) && (<>
+            {order.status === 'موافق عليه' && (
+              <button onClick={() => { updateOrderStatus(order.id, 'تم الصرف', user); toast('تم تحديث الحالة إلى تم الصرف ✓', 'success') }}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#d97706', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(217,119,6,0.35)' }}>
+                <Check size={13}/>تم الصرف
+              </button>
+            )}
+            {order.status === 'تم الصرف' && (
+              <button onClick={() => { updateOrderStatus(order.id, 'مكتمل', user); toast('تم تحديث الحالة إلى مكتمل ✓', 'success') }}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#7c3aed', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(124,58,237,0.35)' }}>
+                <Check size={13}/>مكتمل
+              </button>
+            )}
+            {order.status === 'مكتمل' && (
+              <button onClick={onCollect}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#10b981', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(16,185,129,0.35)' }}>
+                <Check size={13}/>تم التحصيل
+              </button>
+            )}
+          </>)}
 
           {/* Print + Calendar — admin/super_admin on approved orders */}
           {['موافق عليه','تم الصرف','مكتمل','تم التحصيل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && (<>

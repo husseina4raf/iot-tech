@@ -185,36 +185,36 @@ export default function InventoryManager() {
         </div>
       </div>
 
-      {/* Add/Edit form */}
+      {/* Add/Edit modal */}
       {showForm && (
-        <div style={{ ...card, padding:20, marginBottom:16 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-            <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>{editId ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h3>
-            <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
-              <X size={18}/>
-            </button>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
-            <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
-            <FInput label="اسم الموديل (EN)" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
-            <FInput label="اسم الموديل (AR)" value={form.nameAr} onChange={e => upd('nameAr', e.target.value)} placeholder="قفل ذكي XYZ" />
-            <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
-            <FCombo label="التصنيف" options={INVENTORY_CATEGORIES} value={form.category} onChange={e => upd('category', e.target.value)} placeholder="اختر أو اكتب تصنيف جديد" />
-            <FInput label="المورد" value={form.supplier} onChange={e => upd('supplier', e.target.value)} placeholder="اسم المورد" />
-            <FInput label="الكمية المتاحة" type="number" value={form.stock} onChange={e => upd('stock', e.target.value)} placeholder="0" dir="ltr"/>
-            <FInput label="الحد الأدنى للتنبيه" type="number" value={form.minStock} onChange={e => upd('minStock', e.target.value)} placeholder="3" dir="ltr"/>
-            <FInput label="سعر التكلفة (LE)" required error={errors.costPrice} type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
-            <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
-          </div>
-          <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-            <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }}
-              style={{ padding:'8px 16px', borderRadius:8, border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-              إلغاء
-            </button>
-            <button onClick={handleSave}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-              <Check size={14}/>{editId ? 'حفظ التعديلات' : 'إضافة المنتج'}
-            </button>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowForm(false); setEditId(null); setErrors({}) } }}>
+          <div style={{ background:'#fff', borderRadius:16, padding:24, width:'min(600px,95vw)', maxHeight:'90vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.25)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+              <h3 style={{ fontSize:15, fontWeight:700, color:'#0f172a' }}>{editId ? 'تعديل المنتج' : 'إضافة منتج جديد'}</h3>
+              <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}>
+                <X size={18}/>
+              </button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+              <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
+              <FInput label="اسم الموديل" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
+              <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
+              <FCombo label="التصنيف" options={INVENTORY_CATEGORIES} value={form.category} onChange={e => upd('category', e.target.value)} placeholder="اختر أو اكتب تصنيف جديد" />
+              <FInput label="سعر التكلفة (LE)" required error={errors.costPrice} type="number" value={form.costPrice} onChange={e => upd('costPrice', e.target.value)} placeholder="0" dir="ltr"/>
+              <FInput label="سعر البيع (LE)" type="number" value={form.price} onChange={e => upd('price', e.target.value)} placeholder="0" dir="ltr"/>
+              <FInput label="ملاحظات" style={{gridColumn:'1/-1'}} value={form.notes} onChange={e => upd('notes', e.target.value)} placeholder="أي ملاحظات..." />
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button onClick={() => { setShowForm(false); setEditId(null); setErrors({}) }}
+                style={{ padding:'9px 18px', borderRadius:8, border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                إلغاء
+              </button>
+              <button onClick={handleSave}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 20px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                <Check size={14}/>{editId ? 'حفظ التعديلات' : 'إضافة المنتج'}
+              </button>
+            </div>
           </div>
         </div>
       )}

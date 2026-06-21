@@ -274,6 +274,7 @@ export function OrdersProvider({ children }) {
     const updatedLots = [...(item.lots||[]), newLot]
     const newStock    = updatedLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
+    setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:updatedLots, stock:newStock, costPrice:fifoCost } : i))
     await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
     await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة دفعة', oldValue:`${item.stock} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }
@@ -285,6 +286,7 @@ export function OrdersProvider({ children }) {
     const newLots  = (item.lots||[]).map(l => l.id===lotId ? {...l, qty:Number(qty), costPrice:Number(costPrice), note:note??l.note} : l)
     const newStock = newLots.reduce((s,l)=>s+l.qty, 0)
     const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
+    setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:newLots, stock:newStock, costPrice:fifoCost } : i))
     await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
     await pushAudit({ type:'inventory', orderRef:item.name, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
   }

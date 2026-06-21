@@ -39,6 +39,8 @@ export default function OrderCard({ order }) {
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +
       (order.time ? `\nوقت التركيب: ${order.time}` : '') +
+      (order.address ? `\n\nالعنوان: ${order.address}` : '') +
+      (order.locationLink ? `\nخريطة: ${order.locationLink}` : '') +
       `\n\nالأصناف:\n${items}` +
       `\n\nالإجمالي: ${order.total?.toLocaleString()} LE` +
       (order.invoiceType ? `\nنوع الفاتورة: ${order.invoiceType}` : '') +
@@ -46,7 +48,7 @@ export default function OrderCard({ order }) {
       (order.paymentMethod ? `\nطريقة الدفع: ${order.paymentMethod}` : '') +
       (order.notes ? `\n\nملاحظات: ${order.notes}` : '')
     )
-    const location = encodeURIComponent(order.address || '')
+    const location = encodeURIComponent(order.locationLink || order.address || '')
     // Build dates param if we have a date
     const parts = (order.date || '').split('-')
     let datesParam = ''

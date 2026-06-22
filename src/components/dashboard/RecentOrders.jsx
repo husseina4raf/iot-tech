@@ -18,7 +18,8 @@ export default function RecentOrders() {
           عرض الكل ←
         </Link>
       </div>
-      <table style={{ width:'100%', borderCollapse:'collapse' }}>
+      <div className="m-table-scroll">
+      <table style={{ width:'100%', borderCollapse:'collapse', minWidth:480 }}>
         <thead>
           <tr style={{ background:'#f8fafc' }}>
             {['العميل','المندوب','التاريخ','الإجمالي','الحالة'].map((h,i)=>(
@@ -49,6 +50,7 @@ export default function RecentOrders() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

@@ -110,7 +110,8 @@ export default function SalesReports() {
             <Users size={15} color="#2563eb"/>
             <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>أداء المندوبين</h3>
           </div>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <div className="m-table-scroll">
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:560 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
                 {['المندوب','عدد الطلبات','الإيرادات','صافي الربح','هامش الربح','معدل الإغلاق'].map((h,i) => (
@@ -150,6 +151,7 @@ export default function SalesReports() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -167,7 +169,8 @@ export default function SalesReports() {
               {SALES_REPS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <div className="m-table-scroll">
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:620 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
                 {['المنتج','الوحدات','عدد الطلبات','سعر البيع','سعر التكلفة','صافي الربح','هامش %'].map((h,i) => (
@@ -222,6 +225,7 @@ export default function SalesReports() {
               )
             })()}
           </table>
+          </div>
           {products.length === 0 && <div style={{ padding:30, textAlign:'center', color:'#94a3b8', fontSize:13 }}>لا توجد بيانات</div>}
         </div>
       )}

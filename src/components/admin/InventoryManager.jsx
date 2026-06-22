@@ -196,7 +196,7 @@ export default function InventoryManager() {
                 <X size={18}/>
               </button>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+            <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
               <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
               <FInput label="اسم الموديل" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
               <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
@@ -275,7 +275,8 @@ export default function InventoryManager() {
 
       {/* Inventory table */}
       <div style={card}>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+        <div className="m-table-scroll">
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:680 }}>
           <thead>
             <tr style={{ background:'#f8fafc' }}>
               {['SKU','المنتج / الموديل','الماركة','التصنيف','تكلفة الدفعة الحالية','المخزون','الحالة','إجراءات'].map((h, i) => (
@@ -447,6 +448,7 @@ export default function InventoryManager() {
             })}
           </tbody>
         </table>
+        </div>
         {filtered.length === 0 && (
           <div style={{ padding:40, textAlign:'center' }}>
             <Package size={32} color="#e4eaf3" style={{ margin:'0 auto 10px' }} />

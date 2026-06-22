@@ -80,8 +80,8 @@ export default function TaxInvoices() {
   return (
     <div>
       {/* Stats + Upload */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, gap:12 }}>
-        <div style={{ display:'flex', gap:10 }}>
+      <div className="m-wrap" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, gap:12 }}>
+        <div className="m-wrap" style={{ display:'flex', gap:10 }}>
           {[
             { label:'إجمالي الفواتير', value: taxInvoices.length, color:'#1d4ed8', bg:'#eff6ff' },
             { label:'معتمدة', value: verified, color:'#059669', bg:'#ecfdf5' },
@@ -153,7 +153,7 @@ export default function TaxInvoices() {
 
             {/* Preview of selected order */}
             {selectedOrder && (
-              <div style={{ marginTop:10, padding:'12px 16px', borderRadius:10, background:'#f0f7ff', border:'1.5px solid #bfdbfe', display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
+              <div className="m-grid-4" style={{ marginTop:10, padding:'12px 16px', borderRadius:10, background:'#f0f7ff', border:'1.5px solid #bfdbfe', display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
                 <div>
                   <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>رقم الطلب</div>
                   <div style={{ fontSize:13, fontWeight:700, color:'#1d4ed8' }}>#{selectedOrder.serialNumber}</div>
@@ -218,7 +218,8 @@ export default function TaxInvoices() {
             <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد فواتير ضريبية</p>
           </div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <div className="m-table-scroll">
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:620 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
                 {['الفاتورة الضريبية','الفاتورة المرتبطة في النظام','المبلغ','تاريخ الرفع','بواسطة','الحالة','إجراءات'].map((h,i) => (
@@ -291,6 +292,7 @@ export default function TaxInvoices() {
               })}
             </tbody>
           </table>
+          </div>
         )}
         <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
       </div>

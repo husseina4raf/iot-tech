@@ -32,7 +32,7 @@ export default function AdminPage() {
   return (
     <div style={{ maxWidth:1100, margin:'0 auto' }}>
       {/* Tab bar */}
-      <div style={{ display:'flex', gap:2, padding:5, borderRadius:14, background:'#fff', border:'1px solid #e4eaf3', marginBottom:20, boxShadow:'0 1px 4px rgba(15,23,42,0.05)', overflowX:'auto' }}>
+      <div className="m-tab-scroll" style={{ display:'flex', gap:2, padding:5, borderRadius:14, background:'#fff', border:'1px solid #e4eaf3', marginBottom:20, boxShadow:'0 1px 4px rgba(15,23,42,0.05)', overflowX:'auto' }}>
         {tabs.map(({ id, label, icon:Icon }) => {
           const badge = id === 'audit' ? auditLog.length : id === 'tax' ? pendingTax : null
           const active = tab === id

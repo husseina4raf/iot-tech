@@ -39,7 +39,7 @@ export default function AuditLog() {
   return (
     <div>
       {/* Summary strip */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10, marginBottom:16 }}>
+      <div className="m-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10, marginBottom:16 }}>
         {Object.entries(typeConfig).map(([key, cfg]) => {
           const count = auditLog.filter(e => e.type === key).length
           const active = typeFilter === key
@@ -54,7 +54,7 @@ export default function AuditLog() {
       </div>
 
       {/* Filters */}
-      <div style={{ ...card, padding:'12px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:10 }}>
+      <div className="m-wrap" style={{ ...card, padding:'12px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:10 }}>
         <Filter size={15} color="#94a3b8" style={{ flexShrink:0 }} />
         <div style={{ position:'relative', flex:1 }}>
           <Search size={13} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color:'#94a3b8' }} />

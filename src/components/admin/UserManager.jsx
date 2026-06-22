@@ -139,7 +139,7 @@ export default function UserManager() {
             })}
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+          <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
             <div>
               <FInput label="الاسم الكامل (عربي)" required icon={User}
                 value={form.name} onChange={e => upd('name', e.target.value)} placeholder="مثال: أحمد محمد علي" />
@@ -199,7 +199,8 @@ export default function UserManager() {
         {salesUsers.length === 0 ? (
           <div style={{ padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>لا يوجد مندوبون مسجلون</div>
         ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <div className="m-table-scroll">
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:520 }}>
             <thead>
               <tr style={{ background:'#f8fafc' }}>
                 {['المندوب','اسم العرض','اسم المستخدم','الصلاحية','إجراءات'].map((h, i) => (
@@ -246,6 +247,7 @@ export default function UserManager() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -256,7 +258,8 @@ export default function UserManager() {
           <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>حسابات الإدارة</h3>
           <span style={{ fontSize:11, color:'#94a3b8' }}>للعرض فقط — لا يمكن تعديلها</span>
         </div>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+        <div className="m-table-scroll">
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
           <tbody>
             {otherUsers.map(u => (
               <tr key={u.id} style={{ borderBottom:'1px solid #f8fafc' }}>
@@ -281,6 +284,7 @@ export default function UserManager() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

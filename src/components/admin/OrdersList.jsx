@@ -47,7 +47,7 @@ export default function OrdersList() {
   return (
     <div>
       {/* Status pills */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
+      <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
         {ORDER_STATUSES.map(s=>{
           const [bg,border,color]=pill[s]
           const active=status===s
@@ -61,7 +61,7 @@ export default function OrdersList() {
       </div>
 
       {/* Search + filters bar */}
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, background:'#fff', border:'1px solid #e4eaf3', marginBottom:16, boxShadow:'0 1px 4px rgba(15,23,42,0.05)' }}>
+      <div className="m-wrap" style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, background:'#fff', border:'1px solid #e4eaf3', marginBottom:16, boxShadow:'0 1px 4px rgba(15,23,42,0.05)' }}>
         <SlidersHorizontal size={15} color="#94a3b8" style={{flexShrink:0}} />
         <div style={{ position:'relative', flex:1 }}>
           <Search size={14} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', color: focused?'#2563eb':'#94a3b8' }} />

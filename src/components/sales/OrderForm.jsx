@@ -54,7 +54,9 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     } else if (!phoneRegex.test(form.mobile.trim())) {
       errs.mobile = 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
     }
-    if (form.whatsapp.trim() && !phoneRegex.test(form.whatsapp.trim())) {
+    if (!form.whatsapp.trim()) {
+      errs.whatsapp = 'رقم الواتساب مطلوب'
+    } else if (!phoneRegex.test(form.whatsapp.trim())) {
       errs.whatsapp = 'رقم واتساب غير صحيح — 01XXXXXXXXX'
     }
 

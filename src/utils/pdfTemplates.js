@@ -177,7 +177,6 @@ export async function generateDispatchPDF(order) {
       <div class="info-box">
         <div class="info-row"><span class="info-label">رقم الإذن:</span> <span class="info-val">${order.serialNumber}</span></div>
         <div class="info-row"><span class="info-label">التاريخ:</span>   <span class="info-val">${order.date}</span></div>
-        <div class="info-row"><span class="info-label">الوقت:</span>     <span class="info-val">${order.time}</span></div>
       </div>
       <div class="info-box">
         <div class="info-row"><span class="info-label">اسم الشركة / العميل:</span> <span class="info-val">${order.company}</span></div>
@@ -224,13 +223,6 @@ export async function generateDispatchPDF(order) {
     </div>
 
     ${order.address ? `<div class="notes"><h4>عنوان التسليم</h4><p>${order.address}</p></div>` : ''}
-
-    <div class="warranty">
-      <h4>شروط الضمان / Warranty Terms</h4>
-      <p>١. الضمان يغطي عيوب التصنيع فقط لمدة سنتين من تاريخ التركيب.</p>
-      <p>٢. يسقط الضمان في حالة سوء الاستخدام أو التعرض للمياه أو التعديل غير المصرح به.</p>
-      <p>٣. تحديثات البرنامج مجانية خلال فترة الضمان.</p>
-    </div>
 
     <div class="stamps">
       <div class="stamp-box"><div class="stamp-lbl">توقيع العميل / Client Signature</div></div>

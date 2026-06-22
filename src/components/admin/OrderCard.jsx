@@ -38,6 +38,8 @@ export default function OrderCard({ order }) {
     const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +
+      (order.mobile    ? `\nالموبايل: ${order.mobile}`  : '') +
+      (order.whatsapp  ? `\nواتساب: ${order.whatsapp}`  : '') +
       (order.time ? `\nوقت التركيب: ${order.time}` : '') +
       (order.address ? `\n\nالعنوان: ${order.address}` : '') +
       (order.locationLink ? `\nخريطة: ${order.locationLink}` : '') +

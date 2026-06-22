@@ -201,6 +201,26 @@ export default function SalesReports() {
                 )
               })}
             </tbody>
+            {products.length > 0 && (() => {
+              const totUnits   = products.reduce((s,p) => s + p.units, 0)
+              const totRev     = products.reduce((s,p) => s + p.revenue, 0)
+              const totCost    = products.reduce((s,p) => s + p.totalCost, 0)
+              const totProfit  = totRev - totCost
+              const totMargin  = totRev > 0 ? Math.round((totProfit / totRev) * 100) : 0
+              return (
+                <tfoot>
+                  <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
+                    <td style={{ padding:'12px 16px', fontWeight:800, color:'#1d4ed8' }}>الإجمالي</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }}>{totUnits}</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#94a3b8', fontSize:11 }}>—</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{totRev.toLocaleString()} LE</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#64748b' }} dir="ltr">{Math.round(totCost).toLocaleString()} LE</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color: totProfit >= 0 ? '#059669' : '#e11d48' }} dir="ltr">{Math.round(totProfit).toLocaleString()} LE</td>
+                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#7c3aed' }}>{totMargin}%</td>
+                  </tr>
+                </tfoot>
+              )
+            })()}
           </table>
           {products.length === 0 && <div style={{ padding:30, textAlign:'center', color:'#94a3b8', fontSize:13 }}>لا توجد بيانات</div>}
         </div>

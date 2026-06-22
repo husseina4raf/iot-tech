@@ -1,13 +1,27 @@
+import { useState } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import { useMobile } from '../../hooks/useMobile'
 
 export default function Layout({ children }) {
+  const isMobile = useMobile()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
     <div style={{ display:'flex', height:'100vh', width:'100%', overflow:'hidden', background:'#f0f4fa' }}>
-      <Sidebar />
+      <Sidebar isMobile={isMobile} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      {/* Mobile backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:99, backdropFilter:'blur(2px)' }}
+        />
+      )}
+
       <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden', minWidth:0 }}>
-        <TopBar />
-        <main style={{ flex:1, overflowY:'auto', padding:24 }}>
+        <TopBar isMobile={isMobile} onMenuOpen={() => setSidebarOpen(true)} />
+        <main style={{ flex:1, overflowY:'auto', padding: isMobile ? 12 : 24 }}>
           {children}
         </main>
         <footer style={{

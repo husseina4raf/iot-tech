@@ -107,7 +107,7 @@ export default function TeamLeaderPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
+      <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
         {[
           { label:'بانتظار الموافقة', value: pendingOrders.length, color:'#f97316' },
           { label:'إجمالي الفواتير',  value: allOrders.length,     color:'#2563eb' },
@@ -209,7 +209,7 @@ export default function TeamLeaderPage() {
                 {expanded[order.id] && (
                   <div style={{ borderTop:'1px solid #f0f4fa', background:'#f8fafc', padding:'14px 20px' }}>
                     {/* Contact / address info */}
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+                    <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
                       {[
                         { icon:Phone,    label:'موبايل / واتساب', val:`${order.mobile || '—'} / ${order.whatsapp || '—'}`, ltr:true },
                         order.address      && { icon:MapPin,     label:'العنوان',      val:order.address },

@@ -94,7 +94,7 @@ export default function ProfitReport() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
+      <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
         {[
           { label:'إجمالي الإيرادات', value:`${totalRevenue.toLocaleString()} LE`,         color:'#1d4ed8', bg:'#eff6ff' },
           { label:'إجمالي التكلفة',   value:`${Math.round(totalCost).toLocaleString()} LE`, color:'#64748b', bg:'#f8fafc' },

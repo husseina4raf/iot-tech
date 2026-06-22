@@ -79,7 +79,7 @@ export default function SalesReports() {
   return (
     <div>
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+      <div className="m-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[
           { label:'إجمالي الإيرادات', value:`${(totalRevenue/1000).toFixed(1)}K LE`, color:'#1d4ed8' },
           { label:'صافي الربح',       value:`${(totalProfit/1000).toFixed(1)}K LE`,  color:'#059669' },
@@ -94,7 +94,7 @@ export default function SalesReports() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:'flex', gap:1, padding:5, borderRadius:12, background:'#fff', border:'1px solid #e4eaf3', marginBottom:16, width:'fit-content' }}>
+      <div className="m-tab-scroll" style={{ display:'flex', gap:1, padding:5, borderRadius:12, background:'#fff', border:'1px solid #e4eaf3', marginBottom:16, width:'fit-content' }}>
         {tabs.map(({ id, label, icon:Icon }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 18px', borderRadius:9, border:'none', background: activeTab===id?'linear-gradient(135deg,#1d4ed8,#2563eb)':'transparent', color: activeTab===id?'#fff':'#64748b', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow: activeTab===id?'0 3px 10px rgba(37,99,235,0.3)':'none', transition:'all 0.15s' }}>

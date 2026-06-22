@@ -1,13 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_LABELS, ROLE_ROUTES } from '../../data/authData'
 
 const ALL_NAV = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'لوحة التحكم',  labelEn: 'Dashboard',   roles: ['super_admin'] },
-  { to: '/sales',        icon: ShoppingCart,    label: 'المبيعات',      labelEn: 'Sales',        roles: ['sales'] },
-  { to: '/team-leader',  icon: Users,           label: 'مراجعة الطلبات', labelEn: 'Team Leader', roles: ['team_leader'] },
-  { to: '/admin',        icon: Settings,        label: 'الإدارة',       labelEn: 'Admin',        roles: ['admin', 'super_admin'] },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'لوحة التحكم',   labelEn: 'Dashboard',   roles: ['super_admin'] },
+  { to: '/sales',        icon: ShoppingCart,    label: 'المبيعات',       labelEn: 'Sales',        roles: ['sales'] },
+  { to: '/team-leader',  icon: Users,           label: 'مراجعة الطلبات', labelEn: 'Team Leader',  roles: ['team_leader'] },
+  { to: '/admin',        icon: Settings,        label: 'الإدارة',        labelEn: 'Admin',        roles: ['admin', 'super_admin'] },
 ]
 
 const roleInfo = {
@@ -17,19 +17,40 @@ const roleInfo = {
   super_admin: { bg:'rgba(167,139,250,0.15)', color:'#c4b5fd', label:'مدير عام',       avatar:'linear-gradient(135deg,#8b5cf6,#6d28d9)' },
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile, isOpen, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const navItems = ALL_NAV.filter(i => i.roles.includes(user?.role))
   const info = roleInfo[user?.role] || roleInfo.sales
 
+  const sidebarStyle = isMobile ? {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    height: '100%',
+    width: 258,
+    background: '#0d1b3e',
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+    borderLeft: '1px solid rgba(255,255,255,0.05)',
+    zIndex: 100,
+    transform: isOpen ? 'translateX(0)' : 'translateX(110%)',
+    transition: 'transform 0.28s cubic-bezier(.4,0,.2,1)',
+    boxShadow: isOpen ? '-8px 0 32px rgba(0,0,0,0.35)' : 'none',
+  } : {
+    width: 258,
+    background: '#0d1b3e',
+    display: 'flex',
+    flexDirection: 'column',
+    flexShrink: 0,
+    borderLeft: '1px solid rgba(255,255,255,0.05)',
+  }
+
   return (
-    <aside dir="rtl" style={{
-      width: 258, background: '#0d1b3e', display:'flex', flexDirection:'column',
-      flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.05)',
-    }}>
+    <aside dir="rtl" style={sidebarStyle}>
       {/* Logo */}
-      <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <div style={{
             width:38, height:38, borderRadius:10, flexShrink:0,
@@ -44,6 +65,16 @@ export default function Sidebar() {
             <div style={{ color:'#475569', fontSize:11, marginTop:1 }}>إدارة المبيعات</div>
           </div>
         </div>
+
+        {/* Close button — mobile only */}
+        {isMobile && (
+          <button onClick={onClose}
+            style={{ width:32, height:32, borderRadius:8, background:'transparent', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}
+            onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+            <X size={17} color="#94a3b8" />
+          </button>
+        )}
       </div>
 
       {/* Section label */}
@@ -56,7 +87,8 @@ export default function Sidebar() {
       {/* Nav */}
       <nav style={{ flex:1, padding:'0 12px' }}>
         {navItems.map(({ to, icon: Icon, label, labelEn }) => (
-          <NavLink key={to} to={to} style={{ display:'block', marginBottom:2, textDecoration:'none' }}>
+          <NavLink key={to} to={to} style={{ display:'block', marginBottom:2, textDecoration:'none' }}
+            onClick={() => { if (isMobile) onClose() }}>
             {({ isActive }) => (
               <div style={{
                 display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10,
@@ -82,7 +114,6 @@ export default function Sidebar() {
 
       {/* User + logout */}
       <div style={{ padding:'12px 12px 16px' }}>
-        {/* User card */}
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', marginBottom:4 }}>
           <div style={{ width:34, height:34, borderRadius:'50%', background:info.avatar, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:14, flexShrink:0 }}>
             {user?.name?.[0] || '؟'}
@@ -95,7 +126,6 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Logout */}
         <button onClick={() => { logout(); navigate('/login', { replace:true }) }}
           style={{
             width:'100%', display:'flex', alignItems:'center', gap:8, padding:'9px 12px',

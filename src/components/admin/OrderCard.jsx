@@ -123,7 +123,7 @@ export default function OrderCard({ order }) {
         </div>
 
         {/* Actions */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+        <div className="m-wrap" style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
           {/* Approve / Reject — team_leader on pending orders */}
           {order.status === 'بانتظار الموافقة' && user?.role === 'team_leader' && (
             <>
@@ -197,7 +197,7 @@ export default function OrderCard({ order }) {
       {/* Expanded */}
       {expanded && (
         <div style={{ borderTop:'1px solid #f0f4fa', background:'#f8fafc', padding:'16px 20px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+          <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
             {[
               { icon:Phone,  label:'موبايل / واتساب', val:`${order.mobile} / ${order.whatsapp}`, ltr:true },
               order.address && { icon:MapPin, label:'العنوان', val:order.address },

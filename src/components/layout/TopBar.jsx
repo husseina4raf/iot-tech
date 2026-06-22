@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Bell, Package, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Bell, Package, Clock, CheckCircle, XCircle, Menu } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 
 const pages = {
   '/dashboard': { ar:'لوحة التحكم',  en:'Super Admin Dashboard' },
   '/sales':     { ar:'المبيعات',      en:'Sales Management' },
   '/admin':     { ar:'الإدارة',       en:'Orders Administration' },
+  '/team-leader': { ar:'مراجعة الطلبات', en:'Team Leader' },
 }
 
 const STATUS_CONFIG = {
@@ -16,7 +17,7 @@ const STATUS_CONFIG = {
   'مرفوض':            { color:'#e11d48', bg:'#fff1f2', icon: XCircle },
 }
 
-export default function TopBar() {
+export default function TopBar({ isMobile, onMenuOpen }) {
   const { pathname } = useLocation()
   const { orders }   = useOrders()
   const page         = pages[pathname] || pages['/dashboard']
@@ -24,14 +25,12 @@ export default function TopBar() {
   const [open, setOpen] = useState(false)
   const ref             = useRef(null)
 
-  // Close when clicking outside
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Notifications = pending + new orders (latest 10)
   const notifs = orders
     .filter(o => o.status === 'بانتظار الموافقة' || o.status === 'جديد')
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
@@ -43,16 +42,26 @@ export default function TopBar() {
     <header dir="rtl" style={{
       height:60, background:'#fff', borderBottom:'1px solid #e4eaf3',
       display:'flex', alignItems:'center', justifyContent:'space-between',
-      padding:'0 24px', flexShrink:0,
+      padding: isMobile ? '0 14px' : '0 24px', flexShrink:0,
       boxShadow:'0 1px 3px rgba(15,23,42,0.06)',
     }}>
-      <div>
-        <h1 style={{ fontSize:17, fontWeight:700, color:'#0f172a', lineHeight:1.3 }}>{page.ar}</h1>
-        <p style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{page.en}</p>
+      {/* Title + hamburger */}
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        {isMobile && (
+          <button onClick={onMenuOpen}
+            style={{ width:36, height:36, borderRadius:9, background:'#f7f9fc', border:'1px solid #e4eaf3', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}
+            onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
+            onMouseLeave={e => e.currentTarget.style.background='#f7f9fc'}>
+            <Menu size={18} color="#475569" />
+          </button>
+        )}
+        <div>
+          <h1 style={{ fontSize: isMobile ? 14 : 17, fontWeight:700, color:'#0f172a', lineHeight:1.3 }}>{page.ar}</h1>
+          {!isMobile && <p style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{page.en}</p>}
+        </div>
       </div>
 
-      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-
+      <div style={{ display:'flex', alignItems:'center', gap: isMobile ? 6 : 12 }}>
         {/* Bell */}
         <div ref={ref} style={{ position:'relative' }}>
           <button
@@ -67,7 +76,6 @@ export default function TopBar() {
             <Bell size={15} color={open ? '#2563eb' : '#64748b'} />
           </button>
 
-          {/* Badge */}
           {count > 0 && (
             <span style={{
               position:'absolute', top:-5, right:-5, minWidth:18, height:18,
@@ -80,15 +88,14 @@ export default function TopBar() {
             </span>
           )}
 
-          {/* Dropdown */}
           {open && (
             <div style={{
-              position:'absolute', top:42, left:0, width:320, zIndex:1000,
+              position:'absolute', top:42, left: isMobile ? 'auto' : 0, right: isMobile ? 0 : 'auto',
+              width: isMobile ? 'calc(100vw - 28px)' : 320, maxWidth:320, zIndex:1000,
               background:'#fff', borderRadius:14, border:'1px solid #e4eaf3',
               boxShadow:'0 8px 32px rgba(15,23,42,0.15)', overflow:'hidden',
               animation:'fadeDown 0.15s ease-out',
             }}>
-              {/* Header */}
               <div style={{ padding:'14px 16px', borderBottom:'1px solid #f0f4fa', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>الإشعارات</span>
                 {count > 0 && (
@@ -98,7 +105,6 @@ export default function TopBar() {
                 )}
               </div>
 
-              {/* List */}
               <div style={{ maxHeight:340, overflowY:'auto' }}>
                 {notifs.length === 0 ? (
                   <div style={{ padding:'32px 16px', textAlign:'center' }}>
@@ -151,9 +157,12 @@ export default function TopBar() {
           )}
         </div>
 
-        <div style={{ fontSize:12, color:'#64748b', padding:'5px 10px', borderRadius:8, background:'#f7f9fc', border:'1px solid #e4eaf3' }}>
-          {new Date().toLocaleDateString('ar-EG', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}
-        </div>
+        {/* Date — hidden on mobile */}
+        {!isMobile && (
+          <div style={{ fontSize:12, color:'#64748b', padding:'5px 10px', borderRadius:8, background:'#f7f9fc', border:'1px solid #e4eaf3' }}>
+            {new Date().toLocaleDateString('ar-EG', { weekday:'short', year:'numeric', month:'short', day:'numeric' })}
+          </div>
+        )}
       </div>
 
       <style>{`

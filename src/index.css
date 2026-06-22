@@ -35,6 +35,31 @@ body {
 [dir="rtl"] select { direction: rtl; }
 [dir="rtl"] input[type="number"] { direction: ltr; text-align: right; }
 
+/* ─── Responsive utilities ─────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Grid column overrides — use !important to beat inline styles */
+  .m-grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .m-grid-3 { grid-template-columns: 1fr 1fr !important; }
+  .m-grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Horizontally-scrollable table wrapper */
+  .m-table-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+
+  /* Hide elements on mobile */
+  .m-hide { display: none !important; }
+
+  /* Smaller font inside tables */
+  .m-table-scroll table { font-size: 11px !important; min-width: 480px; }
+
+  /* Flex wrapping helpers */
+  .m-wrap { flex-wrap: wrap !important; }
+  .m-col  { flex-direction: column !important; }
+
+  /* Tab bars — scroll horizontally instead of wrapping */
+  .m-tab-scroll { overflow-x: auto !important; white-space: nowrap !important; -webkit-overflow-scrolling: touch; padding-bottom: 4px !important; }
+  .m-tab-scroll button { flex-shrink: 0 !important; }
+}
+
 @media print {
   body { font-size: 16px !important; }
   * { font-size: inherit !important; }

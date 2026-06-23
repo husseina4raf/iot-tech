@@ -60,9 +60,10 @@ export default function OrderForm({ editOrder = null, onSaved }) {
       errs.whatsapp = 'رقم واتساب غير صحيح — 01XXXXXXXXX'
     }
 
-    if (!form.street?.trim() && !form.city?.trim() && !form.governorate?.trim()) {
-      errs.address = 'يرجى إدخال العنوان (المحافظة أو المدينة أو الشارع على الأقل)'
-    }
+    if (!form.governorate?.trim()) errs.governorate = 'المحافظة مطلوبة'
+    if (!form.city?.trim())        errs.city        = 'المدينة / المركز مطلوب'
+    if (!form.street?.trim())      errs.street      = 'الشارع مطلوب'
+    if (!form.time?.trim())        errs.time        = 'وقت التركيب مطلوب'
 
     if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
     if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'

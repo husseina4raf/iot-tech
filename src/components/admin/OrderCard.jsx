@@ -34,7 +34,7 @@ export default function OrderCard({ order }) {
   const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
 
   const onCalendar = () => {
-    const title   = encodeURIComponent(`تركيب IoT Tech — ${order.clientName} (${order.company})`)
+    const title   = encodeURIComponent(order.clientName)
     const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +

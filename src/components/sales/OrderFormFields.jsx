@@ -225,26 +225,29 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
               العنوان <span style={{ color: '#e11d48' }}> *</span>
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <select value={form.governorate || ''} onChange={e => { upd('governorate', e.target.value); upd('city', ''); setErrors(p => ({ ...p, address: '' })) }}
-                style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: form.governorate ? '#0f172a' : '#9ca3af', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
-                <option value="">المحافظة</option>
-                {EGYPT_GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
               <div>
-                <input list="city-list" placeholder="المدينة / المركز" value={form.city || ''}
-                  onChange={e => { upd('city', e.target.value); setErrors(p => ({ ...p, address: '' })) }}
-                  style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', boxSizing: 'border-box' }} />
+                <select value={form.governorate || ''} onChange={e => { upd('governorate', e.target.value); upd('city', '') }}
+                  style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: `1.5px solid ${errors.governorate ? '#e11d48' : '#e4eaf3'}`, borderRadius: 8, background: errors.governorate ? '#fff7f7' : '#f8fafc', color: form.governorate ? '#0f172a' : '#9ca3af', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
+                  <option value="">المحافظة *</option>
+                  {EGYPT_GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                {errors.governorate && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.governorate}</span>}
+              </div>
+              <div>
+                <input list="city-list" placeholder="المدينة / المركز *" value={form.city || ''}
+                  onChange={e => upd('city', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', fontSize: 13, border: `1.5px solid ${errors.city ? '#e11d48' : '#e4eaf3'}`, borderRadius: 8, background: errors.city ? '#fff7f7' : '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', boxSizing: 'border-box' }} />
                 <datalist id="city-list">
                   {(EGYPT_CITIES[form.governorate] || []).map(c => <option key={c} value={c} />)}
                 </datalist>
+                {errors.city && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.city}</span>}
               </div>
               <FInput placeholder="المنطقة / الحي" value={form.district || ''} onChange={e => upd('district', e.target.value)} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-              <FInput placeholder="الشارع" value={form.street || ''} onChange={e => { upd('street', e.target.value); setErrors(p => ({ ...p, address: '' })) }} />
+              <FInput placeholder="الشارع *" error={errors.street} value={form.street || ''} onChange={e => upd('street', e.target.value)} />
               <FInput placeholder="رقم المبنى" value={form.buildingNo || ''} onChange={e => upd('buildingNo', e.target.value)} />
             </div>
-            {errors.address && <span style={{ display: 'block', fontSize: 11, color: '#e11d48', marginTop: 4 }}>{errors.address}</span>}
           </div>
 
           <FInput label="رابط الموقع على الخريطة" style={{ gridColumn: '1/-1' }} placeholder="https://maps.google.com/..." value={form.locationLink} onChange={e => upd('locationLink', e.target.value)} dir="ltr" />
@@ -361,16 +364,17 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
             onChange={e => { const d = e.target.value; setForm(p => ({ ...p, dateRaw: d, date: d ? d.split('-').reverse().join('-') : '' })) }} />
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-              وقت التركيب
-              <span style={{ marginRight: 6, fontSize: 10, color: '#94a3b8', fontWeight: 400 }}>(يظهر في الكالندر فقط)</span>
+              وقت التركيب <span style={{ color: '#e11d48' }}>*</span>
+              <span style={{ marginRight: 6, fontSize: 10, color: '#94a3b8', fontWeight: 400 }}>(يظهر في الكالندر)</span>
             </label>
             <div style={{ position: 'relative' }}>
               <Clock size={13} color="#94a3b8" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               <input type="time" value={form.time} onChange={e => upd('time', e.target.value)} dir="ltr"
-                style={{ width: '100%', padding: '10px 36px 10px 12px', fontSize: 13, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '10px 36px 10px 12px', fontSize: 13, border: `1.5px solid ${errors.time ? '#e11d48' : '#e4eaf3'}`, borderRadius: 8, background: errors.time ? '#fff7f7' : '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', boxSizing: 'border-box' }}
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff' }}
-                onBlur={e => { e.target.style.borderColor = '#e4eaf3'; e.target.style.background = '#f8fafc' }} />
+                onBlur={e => { e.target.style.borderColor = errors.time ? '#e11d48' : '#e4eaf3'; e.target.style.background = errors.time ? '#fff7f7' : '#f8fafc' }} />
             </div>
+            {errors.time && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.time}</span>}
           </div>
           <FTextarea label="ملاحظات" style={{ gridColumn: '1/-1' }} placeholder="أي ملاحظات إضافية..." rows={3} value={form.notes} onChange={e => upd('notes', e.target.value)} />
         </div>

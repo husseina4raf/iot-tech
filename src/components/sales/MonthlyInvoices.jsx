@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText, Phone, MapPin, CreditCard, Package, User } from 'lucide-react'
 import Badge from '../ui/Badge'
 import OrderForm from './OrderForm'
 import { useOrders } from '../../hooks/useOrders'
@@ -15,8 +15,10 @@ const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', b
 export default function MonthlyInvoices() {
   const { user } = useAuth()
   const { getOrdersByRepGrouped } = useOrders()
-  const [editingOrder, setEditingOrder] = useState(null)
-  const [openMonths, setOpenMonths] = useState({})
+  const [editingOrder, setEditingOrder]   = useState(null)
+  const [openMonths, setOpenMonths]       = useState({})
+  const [expandedOrders, setExpandedOrders] = useState({})
+  const toggleOrder = (id) => setExpandedOrders(p => ({ ...p, [id]: !p[id] }))
   const [year,   setYear]   = useState(() => new Date().getFullYear())
   const [month,  setMonth]  = useState(() => new Date().getMonth())
   const [period, setPeriod] = useState('month')
@@ -144,43 +146,107 @@ export default function MonthlyInvoices() {
               {open && (
                 <div style={{ borderTop:'1px solid #f0f4fa' }}>
                   {group.orders.map((order, idx) => (
-                    <div key={order.id}
-                      style={{ padding:'12px 20px', borderBottom: idx < group.orders.length - 1 ? '1px solid #f8fafc' : 'none', display:'flex', alignItems:'center', gap:12 }}>
-                      {/* Serial */}
-                      <div style={{ width:70, fontSize:11, color:'#94a3b8', flexShrink:0 }}>#{order.serialNumber}</div>
+                    <div key={order.id} style={{ borderBottom: idx < group.orders.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                      {/* Row */}
+                      <div style={{ padding:'12px 20px', display:'flex', alignItems:'center', gap:12 }}>
+                        {/* Serial */}
+                        <div style={{ width:70, fontSize:11, color:'#94a3b8', flexShrink:0 }}>#{order.serialNumber}</div>
 
-                      {/* Client */}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:'#0f172a', marginBottom:2 }}>{order.clientName}</div>
-                        <div style={{ fontSize:11, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{order.company}</div>
-                      </div>
+                        {/* Client */}
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:'#0f172a', marginBottom:2 }}>{order.clientName}</div>
+                          <div style={{ fontSize:11, color:'#64748b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{order.company}</div>
+                        </div>
 
-                      {/* Date */}
-                      <div style={{ fontSize:12, color:'#94a3b8', flexShrink:0, minWidth:80 }}>{order.date}</div>
+                        {/* Date */}
+                        <div style={{ fontSize:12, color:'#94a3b8', flexShrink:0, minWidth:80 }}>{order.date}</div>
 
-                      {/* Amount */}
-                      <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', flexShrink:0, minWidth:100, textAlign:'left' }} dir="ltr">
-                        {order.total.toLocaleString()} <span style={{ fontSize:10, fontWeight:400, color:'#94a3b8' }}>LE</span>
-                      </div>
+                        {/* Amount */}
+                        <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', flexShrink:0, minWidth:100, textAlign:'left' }} dir="ltr">
+                          {order.total.toLocaleString()} <span style={{ fontSize:10, fontWeight:400, color:'#94a3b8' }}>LE</span>
+                        </div>
 
-                      {/* Status */}
-                      <div style={{ flexShrink:0 }}>
-                        <Badge status={order.status}>{order.status}</Badge>
-                      </div>
+                        {/* Status */}
+                        <div style={{ flexShrink:0 }}>
+                          <Badge status={order.status}>{order.status}</Badge>
+                        </div>
 
-                      {/* Actions */}
-                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                        {order.status === 'جديد' ? (
-                          <button onClick={() => setEditingOrder(order)}
-                            style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:7, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                            <Edit3 size={11}/>تعديل
+                        {/* Actions */}
+                        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                          {['جديد','مرفوض'].includes(order.status) ? (
+                            <button onClick={() => setEditingOrder(order)}
+                              style={{ display:'flex', alignItems:'center', gap:4, padding:'5px 10px', borderRadius:7, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                              <Edit3 size={11}/>تعديل
+                            </button>
+                          ) : (
+                            <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color:'#94a3b8', padding:'4px 8px', borderRadius:7, background:'#f8fafc', border:'1px solid #e4eaf3' }}>
+                              <Lock size={10}/>مغلق
+                            </span>
+                          )}
+                          <button onClick={() => toggleOrder(order.id)}
+                            style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 8px', borderRadius:7, border:'1.5px solid #e4eaf3', background: expandedOrders[order.id]?'#f0f4fa':'#fff', color:'#475569', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                            <ChevronDown size={11} style={{ transform: expandedOrders[order.id]?'rotate(180deg)':'none', transition:'transform 0.2s' }}/>
+                            تفاصيل
                           </button>
-                        ) : (
-                          <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color:'#94a3b8', padding:'4px 8px', borderRadius:7, background:'#f8fafc', border:'1px solid #e4eaf3' }}>
-                            <Lock size={10}/>مغلق
-                          </span>
-                        )}
+                        </div>
                       </div>
+
+                      {/* Expanded details */}
+                      {expandedOrders[order.id] && (
+                        <div style={{ background:'#f8fafc', borderTop:'1px solid #f0f4fa', padding:'12px 20px' }}>
+                          {/* Contact */}
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
+                            {[
+                              { icon:Phone,    label:'موبايل / واتساب', val:`${order.mobile || '—'} / ${order.whatsapp || '—'}`, ltr:true },
+                              order.address       && { icon:MapPin,     label:'العنوان',      val:order.address },
+                              order.paymentMethod && { icon:CreditCard, label:'طريقة الدفع', val:order.paymentMethod },
+                            ].filter(Boolean).map(row => (
+                              <div key={row.label} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'8px 12px', borderRadius:8, background:'#fff', border:'1px solid #f0f4fa' }}>
+                                <row.icon size={13} color="#94a3b8" style={{ marginTop:2, flexShrink:0 }} />
+                                <div>
+                                  <div style={{ fontSize:10, color:'#94a3b8', marginBottom:2 }}>{row.label}</div>
+                                  <div style={{ fontSize:12, color:'#0f172a' }} dir={row.ltr?'ltr':'rtl'}>{row.val}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Items table */}
+                          <div style={{ borderRadius:8, overflow:'hidden', border:'1px solid #e4eaf3', marginBottom:order.notes?10:0 }}>
+                            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+                              <thead>
+                                <tr style={{ background:'#0f172a' }}>
+                                  {['الصنف','الكمية','السعر','الإجمالي'].map((h,i)=>(
+                                    <th key={h} style={{ padding:'7px 12px', color:'#e2e8f0', fontWeight:600, textAlign:i===0?'right':'center' }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {order.items?.map((item,i)=>(
+                                  <tr key={item.id||i} style={{ background:i%2===0?'#fff':'#f8fafc', borderBottom:'1px solid #f0f4fa' }}>
+                                    <td style={{ padding:'7px 12px', fontWeight:600, color:'#0f172a' }}>{item.name}</td>
+                                    <td style={{ padding:'7px 12px', textAlign:'center' }}>{item.quantity}</td>
+                                    <td style={{ padding:'7px 12px', textAlign:'center', color:'#64748b' }} dir="ltr">{item.price?.toLocaleString()} LE</td>
+                                    <td style={{ padding:'7px 12px', textAlign:'center', fontWeight:700, color:'#1d4ed8' }} dir="ltr">{item.total?.toLocaleString()} LE</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
+                                  <td colSpan={3} style={{ padding:'7px 12px', fontWeight:700, color:'#1d4ed8', fontSize:11 }}>الإجمالي</td>
+                                  <td style={{ padding:'7px 12px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{order.total?.toLocaleString()} LE</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+
+                          {order.notes && (
+                            <div style={{ padding:'8px 12px', borderRadius:8, background:'#eff6ff', border:'1px solid #bfdbfe', fontSize:11, color:'#1e293b' }}>
+                              <span style={{ fontWeight:700, color:'#1d4ed8' }}>ملاحظات: </span>{order.notes}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
 

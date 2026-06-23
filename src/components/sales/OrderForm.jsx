@@ -66,6 +66,8 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
     if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
     if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
+    if (!form.invoiceName?.trim())  errs.invoiceName   = 'الفاتورة باسم مين مطلوب'
+    if (!form.paymentMethod)        errs.paymentMethod = 'طريقة الدفع مطلوبة'
     if (form.invoiceType === 'فاتورة ضريبية' && !form.taxNumber?.trim()) errs.taxNumber = 'الرقم الضريبي مطلوب للفاتورة الضريبية'
 
     if (Object.keys(errs).length > 0) { setErrors(errs); return }

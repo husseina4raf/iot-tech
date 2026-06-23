@@ -349,11 +349,11 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
           <FSelect label="نوع الفاتورة" required value={form.invoiceType} onChange={e => upd('invoiceType', e.target.value)}>
             {INVOICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </FSelect>
-          <FInput label="الفاتورة باسم مين" placeholder="اسم الشركة أو الشخص" value={form.invoiceName} onChange={e => upd('invoiceName', e.target.value)} />
+          <FInput label="الفاتورة باسم مين" required error={errors.invoiceName} placeholder="اسم الشركة أو الشخص" value={form.invoiceName} onChange={e => upd('invoiceName', e.target.value)} />
           {form.invoiceType === 'فاتورة ضريبية' &&
             <FInput label="الرقم الضريبي" required placeholder="123456789" error={errors.taxNumber} value={form.taxNumber} onChange={e => upd('taxNumber', e.target.value)} dir="ltr" />
           }
-          <FSelect label="طريقة الدفع" value={form.paymentMethod} onChange={e => upd('paymentMethod', e.target.value)}>
+          <FSelect label="طريقة الدفع" required error={errors.paymentMethod} value={form.paymentMethod} onChange={e => upd('paymentMethod', e.target.value)}>
             <option value="">اختر طريقة الدفع</option>
             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
           </FSelect>

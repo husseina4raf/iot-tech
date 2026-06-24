@@ -267,7 +267,7 @@ export async function generateInvoicePDF(order) {
 
     <div class="info-grid">
       <div class="info-box">
-        <div class="info-row"><span class="info-label">رقم الفاتورة:</span>  <span class="info-val">${order.serialNumber}</span></div>
+        <div class="info-row"><span class="info-label">${isVat ? 'رقم الفاتورة:' : 'رقم البيان:'}</span>  <span class="info-val">${order.serialNumber}</span></div>
         <div class="info-row"><span class="info-label">التاريخ:</span>        <span class="info-val">${order.date}</span></div>
         <div class="info-row"><span class="info-label">المندوب:</span>        <span class="info-val">${order.salesRep}</span></div>
       </div>

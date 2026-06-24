@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, Package } from 'lucide-react'
+import { TrendingUp, Package, ChevronDown } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -25,7 +25,10 @@ export default function ProfitReport() {
   const [year,   setYear]   = useState(now.getFullYear())
   const [month,  setMonth]  = useState(now.getMonth())
   const [period, setPeriod] = useState('month')
+  const [expanded, setExpanded] = useState({})
   const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - i)
+
+  const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }))
 
   const repName = user?.repName
   const repOrders = repName ? orders.filter(o => {
@@ -37,32 +40,13 @@ export default function ProfitReport() {
       return parseInt(parts[2], 10) === year && parseInt(parts[1], 10) - 1 === month
     }
     return true
-  }) : []
+  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
 
-  // Aggregate per product
-  const productMap = {}
-  repOrders.forEach(order => {
-    order.items.forEach(item => {
-      const costPrice = getCostPrice(item.name, inventory)
-      if (!productMap[item.name]) {
-        productMap[item.name] = {
-          name: item.name,
-          units: 0,
-          revenue: 0,
-          totalCost: 0,
-          unitCost: costPrice,
-          hasCost: costPrice > 0,
-        }
-      }
-      productMap[item.name].units     += Number(item.quantity) || 0
-      productMap[item.name].revenue   += item.total
-      productMap[item.name].totalCost += costPrice * (Number(item.quantity) || 0)
-    })
-  })
-
-  const products = Object.values(productMap).sort((a, b) => b.revenue - a.revenue)
-  const totalRevenue = products.reduce((s, p) => s + p.revenue, 0)
-  const totalCost    = products.reduce((s, p) => s + p.totalCost, 0)
+  // Totals across all filtered orders
+  const totalRevenue = repOrders.reduce((s, o) => s + o.total, 0)
+  const totalCost    = repOrders.reduce((s, o) =>
+    s + o.items.reduce((ss, item) => ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
+  , 0)
   const totalProfit  = totalRevenue - totalCost
 
   return (
@@ -97,9 +81,9 @@ export default function ProfitReport() {
       {/* Summary cards */}
       <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
         {[
-          { label:'إجمالي الإيرادات', value:`${totalRevenue.toLocaleString()} LE`,         color:'#1d4ed8', bg:'#eff6ff' },
-          { label:'إجمالي التكلفة',   value:`${Math.round(totalCost).toLocaleString()} LE`, color:'#64748b', bg:'#f8fafc' },
-          { label:'صافي الربح',       value:`${Math.round(totalProfit).toLocaleString()} LE`, color:'#059669', bg:'#ecfdf5' },
+          { label:'إجمالي الإيرادات', value:`${totalRevenue.toLocaleString()} LE`,           color:'#1d4ed8', bg:'#eff6ff' },
+          { label:'إجمالي التكلفة',   value:`${Math.round(totalCost).toLocaleString()} LE`,   color:'#64748b', bg:'#f8fafc' },
+          { label:'صافي الربح',       value:`${Math.round(totalProfit).toLocaleString()} LE`, color: totalProfit>=0?'#059669':'#e11d48', bg: totalProfit>=0?'#ecfdf5':'#fff1f2' },
         ].map(s => (
           <div key={s.label} style={{ ...card, padding:'16px 20px' }}>
             <div style={{ fontSize:24, fontWeight:800, color:s.color, marginBottom:4 }} dir="ltr">{s.value}</div>
@@ -108,67 +92,104 @@ export default function ProfitReport() {
         ))}
       </div>
 
-      {/* Product breakdown — cards */}
+      {/* Orders list */}
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
         <TrendingUp size={15} color="#2563eb" />
-        <span style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>تقرير الربح بالمنتج</span>
-        <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>طلبات تم التحصيل فقط</span>
+        <span style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>الطلبات المحصّلة</span>
+        <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>تم التحصيل فقط</span>
       </div>
 
-      {products.length === 0 ? (
+      {repOrders.length === 0 ? (
         <div style={{ ...card, padding:40, textAlign:'center' }}>
           <Package size={36} color="#e4eaf3" style={{ margin:'0 auto 12px' }} />
           <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد طلبات تم تحصيلها بعد</p>
         </div>
       ) : (
-        <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          {products.map((p, i) => {
-            const profit   = p.revenue - p.totalCost
-            const margin   = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
-            const isPos    = profit >= 0
-            const barWidth = Math.min(Math.abs(margin), 100)
-            const rankColors = ['linear-gradient(135deg,#f59e0b,#d97706)','linear-gradient(135deg,#94a3b8,#64748b)','linear-gradient(135deg,#b45309,#92400e)']
-            const rankBg = rankColors[i] || 'linear-gradient(135deg,#1d4ed8,#2563eb)'
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {repOrders.map((order, idx) => {
+            const orderCost   = order.items.reduce((s, item) => s + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
+            const orderProfit = order.total - orderCost
+            const margin      = order.total > 0 ? Math.round((orderProfit / order.total) * 100) : 0
+            const isPos       = orderProfit >= 0
+            const isOpen      = expanded[order.id] !== false && (expanded[order.id] === true || idx === 0)
+
             return (
-              <div key={p.name} style={{ ...card, padding:20 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-                  <div style={{ width:30, height:30, borderRadius:9, background:rankBg, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:800, flexShrink:0 }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{p.units} وحدة</div>
-                  </div>
-                </div>
+              <div key={order.id} style={card}>
+                {/* Order header — clickable */}
+                <button onClick={() => toggle(order.id)}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 20px', background:'none', border:'none', cursor:'pointer', fontFamily:'Cairo,sans-serif', textAlign:'right' }}>
 
-                <div style={{ marginBottom:14 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5 }}>
-                    <span style={{ color:'#64748b' }}>هامش الربح</span>
-                    <span style={{ fontWeight:800, color: p.hasCost ? (isPos?'#059669':'#e11d48') : '#94a3b8' }}>
-                      {p.hasCost ? `${margin}%` : 'لا يوجد سعر تكلفة'}
-                    </span>
-                  </div>
-                  <div style={{ height:8, borderRadius:20, background:'#f0f4fa', overflow:'hidden' }}>
-                    {p.hasCost && (
-                      <div style={{ height:'100%', width:`${barWidth}%`, background: isPos ? 'linear-gradient(90deg,#059669,#34d399)' : 'linear-gradient(90deg,#e11d48,#fb7185)', borderRadius:20 }} />
-                    )}
-                  </div>
-                </div>
+                  {/* Serial */}
+                  <div style={{ fontSize:11, color:'#94a3b8', flexShrink:0, minWidth:72 }}>#{order.serialNumber}</div>
 
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div style={{ padding:'8px 12px', borderRadius:10, background:'#eff6ff', border:'1px solid #bfdbfe' }}>
-                    <div style={{ fontSize:10, color:'#3b82f6', fontWeight:600, marginBottom:3 }}>إجمالي المبيعات</div>
-                    <div style={{ fontSize:15, fontWeight:800, color:'#1d4ed8' }} dir="ltr">
-                      {p.revenue >= 1000 ? `${(p.revenue/1000).toFixed(1)}K` : p.revenue.toLocaleString()}
-                    </div>
+                  {/* Client */}
+                  <div style={{ flex:1, minWidth:0, textAlign:'right' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>{order.clientName}</div>
+                    <div style={{ fontSize:11, color:'#64748b', marginTop:1 }}>{order.company}</div>
                   </div>
-                  <div style={{ padding:'8px 12px', borderRadius:10, background: !p.hasCost?'#f8fafc':isPos?'#ecfdf5':'#fff1f2', border:`1px solid ${!p.hasCost?'#e4eaf3':isPos?'#a7f3d0':'#fecdd3'}` }}>
-                    <div style={{ fontSize:10, color: !p.hasCost?'#94a3b8':isPos?'#059669':'#e11d48', fontWeight:600, marginBottom:3 }}>صافي الربح</div>
-                    <div style={{ fontSize:15, fontWeight:800, color: !p.hasCost?'#cbd5e1':isPos?'#059669':'#e11d48' }} dir="ltr">
-                      {p.hasCost ? (Math.abs(profit)>=1000 ? `${(profit/1000).toFixed(1)}K` : Math.round(profit).toLocaleString()) : '—'}
-                    </div>
+
+                  {/* Date */}
+                  <div style={{ fontSize:11, color:'#94a3b8', flexShrink:0 }}>{order.date}</div>
+
+                  {/* Profit pill */}
+                  <div style={{ padding:'4px 10px', borderRadius:20, background: isPos?'#ecfdf5':'#fff1f2', border:`1px solid ${isPos?'#a7f3d0':'#fecdd3'}`, fontSize:11, fontWeight:800, color: isPos?'#059669':'#e11d48', flexShrink:0 }} dir="ltr">
+                    {isPos?'+':''}{Math.round(orderProfit).toLocaleString()} LE
                   </div>
-                </div>
+
+                  {/* Revenue */}
+                  <div style={{ fontSize:13, fontWeight:700, color:'#1d4ed8', flexShrink:0, minWidth:90 }} dir="ltr">
+                    {order.total.toLocaleString()} LE
+                  </div>
+
+                  <ChevronDown size={14} color="#94a3b8" style={{ flexShrink:0, transform: isOpen?'rotate(180deg)':'none', transition:'transform 0.2s' }} />
+                </button>
+
+                {/* Expanded items */}
+                {isOpen && (
+                  <div style={{ borderTop:'1px solid #f0f4fa' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                      <thead>
+                        <tr style={{ background:'#f8fafc' }}>
+                          {['الصنف','الكمية','سعر البيع','التكلفة','الربح'].map((h, i) => (
+                            <th key={h} style={{ padding:'8px 16px', fontWeight:700, color:'#64748b', fontSize:11, textAlign: i===0?'right':'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {order.items.map((item, i) => {
+                          const cost   = getCostPrice(item.name, inventory)
+                          const hasCost = cost > 0
+                          const itemProfit = hasCost ? item.total - cost * (Number(item.quantity) || 0) : null
+                          const itemPos    = itemProfit !== null && itemProfit >= 0
+                          return (
+                            <tr key={item.id || i} style={{ borderBottom:'1px solid #f8fafc' }}>
+                              <td style={{ padding:'9px 16px', fontWeight:600, color:'#0f172a' }}>{item.name}</td>
+                              <td style={{ padding:'9px 16px', textAlign:'center', color:'#475569' }}>{item.quantity}</td>
+                              <td style={{ padding:'9px 16px', textAlign:'center', color:'#1d4ed8', fontWeight:600 }} dir="ltr">{item.total.toLocaleString()} LE</td>
+                              <td style={{ padding:'9px 16px', textAlign:'center', color:'#64748b' }} dir="ltr">
+                                {hasCost ? `${(cost * (Number(item.quantity)||0)).toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
+                              </td>
+                              <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:700, color: itemProfit===null?'#cbd5e1':itemPos?'#059669':'#e11d48' }} dir="ltr">
+                                {itemProfit !== null ? `${Math.round(itemProfit).toLocaleString()} LE` : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background:'#f8fafc', borderTop:'2px solid #e4eaf3' }}>
+                          <td colSpan={2} style={{ padding:'9px 16px', fontWeight:700, color:'#0f172a', fontSize:11 }}>إجمالي الطلب</td>
+                          <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{order.total.toLocaleString()} LE</td>
+                          <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:700, color:'#64748b' }} dir="ltr">{Math.round(orderCost).toLocaleString()} LE</td>
+                          <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:800, color: isPos?'#059669':'#e11d48' }} dir="ltr">
+                            {Math.round(orderProfit).toLocaleString()} LE
+                            {orderCost > 0 && <span style={{ fontSize:10, color:'#94a3b8', marginRight:4 }}>({margin}%)</span>}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </div>
             )
           })}

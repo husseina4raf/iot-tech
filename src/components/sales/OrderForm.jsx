@@ -79,8 +79,10 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     const orderData = { ...rest, address: addressParts.join(' — ') }
 
     if (isEdit) {
-      updateOrder(editOrder.id, orderData, user)
-      toast('تم تحديث الطلب بنجاح ✓', 'success')
+      const wasRejected = editOrder.status === 'مرفوض'
+      const finalData = wasRejected ? { ...orderData, status: 'بانتظار الموافقة' } : orderData
+      updateOrder(editOrder.id, finalData, user)
+      toast(wasRejected ? 'تم إرسال الطلب للمراجعة مجدداً ✓' : 'تم تحديث الطلب بنجاح ✓', 'success')
     } else {
       addOrder(orderData, user)
       toast('تم إرسال الطلب بنجاح ✓', 'success')

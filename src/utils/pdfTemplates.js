@@ -303,7 +303,7 @@ export async function generateInvoicePDF(order) {
       </div>
     </div>
 
-    ${order.notes ? `<div class="notes"><h4>ملاحظات / Notes</h4><p>${order.notes}</p></div>` : ''}
+    ${isVat && order.notes ? `<div class="notes"><h4>ملاحظات / Notes</h4><p>${order.notes}</p></div>` : ''}
 
     <div class="words">
       <strong>المبلغ كتابةً:</strong> ${amountInWords(order.total)}

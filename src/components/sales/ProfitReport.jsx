@@ -30,7 +30,7 @@ export default function ProfitReport() {
   const repName = user?.repName
   const repOrders = repName ? orders.filter(o => {
     if (o.salesRep !== repName) return false
-    if (o.status !== 'مكتمل') return false
+    if (o.status !== 'تم التحصيل') return false
     if (period === 'month') {
       const parts = o.date?.split('-')
       if (!parts || parts.length < 3) return false
@@ -112,13 +112,13 @@ export default function ProfitReport() {
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
         <TrendingUp size={15} color="#2563eb" />
         <span style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>تقرير الربح بالمنتج</span>
-        <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>الطلبات المكتملة فقط</span>
+        <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>طلبات تم التحصيل فقط</span>
       </div>
 
       {products.length === 0 ? (
         <div style={{ ...card, padding:40, textAlign:'center' }}>
           <Package size={36} color="#e4eaf3" style={{ margin:'0 auto 12px' }} />
-          <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد طلبات مكتملة بعد</p>
+          <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد طلبات تم تحصيلها بعد</p>
         </div>
       ) : (
         <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>

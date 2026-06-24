@@ -173,6 +173,7 @@ export function OrdersProvider({ children }) {
       date: orderData.date, time: orderData.time,
       updated_at: new Date().toISOString(),
       edit_history: editHistory,
+      ...(orderData.status && { status: orderData.status }),
     }
     // Optimistic update — reflect edit immediately
     setOrders(prev => prev.map(o => o.id === id ? {
@@ -187,6 +188,7 @@ export function OrdersProvider({ children }) {
       taxNumber: orderData.taxNumber, notes: orderData.notes,
       paymentMethod: orderData.paymentMethod, date: orderData.date, time: orderData.time,
       updatedAt: new Date().toISOString(), editHistory: editHistory,
+      ...(orderData.status && { status: orderData.status }),
     } : o))
     const { error: updateErr } = await supabase.from('orders').update(updatedRow).eq('id', id)
     if (updateErr) {

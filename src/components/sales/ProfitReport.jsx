@@ -30,6 +30,7 @@ export default function ProfitReport() {
   const repName = user?.repName
   const repOrders = repName ? orders.filter(o => {
     if (o.salesRep !== repName) return false
+    if (o.status !== 'مكتمل') return false
     if (period === 'month') {
       const parts = o.date?.split('-')
       if (!parts || parts.length < 3) return false
@@ -107,89 +108,72 @@ export default function ProfitReport() {
         ))}
       </div>
 
-      {/* Product breakdown table */}
-      <div style={card}>
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid #f0f4fa', display:'flex', alignItems:'center', gap:8 }}>
-          <TrendingUp size={16} color="#2563eb" />
-          <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>تقرير الربح بالمنتج</h3>
-        </div>
-
-        {products.length === 0 ? (
-          <div style={{ padding:40, textAlign:'center' }}>
-            <Package size={36} color="#e4eaf3" style={{ margin:'0 auto 12px' }} />
-            <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد مبيعات بعد</p>
-          </div>
-        ) : (
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-            <thead>
-              <tr style={{ background:'#f8fafc' }}>
-                {['المنتج','الوحدات','تكلفة الوحدة','إجمالي المبيعات','إجمالي التكلفة','صافي الربح','هامش %'].map((h, i) => (
-                  <th key={h} style={{ padding:'11px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => {
-                const profit = p.revenue - p.totalCost
-                const margin = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
-                return (
-                  <tr key={p.name} style={{ borderBottom:'1px solid #f8fafc' }}
-                    onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
-                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'12px 16px' }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:'#0f172a' }}>{p.name}</div>
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#0f172a', fontWeight:600 }}>{p.units}</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#64748b', fontWeight:700 }} dir="ltr">
-                      {p.hasCost ? `${p.unitCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#1d4ed8', fontWeight:700 }} dir="ltr">{p.revenue.toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#64748b', fontWeight:700 }} dir="ltr">
-                      {p.hasCost ? `${p.totalCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700 }} dir="ltr">
-                      {p.hasCost
-                        ? <span style={{ color: profit >= 0 ? '#059669' : '#e11d48' }}>{Math.round(profit).toLocaleString()} LE</span>
-                        : <span style={{color:'#cbd5e1'}}>—</span>}
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center' }}>
-                      {p.hasCost
-                        ? <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:700,
-                            background: margin >= 0 ? '#ecfdf5' : '#fff1f2',
-                            color:      margin >= 0 ? '#059669' : '#e11d48',
-                            border:     `1px solid ${margin >= 0 ? '#a7f3d0' : '#fecdd3'}` }}>{margin}%</span>
-                        : <span style={{color:'#cbd5e1', fontSize:11}}>—</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
-                <td style={{ padding:'12px 16px', fontWeight:800, color:'#1d4ed8' }}>الإجمالي</td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }}>
-                  {products.reduce((s, p) => s + p.units, 0)}
-                </td>
-                <td style={{ padding:'12px 16px', textAlign:'center', color:'#94a3b8', fontSize:11 }}>—</td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">
-                  {totalRevenue.toLocaleString()} LE
-                </td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#64748b' }} dir="ltr">
-                  {Math.round(totalCost).toLocaleString()} LE
-                </td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800 }} dir="ltr">
-                  <span style={{ color: totalProfit >= 0 ? '#059669' : '#e11d48' }}>
-                    {Math.round(totalProfit).toLocaleString()} LE
-                  </span>
-                </td>
-                <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#7c3aed' }}>
-                  {totalRevenue > 0 ? `${Math.round((totalProfit/totalRevenue)*100)}%` : '—'}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
+      {/* Product breakdown — cards */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+        <TrendingUp size={15} color="#2563eb" />
+        <span style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>تقرير الربح بالمنتج</span>
+        <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>الطلبات المكتملة فقط</span>
       </div>
+
+      {products.length === 0 ? (
+        <div style={{ ...card, padding:40, textAlign:'center' }}>
+          <Package size={36} color="#e4eaf3" style={{ margin:'0 auto 12px' }} />
+          <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد طلبات مكتملة بعد</p>
+        </div>
+      ) : (
+        <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          {products.map((p, i) => {
+            const profit   = p.revenue - p.totalCost
+            const margin   = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
+            const isPos    = profit >= 0
+            const barWidth = Math.min(Math.abs(margin), 100)
+            const rankColors = ['linear-gradient(135deg,#f59e0b,#d97706)','linear-gradient(135deg,#94a3b8,#64748b)','linear-gradient(135deg,#b45309,#92400e)']
+            const rankBg = rankColors[i] || 'linear-gradient(135deg,#1d4ed8,#2563eb)'
+            return (
+              <div key={p.name} style={{ ...card, padding:20 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+                  <div style={{ width:30, height:30, borderRadius:9, background:rankBg, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:800, flexShrink:0 }}>
+                    {i + 1}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{p.units} وحدة</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5 }}>
+                    <span style={{ color:'#64748b' }}>هامش الربح</span>
+                    <span style={{ fontWeight:800, color: p.hasCost ? (isPos?'#059669':'#e11d48') : '#94a3b8' }}>
+                      {p.hasCost ? `${margin}%` : 'لا يوجد سعر تكلفة'}
+                    </span>
+                  </div>
+                  <div style={{ height:8, borderRadius:20, background:'#f0f4fa', overflow:'hidden' }}>
+                    {p.hasCost && (
+                      <div style={{ height:'100%', width:`${barWidth}%`, background: isPos ? 'linear-gradient(90deg,#059669,#34d399)' : 'linear-gradient(90deg,#e11d48,#fb7185)', borderRadius:20 }} />
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ padding:'8px 12px', borderRadius:10, background:'#eff6ff', border:'1px solid #bfdbfe' }}>
+                    <div style={{ fontSize:10, color:'#3b82f6', fontWeight:600, marginBottom:3 }}>إجمالي المبيعات</div>
+                    <div style={{ fontSize:15, fontWeight:800, color:'#1d4ed8' }} dir="ltr">
+                      {p.revenue >= 1000 ? `${(p.revenue/1000).toFixed(1)}K` : p.revenue.toLocaleString()}
+                    </div>
+                  </div>
+                  <div style={{ padding:'8px 12px', borderRadius:10, background: !p.hasCost?'#f8fafc':isPos?'#ecfdf5':'#fff1f2', border:`1px solid ${!p.hasCost?'#e4eaf3':isPos?'#a7f3d0':'#fecdd3'}` }}>
+                    <div style={{ fontSize:10, color: !p.hasCost?'#94a3b8':isPos?'#059669':'#e11d48', fontWeight:600, marginBottom:3 }}>صافي الربح</div>
+                    <div style={{ fontSize:15, fontWeight:800, color: !p.hasCost?'#cbd5e1':isPos?'#059669':'#e11d48' }} dir="ltr">
+                      {p.hasCost ? (Math.abs(profit)>=1000 ? `${(profit/1000).toFixed(1)}K` : Math.round(profit).toLocaleString()) : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

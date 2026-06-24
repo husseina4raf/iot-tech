@@ -32,9 +32,10 @@ export default function SalesReports() {
     return { rep, count: ro.length, revenue, profit, completed, rate: ro.length > 0 ? Math.round((completed/ro.length)*100) : 0 }
   }).sort((a, b) => b.revenue - a.revenue)
 
-  // ─── Per-product stats ─────────────────────────────────────────────────────
+  // ─── Per-product stats (مكتمل orders only) ────────────────────────────────
   const productMap = {}
-  const filtered = repFilter ? orders.filter(o => o.salesRep === repFilter) : orders
+  const filtered = (repFilter ? orders.filter(o => o.salesRep === repFilter) : orders)
+    .filter(o => o.status === 'مكتمل')
   filtered.forEach(o => o.items.forEach(item => {
     if (!productMap[item.name]) {
       const costPrice = getCostPrice(item.name, inventory)
@@ -156,79 +157,108 @@ export default function SalesReports() {
       )}
 
       {/* Products tab */}
-      {activeTab === 'products' && (
-        <div style={card}>
-          <div style={{ padding:'14px 20px', borderBottom:'1px solid #f0f4fa', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <Package size={15} color="#2563eb"/>
-              <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>مبيعات المنتجات</h3>
+      {activeTab === 'products' && (() => {
+        const totRev    = products.reduce((s,p) => s + p.revenue, 0)
+        const totCost   = products.reduce((s,p) => s + p.totalCost, 0)
+        const totProfit = totRev - totCost
+        const totUnits  = products.reduce((s,p) => s + p.units, 0)
+        return (
+          <div>
+            {/* Header + filter */}
+            <div style={{ ...card, padding:'14px 20px', marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <Package size={15} color="#2563eb"/>
+                <span style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>الربح بالمنتج</span>
+                <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>الطلبات المكتملة فقط</span>
+              </div>
+              <select value={repFilter} onChange={e => setRepFilter(e.target.value)}
+                style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+                <option value="">كل المندوبين</option>
+                {SALES_REPS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
-            <select value={repFilter} onChange={e => setRepFilter(e.target.value)}
-              style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
-              <option value="">كل المندوبين</option>
-              {SALES_REPS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+
+            {/* Summary strip */}
+            <div className="m-grid-4" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
+              {[
+                { label:'إجمالي الإيرادات', val:`${(totRev/1000).toFixed(1)}K LE`,    color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+                { label:'إجمالي التكلفة',   val:`${(totCost/1000).toFixed(1)}K LE`,   color:'#64748b', bg:'#f8fafc', border:'#e4eaf3' },
+                { label:'صافي الربح',        val:`${(totProfit/1000).toFixed(1)}K LE`, color: totProfit>=0?'#059669':'#e11d48', bg: totProfit>=0?'#ecfdf5':'#fff1f2', border: totProfit>=0?'#a7f3d0':'#fecdd3' },
+              ].map(s => (
+                <div key={s.label} style={{ padding:'12px 16px', borderRadius:12, background:s.bg, border:`1px solid ${s.border}` }}>
+                  <div style={{ fontSize:18, fontWeight:800, color:s.color }} dir="ltr">{s.val}</div>
+                  <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Cards grid */}
+            {products.length === 0 ? (
+              <div style={{ ...card, padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>
+                لا توجد طلبات مكتملة بعد
+              </div>
+            ) : (
+              <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                {products.map((p, i) => {
+                  const profit   = p.revenue - p.totalCost
+                  const margin   = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
+                  const isPos    = profit >= 0
+                  const barWidth = Math.min(Math.abs(margin), 100)
+                  const rankColors = ['linear-gradient(135deg,#f59e0b,#d97706)','linear-gradient(135deg,#94a3b8,#64748b)','linear-gradient(135deg,#b45309,#92400e)']
+                  const rankBg = rankColors[i] || 'linear-gradient(135deg,#1d4ed8,#2563eb)'
+                  return (
+                    <div key={p.name} style={{ ...card, padding:20 }}>
+                      {/* Rank + Name */}
+                      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+                        <div style={{ width:30, height:30, borderRadius:9, background:rankBg, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13, fontWeight:800, flexShrink:0 }}>
+                          {i + 1}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                          <div style={{ fontSize:11, color:'#94a3b8', marginTop:1 }}>{p.units} وحدة · {p.orders} طلب</div>
+                        </div>
+                      </div>
+
+                      {/* Margin bar */}
+                      <div style={{ marginBottom:14 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:5 }}>
+                          <span style={{ color:'#64748b' }}>هامش الربح</span>
+                          <span style={{ fontWeight:800, color: p.hasCost ? (isPos?'#059669':'#e11d48') : '#94a3b8' }}>
+                            {p.hasCost ? `${margin}%` : 'لا يوجد سعر تكلفة'}
+                          </span>
+                        </div>
+                        <div style={{ height:8, borderRadius:20, background:'#f0f4fa', overflow:'hidden' }}>
+                          {p.hasCost && (
+                            <div style={{ height:'100%', width:`${barWidth}%`, background: isPos ? 'linear-gradient(90deg,#059669,#34d399)' : 'linear-gradient(90deg,#e11d48,#fb7185)', borderRadius:20, transition:'width 0.5s' }} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Revenue + Profit boxes */}
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                        <div style={{ padding:'8px 12px', borderRadius:10, background:'#eff6ff', border:'1px solid #bfdbfe' }}>
+                          <div style={{ fontSize:10, color:'#3b82f6', fontWeight:600, marginBottom:3 }}>إجمالي المبيعات</div>
+                          <div style={{ fontSize:15, fontWeight:800, color:'#1d4ed8' }} dir="ltr">
+                            {p.revenue >= 1000 ? `${(p.revenue/1000).toFixed(1)}K` : p.revenue.toLocaleString()}
+                          </div>
+                        </div>
+                        <div style={{ padding:'8px 12px', borderRadius:10, background: !p.hasCost ? '#f8fafc' : isPos ? '#ecfdf5' : '#fff1f2', border:`1px solid ${!p.hasCost ? '#e4eaf3' : isPos ? '#a7f3d0' : '#fecdd3'}` }}>
+                          <div style={{ fontSize:10, color: !p.hasCost ? '#94a3b8' : isPos ? '#059669' : '#e11d48', fontWeight:600, marginBottom:3 }}>صافي الربح</div>
+                          <div style={{ fontSize:15, fontWeight:800, color: !p.hasCost ? '#cbd5e1' : isPos ? '#059669' : '#e11d48' }} dir="ltr">
+                            {p.hasCost
+                              ? (Math.abs(profit) >= 1000 ? `${(profit/1000).toFixed(1)}K` : Math.round(profit).toLocaleString())
+                              : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-          <div className="m-table-scroll">
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:620 }}>
-            <thead>
-              <tr style={{ background:'#f8fafc' }}>
-                {['المنتج','الوحدات','عدد الطلبات','سعر البيع','سعر التكلفة','صافي الربح','هامش %'].map((h,i) => (
-                  <th key={h} style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'#64748b', textAlign:i===0?'right':'center', borderBottom:'1px solid #f0f4fa' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => {
-                const profit = p.revenue - p.totalCost
-                const margin = p.revenue > 0 ? Math.round((profit / p.revenue) * 100) : 0
-                return (
-                  <tr key={p.name} style={{ borderBottom:'1px solid #f8fafc' }}
-                    onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    <td style={{ padding:'12px 16px', fontWeight:600, color:'#0f172a' }}>{p.name}</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700 }}>{p.units}</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center' }}>{p.orders}</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#1d4ed8' }} dir="ltr">{p.revenue.toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#64748b' }} dir="ltr">
-                      {p.hasCost ? `${p.totalCost.toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">
-                      {p.hasCost ? `${Math.round(profit).toLocaleString()} LE` : <span style={{color:'#cbd5e1'}}>—</span>}
-                    </td>
-                    <td style={{ padding:'12px 16px', textAlign:'center' }}>
-                      {p.hasCost
-                        ? <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#ecfdf5', color:'#059669', border:'1px solid #a7f3d0', fontWeight:700 }}>{margin}%</span>
-                        : <span style={{color:'#cbd5e1', fontSize:11}}>—</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            {products.length > 0 && (() => {
-              const totUnits   = products.reduce((s,p) => s + p.units, 0)
-              const totRev     = products.reduce((s,p) => s + p.revenue, 0)
-              const totCost    = products.reduce((s,p) => s + p.totalCost, 0)
-              const totProfit  = totRev - totCost
-              const totMargin  = totRev > 0 ? Math.round((totProfit / totRev) * 100) : 0
-              return (
-                <tfoot>
-                  <tr style={{ background:'#eff6ff', borderTop:'2px solid #bfdbfe' }}>
-                    <td style={{ padding:'12px 16px', fontWeight:800, color:'#1d4ed8' }}>الإجمالي</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }}>{totUnits}</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', color:'#94a3b8', fontSize:11 }}>—</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{totRev.toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#64748b' }} dir="ltr">{Math.round(totCost).toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color: totProfit >= 0 ? '#059669' : '#e11d48' }} dir="ltr">{Math.round(totProfit).toLocaleString()} LE</td>
-                    <td style={{ padding:'12px 16px', textAlign:'center', fontWeight:800, color:'#7c3aed' }}>{totMargin}%</td>
-                  </tr>
-                </tfoot>
-              )
-            })()}
-          </table>
-          </div>
-          {products.length === 0 && <div style={{ padding:30, textAlign:'center', color:'#94a3b8', fontSize:13 }}>لا توجد بيانات</div>}
-        </div>
-      )}
+        )
+      })()}
 
       {/* Monthly tab */}
       {activeTab === 'monthly' && (

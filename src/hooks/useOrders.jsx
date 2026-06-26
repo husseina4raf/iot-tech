@@ -38,12 +38,12 @@ export function OrdersProvider({ children }) {
   useEffect(() => {
     Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }).range(0, PAGE_SIZE - 1),
-      supabase.from('inventory').select('*').order('created_at'),
+      supabase.from('inventory').select('*').order('name', { ascending: true }),
       supabase.from('audit_log').select('*').order('changed_at', { ascending: false }),
       supabase.from('tax_invoices').select('*').order('uploaded_at', { ascending: false }),
     ]).then(([o, inv, al, ti]) => {
       if (o.error)   { console.error('orders fetch:', o.error);   toast('خطأ في تحميل الطلبات', 'error') }
-      if (inv.error) { console.error('inventory fetch:', inv.error) }
+      if (inv.error) { console.error('inventory fetch:', inv.error); toast('خطأ في تحميل المنتجات — ' + inv.error.message, 'error') }
       if (al.error)  { console.error('audit fetch:', al.error) }
       if (ti.error)  { console.error('tax fetch:', ti.error) }
       setOrders((o.data || []).map(mapOrder))

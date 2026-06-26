@@ -25,11 +25,12 @@ export const mapOrder = r => ({
 })
 
 export const mapItem = r => ({
-  id: r.id, name: r.name, sku: r.sku, model: r.model,
+  id: r.id, name: r.name, nameAr: r.name_ar, sku: r.sku, model: r.model,
   brand: r.brand, category: r.category,
   price: r.price, costPrice: r.cost_price,
-  stock: r.stock, lots: r.lots || [],
+  stock: r.stock, minStock: r.min_stock, lots: r.lots || [],
   description: r.description, warranty: r.warranty,
+  supplier: r.supplier, notes: r.notes,
 })
 
 export const mapAudit = r => ({

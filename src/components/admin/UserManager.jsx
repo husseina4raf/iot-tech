@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus, Trash2, X, Check, User, Mail, Lock, Shield, AtSign } from 'lucide-react'
+import { UserPlus, Trash2, X, Check, User, Lock, Shield, AtSign } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
 import { ROLE_LABELS } from '../../data/authData'
@@ -28,7 +28,14 @@ function FInput({ label, required, icon: Icon, ...props }) {
   )
 }
 
-const emptyForm = () => ({ name:'', nameEn:'', repName:'', username:'', email:'', password:'', role:'sales' })
+const emptyForm = () => ({ name:'', nameEn:'', repName:'', username:'', password:'', role:'sales' })
+
+const isValidName = (v) => {
+  if (/https?:\/\/|www\./i.test(v))   return false  // URL
+  if (/\d{4,}/.test(v))               return false  // phone-like digits
+  if (/[<>{}\[\]\\|@#$%^&*+=]/.test(v)) return false // special chars
+  return v.trim().length > 0
+}
 
 const ROLE_BADGE = {
   sales:       { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe', label:'مندوب مبيعات' },
@@ -48,17 +55,19 @@ export default function UserManager() {
 
   const validate = () => {
     const e = {}
-    if (!form.name.trim())                    e.name     = 'الاسم بالعربي مطلوب'
-    if (!form.repName.trim())                 e.repName  = 'اسم العرض مطلوب'
-    if (!form.username.trim())                e.username = 'اسم المستخدم مطلوب'
+    if (!form.name.trim())                   e.name    = 'الاسم بالعربي مطلوب'
+    else if (!isValidName(form.name))        e.name    = 'الاسم غير صحيح — لا يقبل أرقام أو روابط'
+    if (!form.repName.trim())                e.repName = 'اسم العرض مطلوب'
+    else if (!isValidName(form.repName))     e.repName = 'اسم العرض غير صحيح — لا يقبل أرقام أو روابط'
+    if (form.nameEn.trim() && !/^[a-zA-Z\s'-]+$/.test(form.nameEn.trim()))
+                                             e.nameEn  = 'الاسم الإنجليزي: أحرف إنجليزية فقط'
+    if (!form.username.trim())               e.username = 'اسم المستخدم مطلوب'
     else if (!/^[a-zA-Z0-9_]+$/.test(form.username.trim()))
-                                              e.username = 'أحرف إنجليزية وأرقام وـ فقط'
+                                             e.username = 'أحرف إنجليزية وأرقام وـ فقط'
     else if (users.some(u => u.username?.toLowerCase() === form.username.toLowerCase().trim()))
-                                              e.username = 'اسم المستخدم مستخدم بالفعل'
-    if (form.email.trim() && users.some(u => u.email?.toLowerCase() === form.email.toLowerCase().trim()))
-                                              e.email    = 'البريد الإلكتروني مستخدم بالفعل'
-    if (!form.password)                       e.password = 'كلمة المرور مطلوبة'
-    else if (form.password.length < 6)        e.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
+                                             e.username = 'اسم المستخدم مستخدم بالفعل'
+    if (!form.password)                      e.password = 'كلمة المرور مطلوبة'
+    else if (form.password.length < 6)       e.password = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -70,7 +79,6 @@ export default function UserManager() {
       nameEn:   form.nameEn.trim() || form.name.trim(),
       repName:  form.repName.trim(),
       username: form.username.trim().toLowerCase(),
-      email:    form.email.trim().toLowerCase() || null,
       password: form.password,
       role:     form.role || 'sales',
     })
@@ -148,6 +156,7 @@ export default function UserManager() {
             <div>
               <FInput label="الاسم (إنجليزي)" icon={User}
                 value={form.nameEn} onChange={e => upd('nameEn', e.target.value)} placeholder="Ahmed Mohamed" dir="ltr"/>
+              {errors.nameEn && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.nameEn}</span>}
             </div>
             <div>
               <FInput label="اسم العرض في التقارير" required icon={User}
@@ -158,11 +167,6 @@ export default function UserManager() {
               <FInput label="اسم المستخدم (للدخول)" required icon={AtSign}
                 value={form.username} onChange={e => upd('username', e.target.value)} placeholder="ahmed123" dir="ltr" autoCapitalize="none"/>
               {errors.username && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.username}</span>}
-            </div>
-            <div>
-              <FInput label="البريد الإلكتروني (اختياري)" icon={Mail}
-                value={form.email} onChange={e => upd('email', e.target.value)} placeholder="ahmed@company.com" dir="ltr" type="email"/>
-              {errors.email && <span style={{ fontSize:11, color:'#e11d48' }}>{errors.email}</span>}
             </div>
             <div>
               <FInput label="كلمة المرور" required icon={Lock}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus, Trash2, X, Check, User, Lock, Shield, AtSign } from 'lucide-react'
+import { UserPlus, Trash2, X, Check, User, Lock, Shield, AtSign, ChevronDown } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
 import { ROLE_LABELS } from '../../data/authData'
@@ -128,23 +128,30 @@ export default function UserManager() {
           </div>
 
           {/* Role selector */}
-          <div style={{ display:'flex', gap:10, marginBottom:14 }}>
-            {[
-              { val:'sales',       label:'مندوب مبيعات', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
-              { val:'team_leader', label:'قائد فريق',    color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc' },
-              ...(currentUser?.role === 'super_admin' ? [
-                { val:'admin', label:'مدير', color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
-              ] : []),
-            ].map(opt => {
-              const active = form.role === opt.val
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:6 }}>
+              الصلاحية <span style={{ color:'#e11d48' }}>*</span>
+            </label>
+            {(() => {
+              const opts = [
+                { val:'sales',       label:'مندوب مبيعات', color:'#1d4ed8', bg:'#eff6ff', border:'#bfdbfe' },
+                { val:'team_leader', label:'قائد فريق',    color:'#0e7490', bg:'#ecfeff', border:'#a5f3fc' },
+                ...(currentUser?.role === 'super_admin' ? [
+                  { val:'admin',       label:'مدير',     color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+                  { val:'super_admin', label:'مدير عام', color:'#c2410c', bg:'#fff7ed', border:'#fed7aa' },
+                ] : []),
+              ]
+              const selected = opts.find(o => o.val === form.role) || opts[0]
               return (
-                <button key={opt.val} type="button" onClick={() => upd('role', opt.val)}
-                  style={{ flex:1, padding:'10px 8px', borderRadius:10, border:`2px solid ${active ? opt.border : '#e4eaf3'}`, background: active ? opt.bg : '#fff', color: active ? opt.color : '#64748b', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  {active && <Check size={14}/>}
-                  {opt.label}
-                </button>
+                <div style={{ position:'relative' }}>
+                  <select value={form.role} onChange={e => upd('role', e.target.value)} dir="rtl"
+                    style={{ width:'100%', padding:'10px 14px', fontSize:13, fontWeight:700, border:`2px solid ${selected.border}`, borderRadius:10, background:selected.bg, color:selected.color, outline:'none', cursor:'pointer', fontFamily:'Cairo,sans-serif', appearance:'none', WebkitAppearance:'none' }}>
+                    {opts.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+                  </select>
+                  <ChevronDown size={14} color={selected.color} style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
+                </div>
               )
-            })}
+            })()}
           </div>
 
           <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>

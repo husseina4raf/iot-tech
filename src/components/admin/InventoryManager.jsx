@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import * as XLSX from 'xlsx'
+import { Plus, Edit3, Trash2, AlertTriangle, Package, X, Check, RotateCcw, ChevronDown, ChevronUp, Pencil, Upload, Download, FileSpreadsheet } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
@@ -77,8 +78,91 @@ export default function InventoryManager() {
   const [page, setPage] = useState(1)
 
   const [errors, setErrors] = useState({})
+  const [importPreview, setImportPreview] = useState(null) // { rows, errors }
+  const [importLoading, setImportLoading] = useState(false)
+  const fileInputRef = useRef(null)
 
   const upd = (f, v) => { setForm(p => ({ ...p, [f]: v })); setErrors(p => ({ ...p, [f]: '' })) }
+
+  const COLUMN_MAP = {
+    'اسم المنتج': 'name', 'name': 'name',
+    'الاسم بالعربي': 'nameAr', 'namear': 'nameAr',
+    'sku': 'sku', 'SKU': 'sku',
+    'الماركة': 'brand', 'brand': 'brand',
+    'الفئة': 'category', 'category': 'category',
+    'سعر البيع': 'price', 'price': 'price',
+    'سعر التكلفة': 'costPrice', 'costprice': 'costPrice', 'سعر التكلفه': 'costPrice',
+    'الكمية': 'stock', 'stock': 'stock', 'الكميه': 'stock',
+    'الحد الأدنى': 'minStock', 'minstock': 'minStock', 'الحد الادنى': 'minStock',
+    'المورد': 'supplier', 'supplier': 'supplier',
+    'ملاحظات': 'notes', 'notes': 'notes',
+  }
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['اسم المنتج *', 'الاسم بالعربي', 'SKU', 'الماركة', 'الفئة', 'سعر البيع', 'سعر التكلفة *', 'الكمية', 'الحد الأدنى', 'المورد', 'ملاحظات'],
+      ['Lezn IHand 02', 'ليزن اي هاند', 'SKU-001', 'Lezn', 'قفل ذكي', 8000, 5000, 10, 3, 'المورد ABC', ''],
+    ])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'المنتجات')
+    XLSX.writeFile(wb, 'نموذج_المنتجات.xlsx')
+  }
+
+  const handleFileImport = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const raw = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        if (!raw.length) return toast('الملف فاضي أو غير صحيح', 'error')
+
+        const rows = []
+        const errs = []
+        raw.forEach((row, idx) => {
+          const mapped = {}
+          Object.entries(row).forEach(([k, v]) => {
+            const key = COLUMN_MAP[k] || COLUMN_MAP[k.toLowerCase().trim()]
+            if (key) mapped[key] = String(v).trim()
+          })
+          if (!mapped.name) { errs.push(`سطر ${idx + 2}: اسم المنتج مطلوب`); return }
+          if (!mapped.costPrice || isNaN(mapped.costPrice) || Number(mapped.costPrice) <= 0) {
+            errs.push(`سطر ${idx + 2} (${mapped.name}): سعر التكلفة مطلوب`)
+            return
+          }
+          rows.push({
+            name: mapped.name,
+            nameAr: mapped.nameAr || '',
+            sku: mapped.sku || '',
+            brand: mapped.brand || '',
+            category: mapped.category || INVENTORY_CATEGORIES[0],
+            price: Number(mapped.price) || 0,
+            costPrice: Number(mapped.costPrice),
+            stock: Number(mapped.stock) || 0,
+            minStock: Number(mapped.minStock) || 3,
+            supplier: mapped.supplier || '',
+            notes: mapped.notes || '',
+          })
+        })
+        setImportPreview({ rows, errs })
+      } catch { toast('فشل قراءة الملف — تأكد أنه Excel صحيح', 'error') }
+    }
+    reader.readAsBinaryString(file)
+  }
+
+  const handleConfirmImport = async () => {
+    if (!importPreview?.rows?.length) return
+    setImportLoading(true)
+    for (const row of importPreview.rows) {
+      await addInventoryItem(row, user)
+    }
+    setImportLoading(false)
+    toast(`تم استيراد ${importPreview.rows.length} منتج بنجاح ✓`, 'success')
+    setImportPreview(null)
+  }
 
   const openAdd = () => { setForm(emptyForm()); setEditId(null); setErrors({}); setShowForm(true) }
   const openEdit = (item) => {
@@ -178,12 +262,102 @@ export default function InventoryManager() {
               مسح
             </button>
           )}
+          <button onClick={handleDownloadTemplate}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:10, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+            <Download size={13}/>نموذج Excel
+          </button>
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:10, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+            <Upload size={13}/>استيراد Excel
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={handleFileImport} />
           <button onClick={openAdd}
             style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 3px 10px rgba(37,99,235,0.3)' }}>
             <Plus size={14}/>إضافة منتج
           </button>
         </div>
       </div>
+
+      {/* Import preview modal */}
+      {importPreview && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setImportPreview(null) }}>
+          <div style={{ background:'#fff', borderRadius:16, padding:24, width:'min(640px,95vw)', maxHeight:'85vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.25)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <FileSpreadsheet size={20} color="#059669"/>
+                <h3 style={{ fontSize:15, fontWeight:700, color:'#0f172a' }}>معاينة الاستيراد</h3>
+              </div>
+              <button onClick={() => setImportPreview(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8' }}><X size={18}/></button>
+            </div>
+
+            {/* Summary */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+              <div style={{ padding:'12px 16px', borderRadius:10, background:'#ecfdf5', border:'1px solid #a7f3d0', textAlign:'center' }}>
+                <div style={{ fontSize:24, fontWeight:800, color:'#059669' }}>{importPreview.rows.length}</div>
+                <div style={{ fontSize:12, color:'#64748b' }}>منتج جاهز للاستيراد</div>
+              </div>
+              <div style={{ padding:'12px 16px', borderRadius:10, background: importPreview.errs.length ? '#fff1f2' : '#f8fafc', border:`1px solid ${importPreview.errs.length ? '#fecdd3' : '#e4eaf3'}`, textAlign:'center' }}>
+                <div style={{ fontSize:24, fontWeight:800, color: importPreview.errs.length ? '#e11d48' : '#94a3b8' }}>{importPreview.errs.length}</div>
+                <div style={{ fontSize:12, color:'#64748b' }}>سطر تم تجاهله</div>
+              </div>
+            </div>
+
+            {/* Errors */}
+            {importPreview.errs.length > 0 && (
+              <div style={{ marginBottom:14, padding:'10px 14px', borderRadius:10, background:'#fff1f2', border:'1px solid #fecdd3' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'#e11d48', marginBottom:6 }}>أسطر بها مشكلة (تم تجاهلها):</div>
+                {importPreview.errs.map((e, i) => <div key={i} style={{ fontSize:11, color:'#9f1239', marginBottom:2 }}>• {e}</div>)}
+              </div>
+            )}
+
+            {/* Preview table */}
+            {importPreview.rows.length > 0 && (
+              <div style={{ borderRadius:10, overflow:'hidden', border:'1px solid #e4eaf3', marginBottom:16 }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+                  <thead>
+                    <tr style={{ background:'#f8fafc' }}>
+                      {['اسم المنتج','SKU','الماركة','سعر التكلفة','الكمية'].map(h => (
+                        <th key={h} style={{ padding:'8px 12px', fontWeight:700, color:'#64748b', textAlign:'right', borderBottom:'1px solid #e4eaf3' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.rows.slice(0, 8).map((r, i) => (
+                      <tr key={i} style={{ borderBottom:'1px solid #f0f4fa' }}>
+                        <td style={{ padding:'7px 12px', fontWeight:600, color:'#0f172a' }}>{r.name}</td>
+                        <td style={{ padding:'7px 12px', color:'#64748b', fontFamily:'monospace' }}>{r.sku || '—'}</td>
+                        <td style={{ padding:'7px 12px', color:'#64748b' }}>{r.brand || '—'}</td>
+                        <td style={{ padding:'7px 12px', color:'#059669', fontWeight:600 }} dir="ltr">{r.costPrice.toLocaleString()} LE</td>
+                        <td style={{ padding:'7px 12px', textAlign:'center' }}>{r.stock}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {importPreview.rows.length > 8 && (
+                  <div style={{ padding:'8px 12px', background:'#f8fafc', fontSize:11, color:'#94a3b8', textAlign:'center' }}>
+                    + {importPreview.rows.length - 8} منتج أخرى
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button onClick={() => setImportPreview(null)}
+                style={{ padding:'9px 20px', borderRadius:9, border:'1.5px solid #e4eaf3', background:'#fff', color:'#64748b', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                إلغاء
+              </button>
+              {importPreview.rows.length > 0 && (
+                <button onClick={handleConfirmImport} disabled={importLoading}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 22px', borderRadius:9, border:'none', background:'linear-gradient(135deg,#059669,#047857)', color:'#fff', fontSize:13, fontWeight:700, cursor: importLoading?'wait':'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 3px 10px rgba(5,150,105,0.35)', opacity: importLoading?0.7:1 }}>
+                  {importLoading ? <><span style={{ width:12,height:12,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite',display:'inline-block' }}/>جارٍ الاستيراد...</> : <><Check size={14}/>تأكيد استيراد {importPreview.rows.length} منتج</>}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit modal */}
       {showForm && (

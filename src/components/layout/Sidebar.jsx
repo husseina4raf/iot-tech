@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users, X } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users, X, HelpCircle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_LABELS, ROLE_ROUTES } from '../../data/authData'
+import HelpGuide from './HelpGuide'
 
 const ALL_NAV = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'لوحة التحكم',   labelEn: 'Dashboard',   roles: ['super_admin'] },
@@ -20,6 +22,7 @@ const roleInfo = {
 export default function Sidebar({ isMobile, isOpen, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [showHelp, setShowHelp] = useState(false)
   const navItems = ALL_NAV.filter(i => i.roles.includes(user?.role))
   const info = roleInfo[user?.role] || roleInfo.sales
 
@@ -109,6 +112,17 @@ export default function Sidebar({ isMobile, isOpen, onClose }) {
         ))}
       </nav>
 
+      {/* Help button */}
+      <div style={{ padding:'0 12px 8px' }}>
+        <button onClick={() => setShowHelp(true)}
+          style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', cursor:'pointer', color:'#94a3b8', fontSize:12, fontFamily:'Cairo, sans-serif', fontWeight:600, transition:'all 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.background='rgba(99,102,241,0.15)'; e.currentTarget.style.color='#a5b4fc' }}
+          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,0.04)'; e.currentTarget.style.color='#94a3b8' }}>
+          <HelpCircle size={15} />
+          دليل الاستخدام
+        </button>
+      </div>
+
       {/* Divider */}
       <div style={{ margin:'0 12px', borderTop:'1px solid rgba(255,255,255,0.06)' }} />
 
@@ -140,5 +154,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }) {
         </button>
       </div>
     </aside>
+
+    {showHelp && <HelpGuide onClose={() => setShowHelp(false)} />}
   )
 }

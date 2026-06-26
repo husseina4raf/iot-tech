@@ -43,7 +43,7 @@ export default function ProfitReport() {
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
 
   // Totals across all filtered orders
-  const totalRevenue = repOrders.reduce((s, o) => s + o.total, 0)
+  const totalRevenue = repOrders.reduce((s, o) => s + (o.subtotal || o.total), 0)
   const totalCost    = repOrders.reduce((s, o) =>
     s + o.items.reduce((ss, item) => ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
   , 0)
@@ -108,8 +108,9 @@ export default function ProfitReport() {
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {repOrders.map((order, idx) => {
             const orderCost   = order.items.reduce((s, item) => s + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
-            const orderProfit = order.total - orderCost
-            const margin      = order.total > 0 ? Math.round((orderProfit / order.total) * 100) : 0
+            const orderBase   = order.subtotal || order.total
+            const orderProfit = orderBase - orderCost
+            const margin      = orderBase > 0 ? Math.round((orderProfit / orderBase) * 100) : 0
             const isPos       = orderProfit >= 0
             const isOpen      = expanded[order.id] !== false && (expanded[order.id] === true || idx === 0)
 
@@ -136,9 +137,9 @@ export default function ProfitReport() {
                     {isPos?'+':''}{Math.round(orderProfit).toLocaleString()} LE
                   </div>
 
-                  {/* Revenue */}
+                  {/* Revenue (subtotal without VAT) */}
                   <div style={{ fontSize:13, fontWeight:700, color:'#1d4ed8', flexShrink:0, minWidth:90 }} dir="ltr">
-                    {order.total.toLocaleString()} LE
+                    {orderBase.toLocaleString()} LE
                   </div>
 
                   <ChevronDown size={14} color="#94a3b8" style={{ flexShrink:0, transform: isOpen?'rotate(180deg)':'none', transition:'transform 0.2s' }} />
@@ -179,7 +180,7 @@ export default function ProfitReport() {
                       <tfoot>
                         <tr style={{ background:'#f8fafc', borderTop:'2px solid #e4eaf3' }}>
                           <td colSpan={2} style={{ padding:'9px 16px', fontWeight:700, color:'#0f172a', fontSize:11 }}>إجمالي الطلب</td>
-                          <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{order.total.toLocaleString()} LE</td>
+                          <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:800, color:'#1d4ed8' }} dir="ltr">{orderBase.toLocaleString()} LE</td>
                           <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:700, color:'#64748b' }} dir="ltr">{Math.round(orderCost).toLocaleString()} LE</td>
                           <td style={{ padding:'9px 16px', textAlign:'center', fontWeight:800, color: isPos?'#059669':'#e11d48' }} dir="ltr">
                             {Math.round(orderProfit).toLocaleString()} LE

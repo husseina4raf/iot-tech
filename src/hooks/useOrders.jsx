@@ -256,6 +256,24 @@ export function OrdersProvider({ children }) {
   const approveOrder = (id, user) => updateOrderStatus(id, 'موافق عليه', user)
   const rejectOrder  = (id, user) => updateOrderStatus(id, 'مرفوض', user)
 
+  const deleteOrder = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    setOrders(prev => prev.filter(o => o.id !== id))
+    const { error: delErr } = await supabase.from('orders').delete().eq('id', id)
+    if (delErr) {
+      console.error('deleteOrder:', delErr)
+      toast('فشل حذف الطلب — ' + delErr.message, 'error')
+      setOrders(prev => [...prev, order].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)))
+      return
+    }
+    await pushAudit({
+      type: 'order_delete', orderId: id,
+      orderRef: `${order?.clientName} — ${order?.company}`,
+      field: 'حذف طلب', oldValue: order?.status || '—', newValue: '—',
+      changedBy: user?.name || 'مجهول',
+    })
+  }
+
   const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep)
 
   const getOrdersByRepGrouped = (rep) => {
@@ -399,7 +417,7 @@ export function OrdersProvider({ children }) {
     <OrdersContext.Provider value={{
       orders, inventory, auditLog, taxInvoices, loading,
       hasMoreOrders, loadMoreOrders,
-      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
+      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,

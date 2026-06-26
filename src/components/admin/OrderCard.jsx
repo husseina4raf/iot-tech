@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar } from 'lucide-react'
+import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar, Trash2 } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, deleteOrder } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -32,6 +32,11 @@ export default function OrderCard({ order }) {
   const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
   const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
   const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
+  const onDelete  = () => {
+    if (!window.confirm(`هل أنت متأكد من حذف طلب "${order.clientName}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return
+    deleteOrder(order.id, user)
+    toast('تم حذف الطلب ✓', 'success')
+  }
 
   const onCalendar = () => {
     const title   = encodeURIComponent(order.clientName)
@@ -187,7 +192,16 @@ export default function OrderCard({ order }) {
             </button>
           </>)}
 
-          <button onClick={()=>setExpanded(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:'1.5px solid #e4eaf3', background: expanded?'#f0f4fa':'#fff', color:'#475569', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', marginRight:'auto' }}>
+          {user?.role === 'super_admin' && (
+            <button onClick={onDelete}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', borderRadius:8, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', marginRight:'auto' }}
+              onMouseEnter={e=>{ e.currentTarget.style.background='#ffe4e6' }}
+              onMouseLeave={e=>{ e.currentTarget.style.background='#fff1f2' }}>
+              <Trash2 size={12}/>حذف الطلب
+            </button>
+          )}
+
+          <button onClick={()=>setExpanded(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:'1.5px solid #e4eaf3', background: expanded?'#f0f4fa':'#fff', color:'#475569', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', ...(user?.role !== 'super_admin' && { marginRight:'auto' }) }}>
             <ChevronDown size={11} style={{ transition:'transform 0.2s', transform: expanded?'rotate(180deg)':'none' }} />
             التفاصيل
           </button>

@@ -49,7 +49,7 @@ export default function Leaderboard() {
       return true
     })
     const profit = repOrders.reduce((s, o) =>
-      s + o.total - o.items.reduce((ss, item) =>
+      s + (o.subtotal || o.total) - o.items.reduce((ss, item) =>
         ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
     , 0)
     return {

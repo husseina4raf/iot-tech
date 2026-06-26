@@ -125,7 +125,8 @@ export default function InventoryManager() {
         raw.forEach((row, idx) => {
           const mapped = {}
           Object.entries(row).forEach(([k, v]) => {
-            const key = COLUMN_MAP[k] || COLUMN_MAP[k.toLowerCase().trim()]
+            const norm = k.replace(/\s*\*\s*$/, '').trim()
+            const key = COLUMN_MAP[norm] || COLUMN_MAP[norm.toLowerCase()]
             if (key) mapped[key] = String(v).trim()
           })
           if (!mapped.name) { errs.push(`سطر ${idx + 2}: اسم المنتج مطلوب`); return }

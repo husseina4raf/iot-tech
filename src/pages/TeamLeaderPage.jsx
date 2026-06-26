@@ -64,6 +64,8 @@ export default function TeamLeaderPage() {
       (order.locationLink ? `\nخريطة: ${order.locationLink}` : '') +
       `\n\nالأصناف:\n${items}` +
       `\n\nالإجمالي: ${order.total?.toLocaleString()} LE` +
+      (order.invoiceType  ? `\nنوع الفاتورة: ${order.invoiceType}`  : '') +
+      (order.invoiceName  ? `\nالفاتورة باسم: ${order.invoiceName}` : '') +
       (order.paymentMethod ? `\nطريقة الدفع: ${order.paymentMethod}` : '') +
       (order.notes ? `\n\nملاحظات: ${order.notes}` : '')
     )

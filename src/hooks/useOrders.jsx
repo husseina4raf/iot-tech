@@ -300,9 +300,10 @@ export function OrdersProvider({ children }) {
   // ── Inventory ─────────────────────────────────────────────────────────────────
   const addInventoryItem = async (item, user) => {
     const qty  = Number(item.stock) || 0
-    const lots = qty > 0 ? [{ id:`lot-${Date.now()}`, qty, costPrice:Number(item.costPrice)||0, date:new Date().toISOString().split('T')[0], note:'دفعة أولى' }] : []
+    const uid  = () => `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
+    const lots = qty > 0 ? [{ id:`lot-${uid()}`, qty, costPrice:Number(item.costPrice)||0, date:new Date().toISOString().split('T')[0], note:'دفعة أولى' }] : []
     const row  = {
-      id:`inv-${Date.now()}`, name:item.name, sku:item.sku||null,
+      id:`inv-${uid()}`, name:item.name, sku:item.sku||null,
       model:item.model||null, brand:item.brand||null, category:item.category||null,
       price:Number(item.price)||0, cost_price:Number(item.costPrice)||0,
       stock:qty, lots, description:item.description||null, warranty:item.warranty||null,

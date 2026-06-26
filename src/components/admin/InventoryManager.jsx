@@ -157,11 +157,27 @@ export default function InventoryManager() {
   const handleConfirmImport = async () => {
     if (!importPreview?.rows?.length) return
     setImportLoading(true)
+    let added = 0, lotAdded = 0, skipped = 0
     for (const row of importPreview.rows) {
-      await addInventoryItem(row, user)
+      const existing = inventory.find(i => i.name.toLowerCase() === row.name.toLowerCase())
+      if (existing) {
+        if (existing.costPrice === Number(row.costPrice)) {
+          skipped++
+        } else {
+          await addStockLot(existing.id, { qty: Number(row.stock) || 0, costPrice: Number(row.costPrice), note: `استيراد Excel — سعر ${row.costPrice} LE` }, user)
+          lotAdded++
+        }
+      } else {
+        await addInventoryItem(row, user)
+        added++
+      }
     }
     setImportLoading(false)
-    toast(`تم استيراد ${importPreview.rows.length} منتج بنجاح ✓`, 'success')
+    const parts = []
+    if (added)    parts.push(`${added} منتج جديد`)
+    if (lotAdded) parts.push(`${lotAdded} دفعة جديدة لمنتجات موجودة`)
+    if (skipped)  parts.push(`${skipped} مكرر تم تجاهله`)
+    toast(parts.join(' · ') + ' ✓', 'success')
     setImportPreview(null)
   }
 

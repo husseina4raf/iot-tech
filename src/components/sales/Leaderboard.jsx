@@ -16,8 +16,15 @@ const medalColors = [
   { bg:'#fff7ed', border:'#fed7aa', color:'#9a3412', shadow:'rgba(234,88,12,0.2)',    icon:'🥉' },
 ]
 
+const getCostPrice = (itemName, inventory) => {
+  const inv = inventory.find(i =>
+    i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName
+  )
+  return inv?.costPrice || 0
+}
+
 export default function Leaderboard() {
-  const { orders } = useOrders()
+  const { orders, inventory } = useOrders()
   const { salesReps, users, user: currentUser } = useAuth()
 
   const now = new Date()
@@ -41,11 +48,15 @@ export default function Leaderboard() {
       }
       return true
     })
+    const profit = repOrders.reduce((s, o) =>
+      s + o.total - o.items.reduce((ss, item) =>
+        ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
+    , 0)
     return {
       rep,
       name: repUser?.name || rep,
       avatar: repUser?.avatar || rep[0],
-      total:  repOrders.reduce((s, o) => s + (o.total || 0), 0),
+      total:  profit,
       count:  repOrders.length,
       isMe:   rep === currentUser?.repName,
     }

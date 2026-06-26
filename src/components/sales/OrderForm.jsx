@@ -29,9 +29,11 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     if (editOrder) {
       return {
         ...editOrder,
-        governorate: '', city: '', district: '',
-        street: editOrder.address || '',
-        buildingNo: '',
+        governorate: editOrder.governorate || '',
+        city:        editOrder.city        || '',
+        district:    editOrder.district    || '',
+        street:      editOrder.street      || editOrder.address || '',
+        buildingNo:  editOrder.buildingNo  || '',
         dateRaw: editOrder.date ? editOrder.date.split('-').reverse().join('-') : new Date().toISOString().split('T')[0],
       }
     }
@@ -67,6 +69,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
     if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
     if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
+    if (!form.locationLink?.trim()) errs.locationLink  = 'رابط الموقع على الخريطة مطلوب'
     if (!form.invoiceName?.trim())  errs.invoiceName   = 'الفاتورة باسم مين مطلوب'
     if (!form.paymentMethod)        errs.paymentMethod = 'طريقة الدفع مطلوبة'
     if (form.invoiceType === 'فاتورة ضريبية' && !form.taxNumber?.trim()) errs.taxNumber = 'الرقم الضريبي مطلوب للفاتورة الضريبية'
@@ -74,8 +77,8 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
     setErrors({})
-    const { dateRaw, governorate, city, district, street, buildingNo, ...rest } = form
-    const addressParts = [governorate, city, district, street, buildingNo].filter(Boolean)
+    const { dateRaw, ...rest } = form
+    const addressParts = [form.governorate, form.city, form.district, form.street, form.buildingNo].filter(Boolean)
     const orderData = { ...rest, address: addressParts.join(' — ') }
 
     if (isEdit) {

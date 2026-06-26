@@ -250,7 +250,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
             </div>
           </div>
 
-          <FInput label="رابط الموقع على الخريطة" style={{ gridColumn: '1/-1' }} placeholder="https://maps.google.com/..." value={form.locationLink} onChange={e => upd('locationLink', e.target.value)} dir="ltr" />
+          <FInput label="رابط الموقع على الخريطة" required error={errors.locationLink} style={{ gridColumn: '1/-1' }} placeholder="https://maps.google.com/..." value={form.locationLink} onChange={e => upd('locationLink', e.target.value)} dir="ltr" />
         </div>
       </div>
 

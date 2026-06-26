@@ -4,7 +4,7 @@
 export { SALES_REPS } from './authData'
 
 export const ORDER_STATUSES  = ['بانتظار الموافقة', 'جديد', 'موافق عليه', 'تم الصرف', 'مكتمل', 'تم التحصيل', 'مرفوض']
-export const PAYMENT_METHODS = ['كاش', 'انستاباي', 'تحويل']
+export const PAYMENT_METHODS = ['كاش', 'انستاباي', 'تحويل', 'فيزا', 'فودافون كاش', 'ايزى كاش']
 export const INVOICE_TYPES   = ['بيان اسعار', 'فاتورة ضريبية']
 
 export const EGYPT_GOVERNORATES = [

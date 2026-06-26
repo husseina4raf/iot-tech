@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { PlusCircle, FolderOpen, TrendingUp, Trophy } from 'lucide-react'
 import OrderForm from '../components/sales/OrderForm'
 import MonthlyInvoices from '../components/sales/MonthlyInvoices'
@@ -17,12 +17,7 @@ export default function SalesPage() {
   const { settings } = useSettings()
   const [tab, setTab] = useState('new')
 
-  const tabs = settings.leaderboardVisible ? [...BASE_TABS, LEADERBOARD_TAB] : BASE_TABS
-
-  // If leaderboard gets hidden while user is on that tab, redirect to new
-  useEffect(() => {
-    if (tab === 'leaderboard' && !settings.leaderboardVisible) setTab('new')
-  }, [settings.leaderboardVisible, tab])
+  const tabs = [...BASE_TABS, LEADERBOARD_TAB]
 
   return (
     <div style={{ maxWidth:900, margin:'0 auto' }}>

@@ -181,6 +181,8 @@ export function OrdersProvider({ children }) {
       clientName: orderData.clientName, company: orderData.company,
       mobile: orderData.mobile, whatsapp: orderData.whatsapp,
       address: orderData.address, locationLink: orderData.locationLink,
+      governorate: orderData.governorate, city: orderData.city,
+      district: orderData.district, street: orderData.street, buildingNo: orderData.buildingNo,
       salesRep: orderData.salesRep, items: orderData.items,
       subtotal: orderData.subtotal, vatPercent: orderData.vatPercent,
       vatAmount: orderData.vatAmount, total: orderData.total,

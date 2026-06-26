@@ -1,8 +1,19 @@
+const parseAddress = (address) => {
+  if (!address) return { governorate:'', city:'', district:'', street:'', buildingNo:'' }
+  const p = address.split(' — ')
+  if (p.length >= 5) return { governorate:p[0], city:p[1], district:p[2], street:p[3], buildingNo:p[4] }
+  if (p.length === 4) return { governorate:p[0], city:p[1], district:p[2], street:p[3], buildingNo:'' }
+  if (p.length === 3) return { governorate:p[0], city:p[1], district:'',   street:p[2], buildingNo:'' }
+  if (p.length === 2) return { governorate:p[0], city:'',   district:'',   street:p[1], buildingNo:'' }
+  return { governorate:'', city:'', district:'', street:p[0], buildingNo:'' }
+}
+
 export const mapOrder = r => ({
   id: r.id, serialNumber: r.serial_number,
   clientName: r.client_name, company: r.company,
   mobile: r.mobile, whatsapp: r.whatsapp,
   address: r.address, locationLink: r.location_link,
+  ...parseAddress(r.address),
   salesRep: r.sales_rep, items: r.items || [],
   subtotal: r.subtotal, vatPercent: r.vat_percent,
   vatAmount: r.vat_amount, total: r.total,

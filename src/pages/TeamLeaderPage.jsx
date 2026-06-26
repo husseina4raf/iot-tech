@@ -1,17 +1,21 @@
 import { useState } from 'react'
-import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
 import Badge from '../components/ui/Badge'
 import OrderForm from '../components/sales/OrderForm'
+import Leaderboard from '../components/sales/Leaderboard'
+import SalesReports from '../components/admin/SalesReports'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
 const TABS = [
-  { id:'pending',   label:'بانتظار الموافقة', icon: Clock },
-  { id:'all',       label:'جميع الفواتير',    icon: FileText },
-  { id:'inventory', label:'المخزون',          icon: Package },
+  { id:'pending',     label:'بانتظار الموافقة', icon: Clock },
+  { id:'all',         label:'جميع الفواتير',    icon: FileText },
+  { id:'inventory',   label:'المخزون',          icon: Package },
+  { id:'leaderboard', label:'المتصدرون',        icon: Trophy },
+  { id:'reports',     label:'تقارير الأرباح',   icon: TrendingUp },
 ]
 
 const STATUS_NEXT = {
@@ -168,8 +172,14 @@ export default function TeamLeaderPage() {
         </div>
       )}
 
+      {/* ── Leaderboard tab ──────────────────────────────────────────────────── */}
+      {tab === 'leaderboard' && <Leaderboard />}
+
+      {/* ── Reports tab ───────────────────────────────────────────────────────── */}
+      {tab === 'reports' && <SalesReports />}
+
       {/* ── Orders tabs ───────────────────────────────────────────────────────── */}
-      {tab !== 'inventory' && (<>
+      {tab !== 'inventory' && tab !== 'leaderboard' && tab !== 'reports' && (<>
         {/* Stats */}
         <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
           {[

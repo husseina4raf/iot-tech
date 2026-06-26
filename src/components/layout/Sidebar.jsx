@@ -51,6 +51,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }) {
   }
 
   return (
+    <>
     <aside dir="rtl" style={sidebarStyle}>
       {/* Logo */}
       <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
@@ -156,5 +157,6 @@ export default function Sidebar({ isMobile, isOpen, onClose }) {
     </aside>
 
     {showHelp && <HelpGuide onClose={() => setShowHelp(false)} />}
+    </>
   )
 }

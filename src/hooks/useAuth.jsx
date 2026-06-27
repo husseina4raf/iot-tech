@@ -66,11 +66,11 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        setUser(profile)
+        if (profile) setUser(profile)
       }
-      await seedIfEmpty()
-      await fetchUsers()
       setLoading(false)
+      // Background: seed & fetch users without blocking UI
+      seedIfEmpty().then(() => fetchUsers())
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {

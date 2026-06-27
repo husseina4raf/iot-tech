@@ -196,10 +196,10 @@ export default function HelpGuide({ onClose }) {
           </Section>
 
           {/* Done */}
-          <div style={{ padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          {/* <div style={{ padding: '10px 14px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             <CheckCircle size={15} color="#059669" />
             <span style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>لو عندك أي سؤال، تواصل مع المدير</span>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

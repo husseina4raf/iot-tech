@@ -63,8 +63,8 @@ export const ROLE_COLORS = {
 export const ROLE_ROUTES = {
   sales:       ['/sales'],
   team_leader: ['/team-leader'],
-  admin:       ['/admin'],
-  super_admin: ['/dashboard', '/admin'],
+  admin:       ['/admin', '/team-leader'],
+  super_admin: ['/dashboard', '/admin', '/team-leader'],
 }
 
 // Sales rep names — derived from actual user accounts (role === 'sales')

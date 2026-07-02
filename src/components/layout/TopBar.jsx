@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Bell, Package, Clock, CheckCircle, XCircle, Menu } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
+import { useAuth } from '../../hooks/useAuth'
 
 const pages = {
   '/dashboard': { ar:'لوحة التحكم',  en:'Super Admin Dashboard' },
@@ -20,6 +21,7 @@ const STATUS_CONFIG = {
 export default function TopBar({ isMobile, onMenuOpen }) {
   const { pathname } = useLocation()
   const { orders }   = useOrders()
+  const { user }     = useAuth()
   const page         = pages[pathname] || pages['/dashboard']
 
   const [open, setOpen] = useState(false)
@@ -32,7 +34,10 @@ export default function TopBar({ isMobile, onMenuOpen }) {
   }, [])
 
   const notifs = orders
-    .filter(o => o.status === 'بانتظار الموافقة' || o.status === 'جديد')
+    .filter(o => {
+      if (user?.role === 'sales') return o.salesRep === user.repName
+      return o.status === 'بانتظار الموافقة' || o.status === 'جديد'
+    })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
     .slice(0, 10)
 

@@ -8,7 +8,7 @@ import HelpGuide from './HelpGuide'
 const ALL_NAV = [
   { to: '/dashboard',    icon: LayoutDashboard, label: 'لوحة التحكم',   labelEn: 'Dashboard',   roles: ['super_admin'] },
   { to: '/sales',        icon: ShoppingCart,    label: 'المبيعات',       labelEn: 'Sales',        roles: ['sales'] },
-  { to: '/team-leader',  icon: Users,           label: 'مراجعة الطلبات', labelEn: 'Team Leader',  roles: ['team_leader'] },
+  { to: '/team-leader',  icon: Users,           label: 'مراجعة الطلبات', labelEn: 'Team Leader',  roles: ['team_leader', 'admin', 'super_admin'] },
   { to: '/admin',        icon: Settings,        label: 'الإدارة',        labelEn: 'Admin',        roles: ['admin', 'super_admin'] },
 ]
 

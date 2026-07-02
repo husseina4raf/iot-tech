@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
@@ -7,6 +7,13 @@ import Badge from '../components/ui/Badge'
 import OrderForm from '../components/sales/OrderForm'
 import Leaderboard from '../components/sales/Leaderboard'
 import SalesReports from '../components/admin/SalesReports'
+
+const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
+
+const getCostPrice = (itemName, inventory) => {
+  const inv = inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName)
+  return inv?.costPrice || 0
+}
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -28,6 +35,10 @@ export default function TeamLeaderPage() {
   const [tab, setTab]                   = useState('pending')
   const [expanded, setExpanded]         = useState({})
   const [editingOrder, setEditingOrder] = useState(null)
+  const [search, setSearch]             = useState('')
+  const [filterDay,   setFilterDay]     = useState('')
+  const [filterMonth, setFilterMonth]   = useState('')
+  const [filterYear,  setFilterYear]    = useState('')
 
   const { orders, approveOrder, rejectOrder, updateOrderStatus, inventory } = useOrders()
   const { user } = useAuth()
@@ -35,8 +46,35 @@ export default function TeamLeaderPage() {
 
   const pendingOrders = [...orders].filter(o => o.status === 'بانتظار الموافقة')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  const allOrders = [...orders]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  const allOrders = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return [...orders]
+      .filter(o => {
+        if (q && !o.clientName?.toLowerCase().includes(q) && !o.mobile?.includes(q) && !o.whatsapp?.includes(q)) return false
+        if (filterYear || filterMonth || filterDay) {
+          // date stored as DD-MM-YYYY
+          const parts = o.date?.split('-') || []
+          const [d, m, y] = parts
+          if (filterYear  && y !== filterYear)                           return false
+          if (filterMonth && m !== String(filterMonth).padStart(2,'0'))  return false
+          if (filterDay   && d !== String(filterDay).padStart(2,'0'))    return false
+        }
+        return true
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  }, [orders, search, filterDay, filterMonth, filterYear])
+
+  const availableYears = useMemo(() => {
+    const ys = new Set(orders.map(o => o.date?.split('-')[2]).filter(Boolean))
+    return [...ys].sort((a, b) => b.localeCompare(a))
+  }, [orders])
+
+  const totalProfit = useMemo(() =>
+    allOrders.filter(o => o.status !== 'مرفوض').reduce((s, o) =>
+      s + o.items.reduce((ss, item) => ss + (item.price - getCostPrice(item.name, inventory)) * item.quantity, 0)
+    , 0)
+  , [allOrders, inventory])
 
   const onApprove = (id, ref) => {
     approveOrder(id, user)
@@ -109,6 +147,7 @@ export default function TeamLeaderPage() {
   )
 
   const displayOrders = tab === 'pending' ? pendingOrders : allOrders
+
 
   return (
     <div style={{ maxWidth:900, margin:'0 auto' }}>
@@ -187,7 +226,7 @@ export default function TeamLeaderPage() {
           {[
             { label:'بانتظار الموافقة', value: pendingOrders.length, color:'#f97316' },
             { label:'إجمالي الفواتير',  value: allOrders.length,     color:'#2563eb' },
-            { label:'إجمالي المبيعات',  value: `${allOrders.filter(o=>o.status!=='مرفوض').reduce((s,o)=>s+o.total,0).toLocaleString()} LE`, color:'#059669' },
+            { label:'إجمالي الأرباح',   value: `${totalProfit.toLocaleString()} LE`, color:'#059669' },
           ].map(s => (
             <div key={s.label} style={{ ...card, padding:'14px 18px', display:'flex', alignItems:'center', gap:12 }}>
               <div style={{ width:10, height:40, borderRadius:6, background:s.color, flexShrink:0 }} />
@@ -198,6 +237,44 @@ export default function TeamLeaderPage() {
             </div>
           ))}
         </div>
+
+        {/* Search + date filters — only on All Invoices tab */}
+        {tab === 'all' && (
+          <div style={{ ...card, padding:'12px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:180 }}>
+              <Search size={14} color="#94a3b8" style={{ flexShrink:0 }} />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="بحث باسم العميل أو رقم الهاتف..."
+                style={{ flex:1, border:'none', background:'transparent', fontSize:13, color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif' }}
+              />
+              {search && <button onClick={() => setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', flexShrink:0 }}><X size={13}/></button>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <select value={filterDay} onChange={e => setFilterDay(e.target.value)} dir="rtl"
+                style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+                <option value="">يوم</option>
+                {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={String(d).padStart(2,'0')}>{d}</option>)}
+              </select>
+              <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} dir="rtl"
+                style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+                <option value="">شهر</option>
+                {MONTHS_AR.map((m,i)=><option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+              </select>
+              <select value={filterYear} onChange={e => setFilterYear(e.target.value)} dir="ltr"
+                style={{ padding:'6px 10px', fontSize:12, border:'1.5px solid #e4eaf3', borderRadius:8, background:'#f8fafc', color:'#0f172a', outline:'none', fontFamily:'Cairo,sans-serif', cursor:'pointer' }}>
+                <option value="">سنة</option>
+                {availableYears.map(y=><option key={y} value={y}>{y}</option>)}
+              </select>
+              {(filterDay || filterMonth || filterYear) && (
+                <button onClick={() => { setFilterDay(''); setFilterMonth(''); setFilterYear('') }}
+                  style={{ display:'flex', alignItems:'center', gap:3, padding:'5px 10px', borderRadius:8, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                  <X size={11}/>مسح
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Orders list */}
         {displayOrders.length === 0 ? (
@@ -294,6 +371,10 @@ export default function TeamLeaderPage() {
                           { icon:Phone,    label:'موبايل / واتساب', val:`${order.mobile || '—'} / ${order.whatsapp || '—'}`, ltr:true },
                           order.address       && { icon:MapPin,     label:'العنوان',      val:order.address },
                           order.paymentMethod && { icon:CreditCard, label:'طريقة الدفع', val:order.paymentMethod },
+                          (order.date || order.time) && { icon:Calendar,  label:'موعد التركيب', val:`${order.date || '—'}${order.time ? ' — ' + order.time : ''}`, ltr:true },
+                          order.invoiceType  && { icon:FileText,   label:'نوع الفاتورة',  val:order.invoiceType },
+                          order.invoiceName  && { icon:User,        label:'الفاتورة باسم', val:order.invoiceName },
+                          order.taxNumber    && { icon:FileText,    label:'الرقم الضريبي', val:order.taxNumber, ltr:true },
                         ].filter(Boolean).map(row => (
                           <div key={row.label} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 14px', borderRadius:10, background:'#fff', border:'1px solid #f0f4fa' }}>
                             <row.icon size={14} color="#94a3b8" style={{ marginTop:2, flexShrink:0 }} />
@@ -303,6 +384,18 @@ export default function TeamLeaderPage() {
                             </div>
                           </div>
                         ))}
+                        {order.locationLink && (
+                          <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 14px', borderRadius:10, background:'#fff', border:'1px solid #f0f4fa' }}>
+                            <Link size={14} color="#94a3b8" style={{ marginTop:2, flexShrink:0 }} />
+                            <div>
+                              <div style={{ fontSize:11, color:'#94a3b8', marginBottom:2 }}>رابط الموقع</div>
+                              <a href={order.locationLink} target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize:13, color:'#2563eb', textDecoration:'underline', wordBreak:'break-all' }}>
+                                عرض على الخريطة
+                              </a>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ borderRadius:10, overflow:'hidden', border:'1px solid #e4eaf3', marginBottom:14 }}>

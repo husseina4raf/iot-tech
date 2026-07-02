@@ -129,8 +129,8 @@ export default function OrderCard({ order }) {
 
         {/* Actions */}
         <div className="m-wrap" style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {/* Approve / Reject — team_leader on pending orders */}
-          {order.status === 'بانتظار الموافقة' && user?.role === 'team_leader' && (
+          {/* Approve / Reject — team_leader, admin, super_admin on pending orders */}
+          {order.status === 'بانتظار الموافقة' && ['team_leader', 'admin', 'super_admin'].includes(user?.role) && (
             <>
               <button onClick={onApprove}
                 style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'none', background:'#059669', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}>

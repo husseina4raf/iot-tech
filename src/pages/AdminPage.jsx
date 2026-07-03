@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings } from 'lucide-react'
+import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen } from 'lucide-react'
 import OrdersList from '../components/admin/OrdersList'
 import InventoryManager from '../components/admin/InventoryManager'
 import SalesReports from '../components/admin/SalesReports'
@@ -7,11 +7,13 @@ import AuditLog from '../components/admin/AuditLog'
 import TaxInvoices from '../components/admin/TaxInvoices'
 import UserManager from '../components/admin/UserManager'
 import AppSettings from '../components/admin/AppSettings'
+import TeamInvoices from '../components/sales/TeamInvoices'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 
 const ALL_TABS = [
   { id:'orders',    label:'الطلبات',          icon:ClipboardList, roles:['admin','super_admin'] },
+  { id:'team',      label:'فواتير الفريق',    icon:FolderOpen,    roles:['admin','super_admin'] },
   { id:'inventory', label:'إدارة المخزون',    icon:Package,       roles:['admin','super_admin'] },
   { id:'reports',   label:'تقارير المبيعات',  icon:BarChart2,     roles:['admin','super_admin'] },
   { id:'users',     label:'المستخدمون',        icon:Users,         roles:['admin','super_admin'] },
@@ -54,6 +56,7 @@ export default function AdminPage() {
       </div>
 
       {tab === 'orders'    && <OrdersList />}
+      {tab === 'team'      && <TeamInvoices />}
       {tab === 'inventory' && <InventoryManager />}
       {tab === 'reports'   && <SalesReports />}
       {tab === 'users'     && <UserManager />}

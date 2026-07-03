@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
@@ -7,6 +7,7 @@ import Badge from '../components/ui/Badge'
 import OrderForm from '../components/sales/OrderForm'
 import Leaderboard from '../components/sales/Leaderboard'
 import SalesReports from '../components/admin/SalesReports'
+import TeamInvoices from '../components/sales/TeamInvoices'
 
 const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 
@@ -20,6 +21,7 @@ const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', b
 const TABS = [
   { id:'pending',     label:'بانتظار الموافقة', icon: Clock },
   { id:'all',         label:'جميع الفواتير',    icon: FileText },
+  { id:'team',        label:'فواتير الفريق',    icon: FolderOpen },
   { id:'inventory',   label:'المخزون',          icon: Package },
   { id:'leaderboard', label:'المتصدرون',        icon: Trophy },
   { id:'reports',     label:'تقارير الأرباح',   icon: TrendingUp },
@@ -219,8 +221,11 @@ export default function TeamLeaderPage() {
       {/* ── Reports tab ───────────────────────────────────────────────────────── */}
       {tab === 'reports' && <SalesReports />}
 
+      {/* ── Team Invoices tab ─────────────────────────────────────────────────── */}
+      {tab === 'team' && <TeamInvoices />}
+
       {/* ── Orders tabs ───────────────────────────────────────────────────────── */}
-      {tab !== 'inventory' && tab !== 'leaderboard' && tab !== 'reports' && (<>
+      {tab !== 'inventory' && tab !== 'leaderboard' && tab !== 'reports' && tab !== 'team' && (<>
         {/* Stats */}
         <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
           {[

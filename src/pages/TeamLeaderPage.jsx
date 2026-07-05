@@ -344,14 +344,14 @@ export default function TeamLeaderPage() {
                         </button>
                       )}
 
-                      {['موافق عليه','تم الصرف','مكتمل','تم التحصيل'].includes(order.status) && (
+                      {/* {['موافق عليه','تم الصرف','مكتمل','تم التحصيل'].includes(order.status) && (
                         <button onClick={() => onCalendar(order)}
                           style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}
                           onMouseEnter={e=>e.currentTarget.style.background='#d1fae5'}
                           onMouseLeave={e=>e.currentTarget.style.background='#ecfdf5'}>
                           <Calendar size={13}/>جدولة التركيب
                         </button>
-                      )}
+                      )} */}
 
                       <button onClick={() => setEditingOrder(order)}
                         style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}

@@ -315,7 +315,7 @@ export async function generateInvoicePDF(order) {
     </div>
 
     <div class="footer">
-13 Abd Elhameed Lotfy st. from Makram Ebid St. Nasr City, Nasr City, Egypt, 11631</div>
+13Abd Elhameed Lotfy st. from Makram Ebid St. Nasr City, Nasr City, Egypt, 11631</div>
   </div>`
 
   await renderHtmlToPDF(html, `invoice-${order.serialNumber}.pdf`)

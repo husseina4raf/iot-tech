@@ -229,7 +229,8 @@ export async function generateDispatchPDF(order) {
       <div class="stamp-box"><div class="stamp-lbl">ختم الشركة / Company Stamp</div></div>
     </div>
 
-    <div class="footer">IoT Tech — Smart Home &amp; Security Solutions — Egypt</div>
+    <div class="footer">
+13 Abd Elhameed Lotfy st. from Makram Ebid St. Nasr City, Nasr City, Egypt, 11631</div>
   </div>`
 
   await renderHtmlToPDF(html, `dispatch-${order.serialNumber}.pdf`)

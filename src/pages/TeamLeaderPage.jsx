@@ -27,11 +27,8 @@ const TABS = [
   { id:'reports',     label:'تقارير الأرباح',   icon: TrendingUp },
 ]
 
-// const STATUS_NEXT = {
-//   'موافق عليه': { label:'تم الصرف',   bg:'#d97706', shadow:'rgba(217,119,6,0.35)' },
-//   'تم الصرف':   { label:'مكتمل',      bg:'#7c3aed', shadow:'rgba(124,58,237,0.35)' },
-//   'مكتمل':      { label:'تم التحصيل', bg:'#10b981', shadow:'rgba(16,185,129,0.35)' },
-// }
+const STATUS_NEXT = {
+}
 
 export default function TeamLeaderPage() {
   const [tab, setTab]                   = useState('pending')

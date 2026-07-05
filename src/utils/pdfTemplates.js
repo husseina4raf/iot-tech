@@ -34,7 +34,7 @@ async function renderHtmlToPDF(htmlContent, filename) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = pdf.internal.pageSize.getWidth()   // 210 mm
   const pageH = pdf.internal.pageSize.getHeight()  // 297 mm
-  const imgH  = (canvas.height * pageW) / canvas.width
+  const imgH = (canvas.height * pageW) / canvas.width
 
   // Multi-page support
   if (imgH <= pageH) {
@@ -46,7 +46,7 @@ async function renderHtmlToPDF(htmlContent, filename) {
     while (remaining > 0) {
       if (!first) pdf.addPage()
       pdf.addImage(imgData, 'JPEG', 0, -yOffset, pageW, imgH)
-      yOffset   += pageH
+      yOffset += pageH
       remaining -= pageH
       first = false
     }
@@ -120,17 +120,17 @@ const BASE_CSS = `
 
 // ─── Arabic number-to-words (simple) ──────────────────────────────────────────
 function toArabicWords(n) {
-  const ones  = ['','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر']
-  const tens  = ['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون']
-  const hunds = ['','مائة','مئتان','ثلاثمائة','أربعمائة','خمسمائة','ستمائة','سبعمائة','ثمانمائة','تسعمائة']
+  const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة', 'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر']
+  const tens = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون']
+  const hunds = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة']
   if (n === 0) return 'صفر'
-  if (n < 20)  return ones[n]
-  if (n < 100) { const t=Math.floor(n/10),o=n%10; return o?`${ones[o]} و${tens[t]}`:tens[t] }
-  if (n < 1000){ const h=Math.floor(n/100),r=n%100; return r?`${hunds[h]} و${toArabicWords(r)}`:hunds[h] }
+  if (n < 20) return ones[n]
+  if (n < 100) { const t = Math.floor(n / 10), o = n % 10; return o ? `${ones[o]} و${tens[t]}` : tens[t] }
+  if (n < 1000) { const h = Math.floor(n / 100), r = n % 100; return r ? `${hunds[h]} و${toArabicWords(r)}` : hunds[h] }
   if (n < 1000000) {
-    const th=Math.floor(n/1000),r=n%1000
-    const thW = th===1?'ألف':th===2?'ألفان':th<11?`${toArabicWords(th)} آلاف`:`${toArabicWords(th)} ألف`
-    return r?`${thW} و${toArabicWords(r)}`:thW
+    const th = Math.floor(n / 1000), r = n % 1000
+    const thW = th === 1 ? 'ألف' : th === 2 ? 'ألفان' : th < 11 ? `${toArabicWords(th)} آلاف` : `${toArabicWords(th)} ألف`
+    return r ? `${thW} و${toArabicWords(r)}` : thW
   }
   return n.toLocaleString('ar-EG')
 }
@@ -144,7 +144,7 @@ function amountInWords(amount) {
 }
 
 // ─── Payment method map ────────────────────────────────────────────────────────
-const payMap = { 'كاش':'كاش (Cash)', 'انستاباي':'انستاباي (InstaPay)', 'تحويل':'تحويل بنكي (Bank Transfer)' }
+const payMap = { 'كاش': 'كاش (Cash)', 'انستاباي': 'انستاباي (InstaPay)', 'تحويل': 'تحويل بنكي (Bank Transfer)' }
 
 // ─── DISPATCH PDF ──────────────────────────────────────────────────────────────
 export async function generateDispatchPDF(order) {
@@ -165,7 +165,7 @@ export async function generateDispatchPDF(order) {
     <div class="header">
       <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@iottech.eg &nbsp;|&nbsp; www.iottech.eg</div>
+      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iottecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
     </div>
 
     <div class="doc-title">
@@ -257,7 +257,7 @@ export async function generateInvoicePDF(order) {
     <div class="header">
       <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01000000000 &nbsp;|&nbsp; info@iottech.eg &nbsp;|&nbsp; www.iottech.eg</div>
+      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iottecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
     </div>
 
     <div class="doc-title">
@@ -314,7 +314,8 @@ export async function generateInvoicePDF(order) {
       <div class="stamp-box"><div class="stamp-lbl">ختم الشركة / Company Stamp</div></div>
     </div>
 
-    <div class="footer">IoT Tech — Smart Home &amp; Security Solutions — Egypt</div>
+    <div class="footer">
+13 Abd Elhameed Lotfy st. from Makram Ebid St. Nasr City, Nasr City, Egypt, 11631</div>
   </div>`
 
   await renderHtmlToPDF(html, `invoice-${order.serialNumber}.pdf`)

@@ -53,11 +53,11 @@ export default function SalesReports() {
 
   // ── Monthly tab data ─────────────────────────────────────────────────────────
   const monthOrders = useMemo(() =>
-    orders.filter(o => { const p = o.date?.split('-'); return p?.length >= 3 && `${p[2]}-${p[1]}` === monthKey })
+    orders.filter(o => { const p = o.date?.split('-'); return p?.length >= 3 && `${p[2]}-${p[1].padStart(2,'0')}` === monthKey })
   , [orders, monthKey])
 
   const prevOrders = useMemo(() =>
-    orders.filter(o => { const p = o.date?.split('-'); return p?.length >= 3 && `${p[2]}-${p[1]}` === prevMonthKey })
+    orders.filter(o => { const p = o.date?.split('-'); return p?.length >= 3 && `${p[2]}-${p[1].padStart(2,'0')}` === prevMonthKey })
   , [orders, prevMonthKey])
 
   const monthStats = useMemo(() =>

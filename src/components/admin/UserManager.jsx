@@ -204,7 +204,7 @@ export default function UserManager() {
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #f0f4fa', display: 'flex', alignItems: 'center', gap: 8 }}>
           <User size={15} color="#2563eb" />
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>المندوبون وقادة الفريق</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>مسؤولو المبيعاتوقادة الفريق</h3>
           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 700 }}>{salesUsers.length}</span>
         </div>
         {salesUsers.length === 0 ? (

@@ -45,3 +45,8 @@ export const mapTax = r => ({
   filename: r.filename, amount: r.amount, invoiceDate: r.invoice_date,
   uploadedAt: r.uploaded_at, uploadedBy: r.uploaded_by, verified: r.verified,
 })
+
+export const mapTarget = r => ({
+  id: r.id, repName: r.rep_name, month: r.month,
+  target: r.target, setBy: r.set_by,
+})

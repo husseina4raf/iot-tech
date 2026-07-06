@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
-import { mapOrder, mapItem, mapAudit, mapTax } from '../lib/mappers'
+import { mapOrder, mapItem, mapAudit, mapTax, mapTarget } from '../lib/mappers'
 
 const OrdersContext = createContext(null)
 
@@ -9,10 +9,11 @@ const PAGE_SIZE = 100
 
 export function OrdersProvider({ children }) {
   const toast = useToast()
-  const [orders,      setOrders]      = useState([])
-  const [inventory,   setInventory]   = useState([])
-  const [auditLog,    setAuditLog]    = useState([])
-  const [taxInvoices, setTaxInvoices] = useState([])
+  const [orders,       setOrders]       = useState([])
+  const [inventory,    setInventory]    = useState([])
+  const [auditLog,     setAuditLog]     = useState([])
+  const [taxInvoices,  setTaxInvoices]  = useState([])
+  const [salesTargets, setSalesTargets] = useState([])
   const [loading,       setLoading]       = useState(true)
   const [hasMoreOrders, setHasMoreOrders] = useState(false)
   const [ordersPage,    setOrdersPage]    = useState(0)
@@ -41,7 +42,8 @@ export function OrdersProvider({ children }) {
       supabase.from('inventory').select('*').order('name', { ascending: true }),
       supabase.from('audit_log').select('*').order('changed_at', { ascending: false }),
       supabase.from('tax_invoices').select('*').order('uploaded_at', { ascending: false }),
-    ]).then(([o, inv, al, ti]) => {
+      supabase.from('sales_targets').select('*').order('month', { ascending: false }),
+    ]).then(([o, inv, al, ti, st]) => {
       if (o.error)   { console.error('orders fetch:', o.error);   toast('خطأ في تحميل الطلبات', 'error') }
       if (inv.error) { console.error('inventory fetch:', inv.error); toast('خطأ في تحميل المنتجات — ' + inv.error.message, 'error') }
       if (al.error)  { console.error('audit fetch:', al.error) }
@@ -51,6 +53,7 @@ export function OrdersProvider({ children }) {
       setInventory((inv.data || []).map(mapItem))
       setAuditLog((al.data || []).map(mapAudit))
       setTaxInvoices((ti.data || []).map(mapTax))
+      setSalesTargets((st.data || []).map(mapTarget))
       setLoading(false)
     })
 
@@ -75,6 +78,11 @@ export function OrdersProvider({ children }) {
         if (p.eventType === 'INSERT') setTaxInvoices(prev => prev.some(i => i.id === p.new.id) ? prev : [mapTax(p.new), ...prev])
         if (p.eventType === 'UPDATE') setTaxInvoices(prev => prev.map(i => i.id === p.new.id ? mapTax(p.new) : i))
         if (p.eventType === 'DELETE') setTaxInvoices(prev => prev.filter(i => i.id !== p.old.id))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_targets' }, p => {
+        if (p.eventType === 'INSERT') setSalesTargets(prev => prev.some(t => t.id === p.new.id) ? prev : [mapTarget(p.new), ...prev])
+        if (p.eventType === 'UPDATE') setSalesTargets(prev => prev.map(t => t.id === p.new.id ? mapTarget(p.new) : t))
+        if (p.eventType === 'DELETE') setSalesTargets(prev => prev.filter(t => t.id !== p.old.id))
       })
       .subscribe()
 
@@ -384,6 +392,31 @@ export function OrdersProvider({ children }) {
     await pushAudit({ type:'inventory', orderRef:item?.name||id, field:'حذف صنف', oldValue:`${item?.stock} وحدة`, newValue:'—', changedBy:user?.name||'مجهول' })
   }
 
+  // ── Sales Targets ─────────────────────────────────────────────────────────────
+  const upsertTarget = useCallback(async (repName, month, target, user) => {
+    const existing = salesTargets.find(t => t.repName === repName && t.month === month)
+    const id = existing?.id || `tgt-${Date.now()}-${Math.random().toString(36).slice(2,6)}`
+    const row = {
+      id, rep_name: repName, month, target: Number(target),
+      set_by: user?.name || 'مجهول', updated_at: new Date().toISOString(),
+    }
+    if (existing) {
+      setSalesTargets(prev => prev.map(t => t.id === existing.id ? { ...t, target: Number(target) } : t))
+    } else {
+      setSalesTargets(prev => [...prev, { id, repName, month, target: Number(target), setBy: user?.name || 'مجهول' }])
+    }
+    const { error } = await supabase.from('sales_targets').upsert(row, { onConflict: 'rep_name,month' })
+    if (error) {
+      console.error('upsertTarget:', error)
+      toast('فشل حفظ الهدف — ' + error.message, 'error')
+      if (existing) {
+        setSalesTargets(prev => prev.map(t => t.id === existing.id ? existing : t))
+      } else {
+        setSalesTargets(prev => prev.filter(t => t.id !== id))
+      }
+    }
+  }, [salesTargets, toast])
+
   // ── Tax Invoices ──────────────────────────────────────────────────────────────
   const addTaxInvoice = async (invoice, user) => {
     const row = {
@@ -416,12 +449,13 @@ export function OrdersProvider({ children }) {
 
   return (
     <OrdersContext.Provider value={{
-      orders, inventory, auditLog, taxInvoices, loading,
+      orders, inventory, auditLog, taxInvoices, salesTargets, loading,
       hasMoreOrders, loadMoreOrders,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,
+      upsertTarget,
     }}>
       {children}
     </OrdersContext.Provider>

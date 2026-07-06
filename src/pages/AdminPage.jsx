@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen } from 'lucide-react'
+import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen, Trophy } from 'lucide-react'
 import OrdersList from '../components/admin/OrdersList'
 import InventoryManager from '../components/admin/InventoryManager'
 import SalesReports from '../components/admin/SalesReports'
@@ -8,18 +8,20 @@ import TaxInvoices from '../components/admin/TaxInvoices'
 import UserManager from '../components/admin/UserManager'
 import AppSettings from '../components/admin/AppSettings'
 import TeamInvoices from '../components/sales/TeamInvoices'
+import Leaderboard from '../components/sales/Leaderboard'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 
 const ALL_TABS = [
-  { id:'orders',    label:'الطلبات',          icon:ClipboardList, roles:['admin','super_admin'] },
-  { id:'team',      label:'فواتير الفريق',    icon:FolderOpen,    roles:['admin','super_admin'] },
-  { id:'inventory', label:'إدارة المخزون',    icon:Package,       roles:['admin','super_admin'] },
-  { id:'reports',   label:'تقارير المبيعات',  icon:BarChart2,     roles:['admin','super_admin'] },
-  { id:'users',     label:'المستخدمون',        icon:Users,         roles:['admin','super_admin'] },
-  { id:'audit',     label:'سجل التعديلات',    icon:History,       roles:['admin','super_admin'] },
-  { id:'tax',       label:'الفواتير الضريبية', icon:FileText,     roles:['admin','super_admin'] },
-  { id:'settings',  label:'الإعدادات',         icon:Settings,     roles:['super_admin'] },
+  { id:'orders',      label:'الطلبات',          icon:ClipboardList, roles:['admin','super_admin'] },
+  { id:'team',        label:'فواتير الفريق',    icon:FolderOpen,    roles:['admin','super_admin'] },
+  { id:'leaderboard', label:'المتصدرون',        icon:Trophy,        roles:['admin','super_admin'] },
+  { id:'inventory',   label:'إدارة المخزون',    icon:Package,       roles:['admin','super_admin'] },
+  { id:'reports',     label:'تقارير المبيعات',  icon:BarChart2,     roles:['admin','super_admin'] },
+  { id:'users',       label:'المستخدمون',        icon:Users,         roles:['admin','super_admin'] },
+  { id:'audit',       label:'سجل التعديلات',    icon:History,       roles:['admin','super_admin'] },
+  { id:'tax',         label:'الفواتير الضريبية', icon:FileText,     roles:['admin','super_admin'] },
+  { id:'settings',    label:'الإعدادات',         icon:Settings,     roles:['super_admin'] },
 ]
 
 export default function AdminPage() {
@@ -55,8 +57,9 @@ export default function AdminPage() {
         })}
       </div>
 
-      {tab === 'orders'    && <OrdersList />}
-      {tab === 'team'      && <TeamInvoices />}
+      {tab === 'orders'      && <OrdersList />}
+      {tab === 'team'        && <TeamInvoices />}
+      {tab === 'leaderboard' && <Leaderboard />}
       {tab === 'inventory' && <InventoryManager />}
       {tab === 'reports'   && <SalesReports />}
       {tab === 'users'     && <UserManager />}

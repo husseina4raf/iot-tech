@@ -13,7 +13,7 @@ const ALL_NAV = [
 ]
 
 const roleInfo = {
-  sales:       { bg:'rgba(59,130,246,0.15)',  color:'#93c5fd', label:'مندوب مبيعات', avatar:'linear-gradient(135deg,#3b82f6,#1d4ed8)' },
+  sales:       { bg:'rgba(59,130,246,0.15)',  color:'#93c5fd', label:' مسئول المبيات', avatar:'linear-gradient(135deg,#3b82f6,#1d4ed8)' },
   team_leader: { bg:'rgba(6,182,212,0.15)',   color:'#67e8f9', label:'قائد فريق',     avatar:'linear-gradient(135deg,#0891b2,#0e7490)' },
   admin:       { bg:'rgba(52,211,153,0.15)',  color:'#6ee7b7', label:'مدير',           avatar:'linear-gradient(135deg,#10b981,#047857)' },
   super_admin: { bg:'rgba(167,139,250,0.15)', color:'#c4b5fd', label:'مدير عام',       avatar:'linear-gradient(135deg,#8b5cf6,#6d28d9)' },

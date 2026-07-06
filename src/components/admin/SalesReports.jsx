@@ -144,9 +144,10 @@ export default function SalesReports() {
     return Object.values(map).sort((a, b) => b.revenue - a.revenue)
   }, [orders, inventory, prodRep])
 
-  // ── Global KPIs ───────────────────────────────────────────────────────────────
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0)
-  const totalProfit  = orders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+  // ── Global KPIs — scoped to selected month when on monthly tab ───────────────
+  const kpiOrders   = tab === 'monthly' ? monthOrders : orders
+  const totalRevenue = kpiOrders.reduce((s, o) => s + o.total, 0)
+  const totalProfit  = kpiOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
 
   const TABS = [
     { id: 'monthly',  label: 'الملخص الشهري',  icon: Target },
@@ -163,7 +164,7 @@ export default function SalesReports() {
           { label: 'إجمالي الإيرادات', value: `${(totalRevenue / 1000).toFixed(1)}K LE`, color: '#1d4ed8' },
           { label: 'صافي الربح',       value: `${(totalProfit  / 1000).toFixed(1)}K LE`,  color: '#059669' },
           { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(totalRevenue, 1)) * 100)}%`, color: '#7c3aed' },
-          { label: 'إجمالي الطلبات',   value: orders.length, color: '#0891b2' },
+          { label: 'إجمالي الطلبات',   value: kpiOrders.length, color: '#0891b2' },
         ].map(k => (
           <div key={k.label} style={{ ...card, padding: '16px 18px' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.color, marginBottom: 3 }} dir="ltr">{k.value}</div>

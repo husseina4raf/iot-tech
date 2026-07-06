@@ -82,7 +82,7 @@ export default function UserManager() {
       password: form.password,
       role: form.role || 'sales',
     })
-    const roleLabel = form.role === 'team_leader' ? 'قائد الفريق' : form.role === 'admin' ? 'المدير' : 'المندوب'
+    const roleLabel = form.role === 'team_leader' ? 'قائد الفريق' : form.role === 'admin' ? 'المدير' : 'مسؤل المبيعات'
     toast(`تم إضافة ${roleLabel} بنجاح ✓`, 'success')
     setShowForm(false)
     setForm(emptyForm())
@@ -194,7 +194,7 @@ export default function UserManager() {
             </button>
             <button onClick={handleSave}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1d4ed8,#2563eb)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
-              <Check size={14} />{form.role === 'team_leader' ? 'إضافة قائد الفريق' : 'إضافة المندوب'}
+              <Check size={14} />{form.role === 'team_leader' ? 'إضافة قائد الفريق' : 'إضافة مسؤل المبيعات'}
             </button>
           </div>
         </div>
@@ -214,7 +214,7 @@ export default function UserManager() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 520 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {['المندوب', 'اسم العرض', 'اسم المستخدم', 'الصلاحية', 'إجراءات'].map((h, i) => (
+                  {['مسؤل المبيعات', 'اسم العرض', 'اسم المستخدم', 'الصلاحية', 'إجراءات'].map((h, i) => (
                     <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom: '1px solid #f0f4fa' }}>{h}</th>
                   ))}
                 </tr>

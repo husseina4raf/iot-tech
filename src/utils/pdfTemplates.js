@@ -182,7 +182,7 @@ export async function generateDispatchPDF(order) {
         <div class="info-row"><span class="info-label">اسم الشركة / العميل:</span> <span class="info-val">${order.company}</span></div>
         <div class="info-row"><span class="info-label">اسم العميل:</span>           <span class="info-val">${order.clientName}</span></div>
         <div class="info-row"><span class="info-label">الموبايل:</span>             <span class="info-val" dir="ltr">${order.mobile}</span></div>
-        <div class="info-row"><span class="info-label">المندوب:</span>              <span class="info-val">${order.salesRep}</span></div>
+        <div class="info-row"><span class="info-label">مسؤل المبيعات:</span>              <span class="info-val">${order.salesRep}</span></div>
       </div>
     </div>
 
@@ -269,7 +269,7 @@ export async function generateInvoicePDF(order) {
       <div class="info-box">
         <div class="info-row"><span class="info-label">${isVat ? 'رقم الفاتورة:' : 'رقم البيان:'}</span>  <span class="info-val">${order.serialNumber}</span></div>
         <div class="info-row"><span class="info-label">التاريخ:</span>        <span class="info-val">${order.date}</span></div>
-        <div class="info-row"><span class="info-label">المندوب:</span>        <span class="info-val">${order.salesRep}</span></div>
+        <div class="info-row"><span class="info-label">مسؤل المبيعات:</span>        <span class="info-val">${order.salesRep}</span></div>
       </div>
       <div class="info-box">
         <div class="info-row"><span class="info-label">فاتورة إلى:</span>    <span class="info-val">${billName}</span></div>

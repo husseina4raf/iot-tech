@@ -212,7 +212,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
             </div>
           ) : (
             <FSelect label="مندوب المبيعات" required error={errors.salesRep} value={form.salesRep} onChange={e => upd('salesRep', e.target.value)}>
-              <option value="">اختر المندوب</option>
+              <option value="">اختر مسؤل المبيعات</option>
               {salesReps.map(r => <option key={r} value={r}>{r}</option>)}
             </FSelect>
           )}
@@ -231,7 +231,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                   <option value="">المحافظة *</option>
                   {EGYPT_GOVERNORATES.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                {errors.governorate && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.governorate}</span>}
+                {errors.governorate && <span style={{ display: 'block', fontSize: 11, color: '#e11d48', marginTop: 3 }}>{errors.governorate}</span>}
               </div>
               <div>
                 <input list="city-list" placeholder="المدينة / المركز *" value={form.city || ''}
@@ -240,7 +240,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                 <datalist id="city-list">
                   {(EGYPT_CITIES[form.governorate] || []).map(c => <option key={c} value={c} />)}
                 </datalist>
-                {errors.city && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.city}</span>}
+                {errors.city && <span style={{ display: 'block', fontSize: 11, color: '#e11d48', marginTop: 3 }}>{errors.city}</span>}
               </div>
               <FInput placeholder="المنطقة / الحي" value={form.district || ''} onChange={e => upd('district', e.target.value)} />
             </div>
@@ -374,7 +374,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                 onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff' }}
                 onBlur={e => { e.target.style.borderColor = errors.time ? '#e11d48' : '#e4eaf3'; e.target.style.background = errors.time ? '#fff7f7' : '#f8fafc' }} />
             </div>
-            {errors.time && <span style={{ display:'block', fontSize:11, color:'#e11d48', marginTop:3 }}>{errors.time}</span>}
+            {errors.time && <span style={{ display: 'block', fontSize: 11, color: '#e11d48', marginTop: 3 }}>{errors.time}</span>}
           </div>
           <FTextarea label="ملاحظات" style={{ gridColumn: '1/-1' }} placeholder="أي ملاحظات إضافية..." rows={3} value={form.notes} onChange={e => upd('notes', e.target.value)} />
         </div>

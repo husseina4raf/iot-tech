@@ -7,11 +7,11 @@ import { useAuth } from '../../hooks/useAuth'
 import { generateDispatchPDF, generateInvoicePDF } from '../../utils/pdfTemplates'
 
 const accent = {
-  'بانتظار الموافقة':'#f97316',
-  'جديد':'#2563eb', 'موافق عليه':'#059669',
-  'تم الصرف':'#d97706', 'مكتمل':'#7c3aed',
-  'تم التحصيل':'#10b981',
-  'مرفوض':'#e11d48',
+  'بانتظار الموافقة': '#f97316',
+  'جديد': '#2563eb', 'موافق عليه': '#059669',
+  'تم الصرف': '#d97706', 'مكتمل': '#7c3aed',
+  'تم التحصيل': '#10b981',
+  'مرفوض': '#e11d48',
 }
 
 // Inject spin keyframe once
@@ -30,21 +30,21 @@ export default function OrderCard({ order }) {
   const [pdfLoading, setPdfLoading] = useState('')
 
   const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
-  const onReject  = () => { rejectOrder(order.id, user);  toast('تم رفض الطلب', 'error') }
+  const onReject = () => { rejectOrder(order.id, user); toast('تم رفض الطلب', 'error') }
   const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
-  const onDelete  = () => {
+  const onDelete = () => {
     if (!window.confirm(`هل أنت متأكد من حذف طلب "${order.clientName}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return
     deleteOrder(order.id, user)
     toast('تم حذف الطلب ✓', 'success')
   }
 
   const onCalendar = () => {
-    const title   = encodeURIComponent(order.clientName)
-    const items   = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
+    const title = encodeURIComponent(order.clientName)
+    const items = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
-      `رقم الطلب: #${order.serialNumber}\nالمندوب: ${order.salesRep}` +
-      (order.mobile    ? `\nالموبايل: ${order.mobile}`  : '') +
-      (order.whatsapp  ? `\nواتساب: ${order.whatsapp}`  : '') +
+      `رقم الطلب: #${order.serialNumber}\nمسؤل المبيعات: ${order.salesRep}` +
+      (order.mobile ? `\nالموبايل: ${order.mobile}` : '') +
+      (order.whatsapp ? `\nواتساب: ${order.whatsapp}` : '') +
       (order.time ? `\nوقت التركيب: ${order.time}` : '') +
       (order.address ? `\n\nالعنوان: ${order.address}` : '') +
       (order.locationLink ? `\nخريطة: ${order.locationLink}` : '') +
@@ -63,10 +63,10 @@ export default function OrderCard({ order }) {
       const ymd = `${parts[2]}${parts[1]}${parts[0]}`
       if (order.time && order.time.includes(':')) {
         const [h, m] = order.time.split(':')
-        const start = `${ymd}T${h.padStart(2,'0')}${m.padStart(2,'0')}00`
-        const endH  = String(parseInt(h, 10) + 2).padStart(2, '0')
-        const end   = `${ymd}T${endH}${m.padStart(2,'0')}00`
-        datesParam  = `&dates=${start}/${end}`
+        const start = `${ymd}T${h.padStart(2, '0')}${m.padStart(2, '0')}00`
+        const endH = String(parseInt(h, 10) + 2).padStart(2, '0')
+        const end = `${ymd}T${endH}${m.padStart(2, '0')}00`
+        datesParam = `&dates=${start}/${end}`
       } else {
         datesParam = `&dates=${ymd}/${ymd}`
       }
@@ -80,129 +80,129 @@ export default function OrderCard({ order }) {
   const onDispatch = async () => {
     setPdfLoading('dispatch')
     try { await generateDispatchPDF(order); toast('تم إنشاء إذن الصرف ✓', 'success') }
-    catch(e) { console.error(e); toast('خطأ في إنشاء PDF', 'error') }
+    catch (e) { console.error(e); toast('خطأ في إنشاء PDF', 'error') }
     finally { setPdfLoading('') }
   }
 
   const onInvoice = async () => {
     setPdfLoading('invoice')
     try { await generateInvoicePDF(order); toast('تم إنشاء الفاتورة ✓', 'success') }
-    catch(e) { console.error(e); toast('خطأ في إنشاء PDF', 'error') }
+    catch (e) { console.error(e); toast('خطأ في إنشاء PDF', 'error') }
     finally { setPdfLoading('') }
   }
 
-  const col = accent[order.status]||'#475569'
+  const col = accent[order.status] || '#475569'
 
   return (
-    <div className="fade-in" style={{ background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', borderRight:`3px solid ${col}`, boxShadow:'0 1px 4px rgba(15,23,42,0.06)', overflow:'hidden' }}>
-      <div style={{ padding:'16px 20px' }}>
+    <div className="fade-in" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', borderRight: `3px solid ${col}`, boxShadow: '0 1px 4px rgba(15,23,42,0.06)', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 20px' }}>
         {/* Header row */}
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, marginBottom:14 }}>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:6 }}>
-              <span style={{ fontSize:15, fontWeight:700, color:'#0f172a' }}>{order.clientName}</span>
-              <span style={{ color:'#cbd5e1' }}>·</span>
-              <span style={{ fontSize:13, color:'#64748b' }}>{order.company}</span>
-              {order.editHistory?.length>0 && (
-                <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe', display:'inline-flex', alignItems:'center', gap:4 }}>
-                  <History size={9}/> معدّل {order.editHistory.length}×
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 14 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{order.clientName}</span>
+              <span style={{ color: '#cbd5e1' }}>·</span>
+              <span style={{ fontSize: 13, color: '#64748b' }}>{order.company}</span>
+              {order.editHistory?.length > 0 && (
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <History size={9} /> معدّل {order.editHistory.length}×
                 </span>
               )}
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', fontSize:12, color:'#94a3b8' }}>
-              <span style={{display:'flex',alignItems:'center',gap:4}}><User size={11}/>{order.salesRep}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 12, color: '#94a3b8' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={11} />{order.salesRep}</span>
               <span>#{order.serialNumber}</span>
               <span>{order.date}{order.time ? ` — ${order.time}` : ''}</span>
-              {order.paymentMethod && <span style={{display:'flex',alignItems:'center',gap:4}}><CreditCard size={11}/>{order.paymentMethod}</span>}
+              {order.paymentMethod && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CreditCard size={11} />{order.paymentMethod}</span>}
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
-            <div style={{ textAlign:'left' }}>
-              <div style={{ fontSize:18, fontWeight:800, color:'#0f172a' }} dir="ltr">
-                {order.total.toLocaleString()} <span style={{fontSize:12,fontWeight:500,color:'#94a3b8'}}>LE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }} dir="ltr">
+                {order.total.toLocaleString()} <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8' }}>LE</span>
               </div>
-              <div style={{ fontSize:11, color:'#94a3b8', textAlign:'left' }}>إجمالي الطلب</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'left' }}>إجمالي الطلب</div>
             </div>
             <Badge status={order.status}>{order.status}</Badge>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="m-wrap" style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+        <div className="m-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {/* Approve / Reject — team_leader, admin, super_admin on pending orders */}
           {order.status === 'بانتظار الموافقة' && ['team_leader', 'admin', 'super_admin'].includes(user?.role) && (
             <>
               <button onClick={onApprove}
-                style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'none', background:'#059669', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(5,150,105,0.3)' }}>
-                <Check size={13}/>موافقة
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(5,150,105,0.3)' }}>
+                <Check size={13} />موافقة
               </button>
               <button onClick={onReject}
-                style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:8, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
-                <X size={13}/>رفض
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
+                <X size={13} />رفض
               </button>
             </>
           )}
 
           {/* Admin status-advance buttons */}
-          {['admin','super_admin'].includes(user?.role) && (<>
+          {['admin', 'super_admin'].includes(user?.role) && (<>
             {order.status === 'موافق عليه' && (
               <button onClick={() => { updateOrderStatus(order.id, 'تم الصرف', user); toast('تم تحديث الحالة إلى تم الصرف ✓', 'success') }}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#d97706', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(217,119,6,0.35)' }}>
-                <Check size={13}/>تم الصرف
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(217,119,6,0.35)' }}>
+                <Check size={13} />تم الصرف
               </button>
             )}
             {order.status === 'تم الصرف' && (
               <button onClick={() => { updateOrderStatus(order.id, 'مكتمل', user); toast('تم تحديث الحالة إلى مكتمل ✓', 'success') }}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#7c3aed', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(124,58,237,0.35)' }}>
-                <Check size={13}/>مكتمل
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#7c3aed', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(124,58,237,0.35)' }}>
+                <Check size={13} />مكتمل
               </button>
             )}
             {order.status === 'مكتمل' && (
               <button onClick={onCollect}
-                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', background:'#10b981', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 2px 8px rgba(16,185,129,0.35)' }}>
-                <Check size={13}/>تم التحصيل
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#10b981', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(16,185,129,0.35)' }}>
+                <Check size={13} />تم التحصيل
               </button>
             )}
           </>)}
 
           {/* Print + Calendar — admin/super_admin on approved orders */}
-          {['موافق عليه','تم الصرف','مكتمل','تم التحصيل'].includes(order.status) && ['admin','super_admin'].includes(user?.role) && (<>
+          {['موافق عليه', 'تم الصرف', 'مكتمل', 'تم التحصيل'].includes(order.status) && ['admin', 'super_admin'].includes(user?.role) && (<>
             {[
-              { label:'إذن صرف PDF', key:'dispatch', icon:Package,  fn:onDispatch, bg:'#1e293b', hover:'#0f172a' },
-              { label:'فاتورة PDF',  key:'invoice',  icon:FileText, fn:onInvoice,  bg:'#2563eb', hover:'#1d4ed8', shadow:'0 2px 8px rgba(37,99,235,0.3)' },
+              { label: 'إذن صرف PDF', key: 'dispatch', icon: Package, fn: onDispatch, bg: '#1e293b', hover: '#0f172a' },
+              { label: 'فاتورة PDF', key: 'invoice', icon: FileText, fn: onInvoice, bg: '#2563eb', hover: '#1d4ed8', shadow: '0 2px 8px rgba(37,99,235,0.3)' },
             ].map(btn => {
               const busy = pdfLoading === btn.key
               return (
                 <button key={btn.label} onClick={btn.fn} disabled={!!pdfLoading}
-                  style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'none', cursor: busy?'wait':'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', background:btn.bg, color:'#fff', boxShadow:btn.shadow||'none', opacity: pdfLoading && !busy ? 0.6 : 1 }}
-                  onMouseEnter={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.hover }}
-                  onMouseLeave={e=>{ if(!pdfLoading) e.currentTarget.style.background=btn.bg }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', cursor: busy ? 'wait' : 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'Cairo,sans-serif', transition: 'all 0.15s', background: btn.bg, color: '#fff', boxShadow: btn.shadow || 'none', opacity: pdfLoading && !busy ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!pdfLoading) e.currentTarget.style.background = btn.hover }}
+                  onMouseLeave={e => { if (!pdfLoading) e.currentTarget.style.background = btn.bg }}>
                   {busy
-                    ? <span style={{ width:12,height:12,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite',display:'inline-block' }} />
-                    : <btn.icon size={13}/>}
+                    ? <span style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                    : <btn.icon size={13} />}
                   {busy ? 'جارٍ الإنشاء...' : btn.label}
                 </button>
               )
             })}
             <button onClick={onCalendar}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:8, border:'1.5px solid #a7f3d0', background:'#ecfdf5', color:'#059669', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}
-              onMouseEnter={e=>{ e.currentTarget.style.background='#d1fae5' }}
-              onMouseLeave={e=>{ e.currentTarget.style.background='#ecfdf5' }}>
-              <Calendar size={13}/>جدولة التركيب
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #a7f3d0', background: '#ecfdf5', color: '#059669', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#d1fae5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#ecfdf5' }}>
+              <Calendar size={13} />جدولة التركيب
             </button>
           </>)}
 
           {user?.role === 'super_admin' && (
             <button onClick={onDelete}
-              style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', borderRadius:8, border:'1.5px solid #fecdd3', background:'#fff1f2', color:'#e11d48', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif', marginRight:'auto' }}
-              onMouseEnter={e=>{ e.currentTarget.style.background='#ffe4e6' }}
-              onMouseLeave={e=>{ e.currentTarget.style.background='#fff1f2' }}>
-              <Trash2 size={12}/>حذف الطلب
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', marginRight: 'auto' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#ffe4e6' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff1f2' }}>
+              <Trash2 size={12} />حذف الطلب
             </button>
           )}
 
-          <button onClick={()=>setExpanded(v=>!v)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:'1.5px solid #e4eaf3', background: expanded?'#f0f4fa':'#fff', color:'#475569', cursor:'pointer', fontSize:12, fontWeight:600, fontFamily:'Cairo,sans-serif', transition:'all 0.15s', ...(user?.role !== 'super_admin' && { marginRight:'auto' }) }}>
-            <ChevronDown size={11} style={{ transition:'transform 0.2s', transform: expanded?'rotate(180deg)':'none' }} />
+          <button onClick={() => setExpanded(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: expanded ? '#f0f4fa' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'Cairo,sans-serif', transition: 'all 0.15s', ...(user?.role !== 'super_admin' && { marginRight: 'auto' }) }}>
+            <ChevronDown size={11} style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }} />
             التفاصيل
           </button>
         </div>
@@ -210,71 +210,71 @@ export default function OrderCard({ order }) {
 
       {/* Expanded */}
       {expanded && (
-        <div style={{ borderTop:'1px solid #f0f4fa', background:'#f8fafc', padding:'16px 20px' }}>
-          <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+        <div style={{ borderTop: '1px solid #f0f4fa', background: '#f8fafc', padding: '16px 20px' }}>
+          <div className="m-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             {[
-              { icon:Phone,  label:'موبايل / واتساب', val:`${order.mobile} / ${order.whatsapp}`, ltr:true },
-              order.address && { icon:MapPin, label:'العنوان', val:order.address },
-            ].filter(Boolean).map(row=>(
-              <div key={row.label} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 14px', borderRadius:10, background:'#fff', border:'1px solid #f0f4fa' }}>
-                <row.icon size={14} color="#94a3b8" style={{ marginTop:2, flexShrink:0 }} />
+              { icon: Phone, label: 'موبايل / واتساب', val: `${order.mobile} / ${order.whatsapp}`, ltr: true },
+              order.address && { icon: MapPin, label: 'العنوان', val: order.address },
+            ].filter(Boolean).map(row => (
+              <div key={row.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#fff', border: '1px solid #f0f4fa' }}>
+                <row.icon size={14} color="#94a3b8" style={{ marginTop: 2, flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize:11, color:'#94a3b8', marginBottom:2 }}>{row.label}</div>
-                  <div style={{ fontSize:13, color:'#0f172a' }} dir={row.ltr?'ltr':'rtl'}>{row.val}</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>{row.label}</div>
+                  <div style={{ fontSize: 13, color: '#0f172a' }} dir={row.ltr ? 'ltr' : 'rtl'}>{row.val}</div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Items table */}
-          <div style={{ borderRadius:10, overflow:'hidden', border:'1px solid #e4eaf3', marginBottom:14 }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+          <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e4eaf3', marginBottom: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ background:'#0f172a' }}>
-                  {['الصنف','الموديل','الكمية','السعر','الإجمالي'].map((h,i)=>(
-                    <th key={h} style={{ padding:'9px 14px', color:'#e2e8f0', fontWeight:600, textAlign:i===0?'right':'center' }}>{h}</th>
+                <tr style={{ background: '#0f172a' }}>
+                  {['الصنف', 'الموديل', 'الكمية', 'السعر', 'الإجمالي'].map((h, i) => (
+                    <th key={h} style={{ padding: '9px 14px', color: '#e2e8f0', fontWeight: 600, textAlign: i === 0 ? 'right' : 'center' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {order.items.map((item,i)=>(
-                  <tr key={item.id} style={{ background:i%2===0?'#fff':'#f8fafc', borderBottom:'1px solid #f0f4fa' }}>
-                    <td style={{ padding:'9px 14px', fontWeight:600, color:'#0f172a' }}>{item.name}</td>
-                    <td style={{ padding:'9px 14px', textAlign:'center', color:'#64748b' }}>{item.model||'—'}</td>
-                    <td style={{ padding:'9px 14px', textAlign:'center', color:'#0f172a' }}>{item.quantity}</td>
-                    <td style={{ padding:'9px 14px', textAlign:'center', color:'#64748b' }} dir="ltr">{item.price.toLocaleString()} LE</td>
-                    <td style={{ padding:'9px 14px', textAlign:'center', fontWeight:700, color:'#0f172a' }} dir="ltr">{item.total.toLocaleString()} LE</td>
+                {order.items.map((item, i) => (
+                  <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f4fa' }}>
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }}>{item.model || '—'}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#0f172a' }}>{item.quantity}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }} dir="ltr">{item.price.toLocaleString()} LE</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 700, color: '#0f172a' }} dir="ltr">{item.total.toLocaleString()} LE</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ background:'#f0f4fa', borderTop:'1.5px solid #e4eaf3' }}>
-                  <td colSpan={4} style={{ padding:'9px 14px', fontWeight:700, color:'#0f172a', fontSize:13 }}>الإجمالي شامل {order.vatPercent}% ضريبة</td>
-                  <td style={{ padding:'9px 14px', textAlign:'center', fontWeight:800, color:'#2563eb', fontSize:13 }} dir="ltr">{order.total.toLocaleString()} LE</td>
+                <tr style={{ background: '#f0f4fa', borderTop: '1.5px solid #e4eaf3' }}>
+                  <td colSpan={4} style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', fontSize: 13 }}>الإجمالي شامل {order.vatPercent}% ضريبة</td>
+                  <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 800, color: '#2563eb', fontSize: 13 }} dir="ltr">{order.total.toLocaleString()} LE</td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
           {/* Notes + history */}
-          {(order.notes || order.editHistory?.length>0) && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          {(order.notes || order.editHistory?.length > 0) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {order.notes && (
-                <div style={{ padding:'12px 14px', borderRadius:10, background:'#eff6ff', border:'1px solid #bfdbfe' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#1d4ed8', marginBottom:4 }}>ملاحظات</div>
-                  <div style={{ fontSize:12, color:'#0f172a' }}>{order.notes}</div>
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }}>ملاحظات</div>
+                  <div style={{ fontSize: 12, color: '#0f172a' }}>{order.notes}</div>
                 </div>
               )}
-              {order.editHistory?.length>0 && (
-                <div style={{ padding:'12px 14px', borderRadius:10, background:'#fffbeb', border:'1px solid #fde68a' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'#92400e', marginBottom:6, display:'flex', alignItems:'center', gap:4 }}>
-                    <History size={10}/> سجل التعديلات
+              {order.editHistory?.length > 0 && (
+                <div style={{ padding: '12px 14px', borderRadius: 10, background: '#fffbeb', border: '1px solid #fde68a' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <History size={10} /> سجل التعديلات
                   </div>
-                  {order.editHistory.map((h,i)=>(
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#475569', marginBottom:4 }}>
-                      <Clock size={9} color="#f59e0b" style={{flexShrink:0}}/>
-                      <span style={{flex:1}}>{h.note}</span>
-                      <span dir="ltr" style={{color:'#94a3b8'}}>{new Date(h.editedAt).toLocaleDateString('ar-EG')}</span>
+                  {order.editHistory.map((h, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569', marginBottom: 4 }}>
+                      <Clock size={9} color="#f59e0b" style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{h.note}</span>
+                      <span dir="ltr" style={{ color: '#94a3b8' }}>{new Date(h.editedAt).toLocaleDateString('ar-EG')}</span>
                     </div>
                   ))}
                 </div>

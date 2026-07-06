@@ -38,6 +38,8 @@ export default function TeamLeaderPage() {
   const [filterDay, setFilterDay] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [filterYear, setFilterYear] = useState('')
+  const [invPage,    setInvPage]    = useState(0)
+  const [invPerPage, setInvPerPage] = useState(10)
 
   const { orders, approveOrder, rejectOrder, updateOrderStatus, inventory } = useOrders()
   const { user } = useAuth()
@@ -171,46 +173,69 @@ export default function TeamLeaderPage() {
       </div>
 
       {/* ── Inventory tab ─────────────────────────────────────────────────────── */}
-      {tab === 'inventory' && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Package size={16} color="#2563eb" />
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>المخزون</h3>
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontWeight: 700 }}>{inventory.length} منتج</span>
-            <span style={{ fontSize: 11, color: '#94a3b8', marginRight: 'auto' }}>للعرض فقط</span>
-          </div>
-          <div style={card}>
-            {inventory.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>لا توجد منتجات</div>
-            ) : inventory.map((item, i) => {
-              const isLow = item.stock < (item.minStock || 5)
-              return (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px', borderBottom: i < inventory.length - 1 ? '1px solid #f8fafc' : 'none', background: isLow ? '#fffafa' : 'transparent' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: isLow ? '#ffe4e6' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Package size={15} color={isLow ? '#e11d48' : '#2563eb'} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-                      {item.brand && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>{item.brand}</span>}
-                      {item.category && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>{item.category}</span>}
+      {tab === 'inventory' && (() => {
+        const totalPages  = Math.ceil(inventory.length / invPerPage)
+        const pageItems   = inventory.slice(invPage * invPerPage, invPage * invPerPage + invPerPage)
+        const btnStyle    = (active) => ({ padding: '5px 11px', borderRadius: 8, border: `1.5px solid ${active ? '#2563eb' : '#e4eaf3'}`, background: active ? '#eff6ff' : '#fff', color: active ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' })
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <Package size={16} color="#2563eb" />
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>المخزون</h3>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontWeight: 700 }}>{inventory.length} منتج</span>
+              <span style={{ fontSize: 11, color: '#94a3b8', marginRight: 'auto' }}>للعرض فقط</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>عرض:</span>
+                {[5, 10, 20].map(n => (
+                  <button key={n} onClick={() => { setInvPerPage(n); setInvPage(0) }} style={btnStyle(invPerPage === n)}>{n}</button>
+                ))}
+              </div>
+            </div>
+            <div style={card}>
+              {inventory.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>لا توجد منتجات</div>
+              ) : pageItems.map((item, i) => {
+                const isLow = item.stock < (item.minStock || 5)
+                return (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px', borderBottom: i < pageItems.length - 1 ? '1px solid #f8fafc' : 'none', background: isLow ? '#fffafa' : 'transparent' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: isLow ? '#ffe4e6' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Package size={15} color={isLow ? '#e11d48' : '#2563eb'} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                        {item.brand && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>{item.brand}</span>}
+                        {item.category && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>{item.category}</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: isLow ? '#e11d48' : '#0f172a' }}>{item.stock}</div>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>وحدة</div>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      {isLow
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '3px 8px', borderRadius: 20, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontWeight: 600 }}><AlertTriangle size={10} />منخفض</span>
+                        : <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontWeight: 600 }}>✓ متاح</span>}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: isLow ? '#e11d48' : '#0f172a' }}>{item.stock}</div>
-                    <div style={{ fontSize: 10, color: '#94a3b8' }}>وحدة</div>
-                  </div>
-                  <div style={{ flexShrink: 0 }}>
-                    {isLow
-                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '3px 8px', borderRadius: 20, background: '#fff1f2', color: '#e11d48', border: '1px solid #fecdd3', fontWeight: 600 }}><AlertTriangle size={10} />منخفض</span>
-                      : <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontWeight: 600 }}>✓ متاح</span>}
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 }}>
+                <button onClick={() => setInvPage(p => Math.max(0, p - 1))} disabled={invPage === 0}
+                  style={{ ...btnStyle(false), opacity: invPage === 0 ? 0.4 : 1, cursor: invPage === 0 ? 'default' : 'pointer' }}>→</button>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button key={i} onClick={() => setInvPage(i)} style={btnStyle(invPage === i)}>{i + 1}</button>
+                ))}
+                <button onClick={() => setInvPage(p => Math.min(totalPages - 1, p + 1))} disabled={invPage === totalPages - 1}
+                  style={{ ...btnStyle(false), opacity: invPage === totalPages - 1 ? 0.4 : 1, cursor: invPage === totalPages - 1 ? 'default' : 'pointer' }}>←</button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Leaderboard tab ──────────────────────────────────────────────────── */}
       {tab === 'leaderboard' && <Leaderboard />}

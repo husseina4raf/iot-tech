@@ -165,7 +165,7 @@ export async function generateDispatchPDF(order) {
     <div class="header">
       <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iottecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
+      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iotecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
     </div>
 
     <div class="doc-title">
@@ -257,7 +257,7 @@ export async function generateInvoicePDF(order) {
     <div class="header">
       <h1>IoT Tech</h1>
       <div class="sub">Smart Home &amp; Security Solutions</div>
-      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iottecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
+      <div class="contact">Tel: 01024400523 &nbsp;|&nbsp; info@iotecheg.com &nbsp;|&nbsp; www.iotecheg.com</div>
     </div>
 
     <div class="doc-title">

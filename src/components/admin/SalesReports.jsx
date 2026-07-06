@@ -33,7 +33,8 @@ export default function SalesReports() {
   const [selMonth, setSelMonth] = useState(thisMonth)
   const [editing,  setEditing]  = useState(false)
   const [drafts,   setDrafts]   = useState({})
-  const [perfYear, setPerfYear] = useState('')
+  const [perfYear,  setPerfYear]  = useState('')
+  const [perfMonth, setPerfMonth] = useState('')
   const [trendRep, setTrendRep] = useState('')
   const [prodRep,  setProdRep]  = useState('')
 
@@ -98,16 +99,21 @@ export default function SalesReports() {
 
   // ── Rep performance tab data ──────────────────────────────────────────────────
   const perfStats = useMemo(() => {
-    const src = perfYear ? orders.filter(o => o.date?.split('-')[2] === perfYear) : orders
+    let src = orders
+    if (perfYear)  src = src.filter(o => o.date?.split('-')[2] === perfYear)
+    if (perfMonth) src = src.filter(o => o.date?.split('-')[1]?.padStart(2,'0') === perfMonth)
     return SALES_REPS.map(rep => {
       const ro = src.filter(o => o.salesRep === rep)
       const revenue   = ro.reduce((s, o) => s + o.total, 0)
       const profit    = ro.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
       const completed = ro.filter(o => ['تم الصرف', 'مكتمل', 'تم التحصيل'].includes(o.status)).length
-      return { rep, count: ro.length, revenue, profit, completed,
+      // count distinct active months for this rep
+      const activeMonths = new Set(ro.map(o => { const p = o.date?.split('-'); return p?.length >= 3 ? `${p[2]}-${p[1]?.padStart(2,'0')}` : null }).filter(Boolean)).size
+      const perMonth = activeMonths > 0 ? Math.round(ro.length / activeMonths) : 0
+      return { rep, count: ro.length, revenue, profit, completed, activeMonths, perMonth,
         rate: ro.length > 0 ? Math.round((completed / ro.length) * 100) : 0 }
     }).sort((a, b) => b.revenue - a.revenue)
-  }, [SALES_REPS, orders, inventory, perfYear])
+  }, [SALES_REPS, orders, inventory, perfYear, perfMonth])
 
   // ── Monthly trend tab data ────────────────────────────────────────────────────
   const trendData = useMemo(() => {
@@ -304,27 +310,44 @@ export default function SalesReports() {
       {/* ─── Rep Performance ─────────────────────────────────────────────────── */}
       {tab === 'reps' && (
         <div>
-          <div style={{ ...card, padding: '12px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>السنة:</span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button onClick={() => setPerfYear('')}
-                style={{ padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${!perfYear ? '#2563eb' : '#e4eaf3'}`, background: !perfYear ? '#eff6ff' : '#fff', color: !perfYear ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>الكل</button>
-              {availableYears.map(y => (
-                <button key={y} onClick={() => setPerfYear(y)}
-                  style={{ padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${perfYear === y ? '#2563eb' : '#e4eaf3'}`, background: perfYear === y ? '#eff6ff' : '#fff', color: perfYear === y ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>{y}</button>
-              ))}
+          <div style={{ ...card, padding: '12px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>السنة:</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => setPerfYear('')}
+                  style={{ padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${!perfYear ? '#2563eb' : '#e4eaf3'}`, background: !perfYear ? '#eff6ff' : '#fff', color: !perfYear ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>الكل</button>
+                {availableYears.map(y => (
+                  <button key={y} onClick={() => setPerfYear(y)}
+                    style={{ padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${perfYear === y ? '#2563eb' : '#e4eaf3'}`, background: perfYear === y ? '#eff6ff' : '#fff', color: perfYear === y ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>{y}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ width: 1, height: 24, background: '#e4eaf3', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>الشهر:</span>
+              <select value={perfMonth} onChange={e => setPerfMonth(e.target.value)} dir="rtl"
+                style={{ padding: '6px 10px', fontSize: 12, border: `1.5px solid ${perfMonth ? '#2563eb' : '#e4eaf3'}`, borderRadius: 8, background: perfMonth ? '#eff6ff' : '#f8fafc', color: perfMonth ? '#1d4ed8' : '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer', fontWeight: perfMonth ? 700 : 400 }}>
+                <option value="">كل الشهور</option>
+                {MONTHS_AR.map((m, i) => (
+                  <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div style={card}>
             <div style={{ padding: '14px 20px', borderBottom: '1px solid #f0f4fa', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={15} color="#2563eb" />
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>أداء المندوبين {perfYear ? `— ${perfYear}` : '(كل الوقت)'}</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                أداء المندوبين
+                {perfMonth ? ` — ${MONTHS_AR[Number(perfMonth)-1]}` : ''}
+                {perfYear  ? ` ${perfYear}` : !perfMonth ? ' (كل الوقت)' : ''}
+              </h3>
             </div>
             <div className="m-table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
-                    {['المندوب', 'الطلبات', 'الإيرادات', 'صافي الربح', 'هامش الربح', 'معدل الإغلاق'].map((h, i) => (
+                    {['المندوب', 'الطلبات', !perfMonth ? 'طلبات/شهر' : 'الشهر', 'الإيرادات', 'صافي الربح', 'هامش الربح', 'معدل الإغلاق'].map((h, i) => (
                       <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom: '1px solid #f0f4fa' }}>{h}</th>
                     ))}
                   </tr>
@@ -341,6 +364,16 @@ export default function SalesReports() {
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600 }}>{r.count}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        {perfMonth ? (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{MONTHS_AR[Number(perfMonth)-1]}</span>
+                        ) : (
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+                            {r.perMonth}
+                            <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400, marginRight: 3 }}>/ شهر</span>
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }} dir="ltr">{r.revenue.toLocaleString()} LE</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#059669' }} dir="ltr">{Math.round(r.profit).toLocaleString()} LE</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

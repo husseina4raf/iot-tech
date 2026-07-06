@@ -150,10 +150,9 @@ export default function SalesReports() {
     return Object.values(map).sort((a, b) => b.revenue - a.revenue)
   }, [orders, inventory, prodRep])
 
-  // ── Global KPIs — scoped to selected month when on monthly tab ───────────────
-  const kpiOrders   = tab === 'monthly' ? monthOrders : orders
-  const totalRevenue = kpiOrders.reduce((s, o) => s + o.total, 0)
-  const totalProfit  = kpiOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+  // ── Global KPIs — always scoped to selected month ────────────────────────────
+  const totalRevenue = monthOrders.reduce((s, o) => s + o.total, 0)
+  const totalProfit  = monthOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
 
   const TABS = [
     { id: 'monthly',  label: 'الملخص الشهري',  icon: Target },
@@ -164,13 +163,31 @@ export default function SalesReports() {
 
   return (
     <div>
+      {/* Global month/year picker */}
+      <div style={{ ...card, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>الفترة:</label>
+        <select value={selMonth} onChange={e => setSelMonth(e.target.value)} dir="rtl"
+          style={{ padding: '6px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
+          {MONTHS_AR.map((m, i) => (
+            <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
+          ))}
+        </select>
+        <select value={selYear} onChange={e => setSelYear(e.target.value)} dir="ltr"
+          style={{ padding: '6px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
+          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>
+          {MONTHS_AR[Number(selMonth) - 1]} {selYear} · {monthOrders.length} طلب · {monthTotal.toLocaleString()} LE
+        </span>
+      </div>
+
       {/* Global KPIs */}
       <div className="m-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'إجمالي الإيرادات', value: `${(totalRevenue / 1000).toFixed(1)}K LE`, color: '#1d4ed8' },
           { label: 'صافي الربح',       value: `${(totalProfit  / 1000).toFixed(1)}K LE`,  color: '#059669' },
           { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(totalRevenue, 1)) * 100)}%`, color: '#7c3aed' },
-          { label: 'إجمالي الطلبات',   value: kpiOrders.length, color: '#0891b2' },
+          { label: 'إجمالي الطلبات',   value: monthOrders.length, color: '#0891b2' },
         ].map(k => (
           <div key={k.label} style={{ ...card, padding: '16px 18px' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: k.color, marginBottom: 3 }} dir="ltr">{k.value}</div>
@@ -192,43 +209,29 @@ export default function SalesReports() {
       {/* ─── Monthly Summary ─────────────────────────────────────────────────── */}
       {tab === 'monthly' && (
         <div>
-          {/* Controls bar */}
-          <div style={{ ...card, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#64748b' }}>الشهر:</label>
-              <select value={selMonth} onChange={e => setSelMonth(e.target.value)} dir="rtl"
-                style={{ padding: '6px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
-                {MONTHS_AR.map((m, i) => (
-                  <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
-                ))}
-              </select>
-              <select value={selYear} onChange={e => setSelYear(e.target.value)} dir="ltr"
-                style={{ padding: '6px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                {MONTHS_AR[Number(selMonth) - 1]} {selYear} · {monthOrders.length} طلب · {monthTotal.toLocaleString()} LE
-              </span>
+          {/* Controls bar — targets edit only */}
+          {canEdit && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              {!editing && (
+                <button onClick={startEdit}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
+                  <Edit3 size={12} />تعديل الأهداف
+                </button>
+              )}
+              {editing && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={saveTargets}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
+                    <Check size={12} />حفظ
+                  </button>
+                  <button onClick={() => { setEditing(false); setDrafts({}) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: '#fff', color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
+                    <X size={12} />إلغاء
+                  </button>
+                </div>
+              )}
             </div>
-            {canEdit && !editing && (
-              <button onClick={startEdit}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
-                <Edit3 size={12} />تعديل الأهداف
-              </button>
-            )}
-            {canEdit && editing && (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={saveTargets}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
-                  <Check size={12} />حفظ
-                </button>
-                <button onClick={() => { setEditing(false); setDrafts({}) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: '#fff', color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
-                  <X size={12} />إلغاء
-                </button>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Mini comparison bars */}
           <div style={{ ...card, padding: '14px 20px', marginBottom: 16 }}>

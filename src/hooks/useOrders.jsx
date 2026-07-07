@@ -121,7 +121,7 @@ export function OrdersProvider({ children }) {
   // ── Orders ────────────────────────────────────────────────────────────────────
   const getNextSerial = () => {
     const nums = orders.map(o => parseInt(o.serialNumber, 10)).filter(Boolean)
-    return String(Math.max(nums.length ? Math.max(...nums) + 1 : 2780, 2780))
+    return String(Math.max(nums.length ? Math.max(...nums) + 1 : 2766, 2766))
   }
 
   const addOrder = async (orderData, user) => {

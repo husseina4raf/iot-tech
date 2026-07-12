@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users, X, HelpCircle } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Settings, Lock, LogOut, Users, X, HelpCircle, PlusCircle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_LABELS, ROLE_ROUTES } from '../../data/authData'
 import HelpGuide from './HelpGuide'
@@ -112,6 +112,29 @@ export default function Sidebar({ isMobile, isOpen, onClose }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* New Order shortcut — admin, super_admin, team_leader */}
+      {['admin', 'super_admin', 'team_leader'].includes(user?.role) && (
+        <div style={{ padding:'0 12px 8px' }}>
+          <button onClick={() => {
+            if (user.role === 'team_leader') {
+              navigate('/team-leader', { state: { openTab: 'new' } })
+            } else {
+              navigate('/admin', { state: { openTab: 'new' } })
+            }
+            if (isMobile) onClose()
+          }}
+            style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(16,185,129,0.25)', background:'rgba(16,185,129,0.1)', cursor:'pointer', fontFamily:'Cairo, sans-serif', transition:'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background='rgba(16,185,129,0.2)'; e.currentTarget.style.borderColor='rgba(16,185,129,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.background='rgba(16,185,129,0.1)'; e.currentTarget.style.borderColor='rgba(16,185,129,0.25)' }}>
+            <PlusCircle size={17} color="#10b981" style={{ flexShrink:0 }} />
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:'#6ee7b7' }}>طلب جديد</div>
+              <div style={{ fontSize:10, color:'#065f46' }}>New Order</div>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Help button */}
       <div style={{ padding:'0 12px 8px' }}>

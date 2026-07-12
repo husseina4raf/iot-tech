@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen, PlusCircle } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
@@ -33,6 +34,10 @@ const STATUS_NEXT = {
 
 export default function TeamLeaderPage() {
   const [tab, setTab] = useState('pending')
+  const location = useLocation()
+  useEffect(() => {
+    if (location.state?.openTab) setTab(location.state.openTab)
+  }, [location.state])
   const [expanded, setExpanded] = useState({})
   const [editingOrder, setEditingOrder] = useState(null)
   const [search, setSearch] = useState('')

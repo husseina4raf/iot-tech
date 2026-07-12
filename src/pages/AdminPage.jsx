@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen, Trophy, PlusCircle } from 'lucide-react'
 import OrdersList from '../components/admin/OrdersList'
 import OrderForm from '../components/sales/OrderForm'
@@ -31,6 +32,11 @@ export default function AdminPage() {
   const changeTab = (id) => { setTab(id); localStorage.setItem('admin_tab', id) }
   const { auditLog, taxInvoices } = useOrders()
   const { user } = useAuth()
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.state?.openTab) changeTab(location.state.openTab)
+  }, [location.state])
 
   const tabs = ALL_TABS.filter(t => t.roles.includes(user?.role))
   const pendingTax = taxInvoices.filter(i => !i.verified).length

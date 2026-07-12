@@ -19,13 +19,13 @@ const getCostPrice = (itemName, inventory) => {
 const card = { background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }
 
 const TABS = [
+  { id: 'new',       label: 'طلب جديد',          icon: PlusCircle },
   { id: 'pending',   label: 'بانتظار الموافقة',   icon: Clock },
   { id: 'all',       label: 'جميع الفواتير',      icon: FileText },
   { id: 'team',      label: 'فواتير الفريق',      icon: FolderOpen },
   { id: 'inventory', label: 'المخزون',            icon: Package },
   { id: 'leaderboard', label: 'المتصدرون',        icon: Trophy },
   { id: 'reports',   label: 'تقارير الأرباح',     icon: TrendingUp },
-  { id: 'new',       label: 'طلب جديد',          icon: PlusCircle },
 ]
 
 const STATUS_NEXT = {

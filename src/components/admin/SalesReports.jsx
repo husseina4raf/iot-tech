@@ -259,7 +259,7 @@ export default function SalesReports() {
           {/* Per-rep detail cards */}
           <div className="m-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {monthStats.map((r, i) => {
-              const achPct   = r.target > 0 ? Math.min(Math.round((r.revenue / r.target) * 100), 999) : null
+              const achPct   = r.target > 0 ? Math.min(Math.round((r.profit  / r.target) * 100), 999) : null
               const barColor = !achPct ? '#2563eb' : achPct >= 100 ? '#059669' : achPct >= 70 ? '#d97706' : '#e11d48'
               return (
                 <div key={r.rep} style={{ ...card, padding: 20 }}>

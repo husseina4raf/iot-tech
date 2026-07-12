@@ -105,12 +105,14 @@ export default function SalesReports() {
     return SALES_REPS.map(rep => {
       const ro = src.filter(o => o.salesRep === rep)
       const revenue   = ro.reduce((s, o) => s + o.total, 0)
-      const profit    = ro.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+      const collected = ro.filter(o => o.status === 'تم التحصيل')
+      const collRev   = collected.reduce((s, o) => s + o.total, 0)
+      const profit    = collected.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
       const completed = ro.filter(o => ['تم الصرف', 'مكتمل', 'تم التحصيل'].includes(o.status)).length
       // count distinct active months for this rep
       const activeMonths = new Set(ro.map(o => { const p = o.date?.split('-'); return p?.length >= 3 ? `${p[2]}-${p[1]?.padStart(2,'0')}` : null }).filter(Boolean)).size
       const perMonth = activeMonths > 0 ? Math.round(ro.length / activeMonths) : 0
-      return { rep, count: ro.length, revenue, profit, completed, activeMonths, perMonth,
+      return { rep, count: ro.length, revenue, collRev, profit, completed, activeMonths, perMonth,
         rate: ro.length > 0 ? Math.round((completed / ro.length) * 100) : 0 }
     }).sort((a, b) => b.revenue - a.revenue)
   }, [SALES_REPS, orders, inventory, perfYear, perfMonth])
@@ -134,7 +136,7 @@ export default function SalesReports() {
 
   // ── Products tab data ─────────────────────────────────────────────────────────
   const productData = useMemo(() => {
-    const src = (prodRep ? orders.filter(o => o.salesRep === prodRep) : orders).filter(o => o.status === 'مكتمل')
+    const src = (prodRep ? orders.filter(o => o.salesRep === prodRep) : orders).filter(o => o.status === 'تم التحصيل')
     const map = {}
     src.forEach(o => o.items.forEach(item => {
       if (!map[item.name]) {
@@ -151,9 +153,11 @@ export default function SalesReports() {
   }, [orders, inventory, prodRep])
 
   // ── Global KPIs — only orders from known sales reps ──────────────────────────
-  const repMonthOrders = monthOrders.filter(o => SALES_REPS.includes(o.salesRep))
-  const totalRevenue = repMonthOrders.reduce((s, o) => s + o.total, 0)
-  const totalProfit  = repMonthOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+  const repMonthOrders    = monthOrders.filter(o => SALES_REPS.includes(o.salesRep))
+  const collectedMonthOrders = repMonthOrders.filter(o => o.status === 'تم التحصيل')
+  const totalRevenue      = repMonthOrders.reduce((s, o) => s + o.total, 0)
+  const collectedRevenue  = collectedMonthOrders.reduce((s, o) => s + o.total, 0)
+  const totalProfit       = collectedMonthOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
 
   const TABS = [
     { id: 'monthly',  label: 'الملخص الشهري',  icon: Target },
@@ -187,7 +191,7 @@ export default function SalesReports() {
         {[
           { label: 'إجمالي الإيرادات', value: `${(totalRevenue / 1000).toFixed(1)}K LE`, color: '#1d4ed8' },
           { label: 'صافي الربح',       value: `${(totalProfit  / 1000).toFixed(1)}K LE`,  color: '#059669' },
-          { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(totalRevenue, 1)) * 100)}%`, color: '#7c3aed' },
+          { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(collectedRevenue, 1)) * 100)}%`, color: '#7c3aed' },
           { label: 'إجمالي الطلبات',   value: repMonthOrders.length, color: '#0891b2' },
         ].map(k => (
           <div key={k.label} style={{ ...card, padding: '16px 18px' }}>
@@ -382,7 +386,7 @@ export default function SalesReports() {
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#059669' }} dir="ltr">{Math.round(r.profit).toLocaleString()} LE</td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontWeight: 700 }}>
-                          {r.revenue > 0 ? `${Math.round((r.profit / r.revenue) * 100)}%` : '—'}
+                          {r.collRev > 0 ? `${Math.round((r.profit / r.collRev) * 100)}%` : '—'}
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -455,7 +459,7 @@ export default function SalesReports() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Package size={15} color="#2563eb" />
                 <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>الربح بالمنتج</span>
-                <span style={{ fontSize: 11, color: '#94a3b8', padding: '2px 8px', borderRadius: 20, background: '#f0f4fa', border: '1px solid #e4eaf3' }}>الطلبات المكتملة فقط</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', padding: '2px 8px', borderRadius: 20, background: '#f0f4fa', border: '1px solid #e4eaf3' }}>الطلبات المحصّلة فقط</span>
               </div>
               <select value={prodRep} onChange={e => setProdRep(e.target.value)}
                 style={{ padding: '6px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
@@ -476,7 +480,7 @@ export default function SalesReports() {
               ))}
             </div>
             {productData.length === 0 ? (
-              <div style={{ ...card, padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>لا توجد طلبات مكتملة بعد</div>
+              <div style={{ ...card, padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>لا توجد طلبات محصّلة بعد</div>
             ) : (
               <div className="m-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {productData.map((p, i) => {

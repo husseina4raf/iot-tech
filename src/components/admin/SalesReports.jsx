@@ -71,7 +71,7 @@ export default function SalesReports() {
         s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
       const target      = salesTargets?.find(t => t.repName === rep && t.month === monthKey)?.target || 0
       const trend       = prevRevenue > 0 ? Math.round(((revenue - prevRevenue) / prevRevenue) * 100) : null
-      const achievement = target > 0 ? Math.round((revenue / target) * 100) : null
+      const achievement = target > 0 ? Math.round((profit / target) * 100) : null
       return { rep, revenue, prevRevenue, profit, count: mo.length, target, trend, achievement }
     })
   , [SALES_REPS, monthOrders, prevOrders, salesTargets, monthKey, inventory])

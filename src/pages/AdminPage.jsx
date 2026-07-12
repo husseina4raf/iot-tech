@@ -15,7 +15,6 @@ import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 
 const ALL_TABS = [
-  { id:'new',         label:'طلب جديد',          icon:PlusCircle,   roles:['admin','super_admin'] },
   { id:'orders',      label:'الطلبات',           icon:ClipboardList, roles:['admin','super_admin'] },
   { id:'team',        label:'فواتير الفريق',    icon:FolderOpen,    roles:['admin','super_admin'] },
   { id:'leaderboard', label:'المتصدرون',        icon:Trophy,        roles:['admin','super_admin'] },

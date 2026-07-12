@@ -133,6 +133,9 @@ export default function TeamLeaderPage() {
 
   const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }))
 
+  // Reset page when filters / tab change — must be before any early returns (Rules of Hooks)
+  useEffect(() => { setAllPage(0) }, [search, filterDay, filterMonth, filterYear, tab])
+
   // ── Edit order view ──────────────────────────────────────────────────────────
   if (editingOrder) return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -148,9 +151,6 @@ export default function TeamLeaderPage() {
       <OrderForm editOrder={editingOrder} onSaved={() => setEditingOrder(null)} />
     </div>
   )
-
-  // Reset page when filters / tab change
-  useEffect(() => { setAllPage(0) }, [search, filterDay, filterMonth, filterYear, tab])
 
   const allTotalPages = Math.ceil(allOrders.length / allPerPage)
   const displayOrders = tab === 'pending'

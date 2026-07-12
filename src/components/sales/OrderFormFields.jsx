@@ -80,8 +80,8 @@ function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
       (i.nameAr || '').includes(query) ||
       (i.sku || '').toLowerCase().includes(query.toLowerCase()) ||
       (i.brand || '').toLowerCase().includes(query.toLowerCase())
-    ).slice(0, 8)
-    : inventory.slice(0, 8)
+    )
+    : inventory
 
   const iStyle = { width: '100%', padding: '9px 10px 9px 32px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', boxSizing: 'border-box' }
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
@@ -40,6 +40,8 @@ export default function TeamLeaderPage() {
   const [filterYear, setFilterYear] = useState('')
   const [invPage,    setInvPage]    = useState(0)
   const [invPerPage, setInvPerPage] = useState(10)
+  const [allPage,    setAllPage]    = useState(0)
+  const [allPerPage, setAllPerPage] = useState(10)
 
   const { orders, approveOrder, rejectOrder, updateOrderStatus, inventory } = useOrders()
   const { user } = useAuth()
@@ -147,7 +149,15 @@ export default function TeamLeaderPage() {
     </div>
   )
 
-  const displayOrders = tab === 'pending' ? pendingOrders : allOrders
+  // Reset page when filters / tab change
+  useEffect(() => { setAllPage(0) }, [search, filterDay, filterMonth, filterYear, tab])
+
+  const allTotalPages = Math.ceil(allOrders.length / allPerPage)
+  const displayOrders = tab === 'pending'
+    ? pendingOrders
+    : tab === 'all'
+      ? allOrders.slice(allPage * allPerPage, allPage * allPerPage + allPerPage)
+      : allOrders
 
 
   return (
@@ -223,14 +233,14 @@ export default function TeamLeaderPage() {
             </div>
             {/* Pagination controls */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 }}>
-                <button onClick={() => setInvPage(p => Math.max(0, p - 1))} disabled={invPage === 0}
-                  style={{ ...btnStyle(false), opacity: invPage === 0 ? 0.4 : 1, cursor: invPage === 0 ? 'default' : 'pointer' }}>→</button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button key={i} onClick={() => setInvPage(i)} style={btnStyle(invPage === i)}>{i + 1}</button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 14 }}>
                 <button onClick={() => setInvPage(p => Math.min(totalPages - 1, p + 1))} disabled={invPage === totalPages - 1}
                   style={{ ...btnStyle(false), opacity: invPage === totalPages - 1 ? 0.4 : 1, cursor: invPage === totalPages - 1 ? 'default' : 'pointer' }}>←</button>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', minWidth: 100, textAlign: 'center' }}>
+                  صفحة {invPage + 1} من {totalPages}
+                </span>
+                <button onClick={() => setInvPage(p => Math.max(0, p - 1))} disabled={invPage === 0}
+                  style={{ ...btnStyle(false), opacity: invPage === 0 ? 0.4 : 1, cursor: invPage === 0 ? 'default' : 'pointer' }}>→</button>
               </div>
             )}
           </div>
@@ -469,6 +479,28 @@ export default function TeamLeaderPage() {
             })}
           </div>
         )}
+
+        {/* All Invoices pagination */}
+        {tab === 'all' && allTotalPages > 1 && (() => {
+          const pagBtnStyle = (active) => ({ padding: '5px 11px', borderRadius: 8, border: `1.5px solid ${active ? '#2563eb' : '#e4eaf3'}`, background: active ? '#eff6ff' : '#fff', color: active ? '#1d4ed8' : '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' })
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>عرض:</span>
+                {[10, 20, 50].map(n => (
+                  <button key={n} onClick={() => { setAllPerPage(n); setAllPage(0) }} style={pagBtnStyle(allPerPage === n)}>{n}</button>
+                ))}
+              </div>
+              <button onClick={() => setAllPage(p => Math.min(allTotalPages - 1, p + 1))} disabled={allPage === allTotalPages - 1}
+                style={{ ...pagBtnStyle(false), opacity: allPage === allTotalPages - 1 ? 0.4 : 1, cursor: allPage === allTotalPages - 1 ? 'default' : 'pointer' }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', minWidth: 100, textAlign: 'center' }}>
+                صفحة {allPage + 1} من {allTotalPages}
+              </span>
+              <button onClick={() => setAllPage(p => Math.max(0, p - 1))} disabled={allPage === 0}
+                style={{ ...pagBtnStyle(false), opacity: allPage === 0 ? 0.4 : 1, cursor: allPage === 0 ? 'default' : 'pointer' }}>→</button>
+            </div>
+          )
+        })()}
       </>)}
     </div>
   )

@@ -14,7 +14,6 @@ import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 
 const ALL_TABS = [
-  { id:'new',         label:'طلب جديد',          icon:PlusCircle,    roles:['admin','super_admin'] },
   { id:'orders',      label:'الطلبات',           icon:ClipboardList, roles:['admin','super_admin'] },
   { id:'team',        label:'فواتير الفريق',    icon:FolderOpen,    roles:['admin','super_admin'] },
   { id:'leaderboard', label:'المتصدرون',        icon:Trophy,        roles:['admin','super_admin'] },
@@ -24,6 +23,7 @@ const ALL_TABS = [
   { id:'audit',       label:'سجل التعديلات',    icon:History,       roles:['admin','super_admin'] },
   { id:'tax',         label:'الفواتير الضريبية', icon:FileText,     roles:['admin','super_admin'] },
   { id:'settings',    label:'الإعدادات',         icon:Settings,     roles:['super_admin'] },
+  { id:'new',         label:'طلب جديد',          icon:PlusCircle,   roles:['admin','super_admin'] },
 ]
 
 export default function AdminPage() {

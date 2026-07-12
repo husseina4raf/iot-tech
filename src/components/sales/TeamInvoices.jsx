@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Calendar, FileText, Phone, MapPin, CreditCard, User, Search, X, ClipboardX, TrendingUp, Link } from 'lucide-react'
 import Badge from '../ui/Badge'
+import Pagination from '../ui/Pagination'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -9,10 +10,15 @@ const MONTHS_AR = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
 ]
 
+const PAGE_SIZE = 6
+
 const card = { background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }
 
+const getCostPrice = (name, inventory) =>
+  inventory.find(i => i.name?.toLowerCase() === name?.toLowerCase() || i.nameAr === name)?.costPrice || 0
+
 export default function TeamInvoices() {
-  const { orders } = useOrders()
+  const { orders, inventory } = useOrders()
   const { salesReps } = useAuth()
 
   const [selectedRep, setSelectedRep] = useState('')
@@ -22,6 +28,7 @@ export default function TeamInvoices() {
   const [filterYear, setFilterYear] = useState('')
   const [openMonths, setOpenMonths] = useState({})
   const [expanded, setExpanded] = useState({})
+  const [page, setPage] = useState(1)
 
   const toggleMonth = (key) => setOpenMonths(p => ({ ...p, [key]: !p[key] }))
   const toggleOrder = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }))
@@ -63,9 +70,14 @@ export default function TeamInvoices() {
     return Object.values(map).sort((a, b) => b.key.localeCompare(a.key))
   }, [filtered])
 
+  useEffect(() => setPage(1), [selectedRep, search, filterDay, filterMonth, filterYear])
+
   const totalOrders = filtered.length
   const totalRevenue = filtered.reduce((s, o) => s + o.total, 0)
+  const totalProfit  = filtered.reduce((s, o) =>
+    s + (o.items?.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0), 0)
   const hasFilter = search || filterDay || filterMonth || filterYear || selectedRep
+  const pagedGroups = groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const clearAll = () => {
     setSearch(''); setFilterDay(''); setFilterMonth(''); setFilterYear(''); setSelectedRep('')
@@ -138,7 +150,7 @@ export default function TeamInvoices() {
         {[
           { label: 'إجمالي الفواتير', value: totalOrders, color: '#2563eb', bg: '#eff6ff' },
           { label: 'إجمالي المبيعات', value: `${totalRevenue.toLocaleString()} LE`, color: '#059669', bg: '#ecfdf5' },
-          { label: 'عدد الأشهر', value: groups.length, color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'إجمالي الأرباح', value: `${Math.round(totalProfit).toLocaleString()} LE`, color: '#7c3aed', bg: '#f5f3ff' },
         ].map(s => (
           <div key={s.label} style={{ ...card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -160,9 +172,11 @@ export default function TeamInvoices() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {groups.map((group, gi) => {
-            const isOpen = group.key in openMonths ? openMonths[group.key] : gi === 0
-            const monthTotal = group.orders.reduce((s, o) => s + o.total, 0)
+          {pagedGroups.map((group, gi) => {
+            const isOpen = group.key in openMonths ? openMonths[group.key] : gi === 0 && page === 1
+            const monthTotal  = group.orders.reduce((s, o) => s + o.total, 0)
+            const monthProfit = group.orders.reduce((s, o) =>
+              s + (o.items?.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0), 0)
 
             return (
               <div key={group.key} style={card}>
@@ -189,7 +203,10 @@ export default function TeamInvoices() {
 
                 {isOpen && (
                   <div style={{ borderTop: '1px solid #f0f4fa' }}>
-                    {group.orders.map((order, idx) => (
+                    {group.orders.map((order, idx) => {
+                      const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
+                      const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
+                      return (
                       <div key={order.id} style={{ borderBottom: idx < group.orders.length - 1 ? '1px solid #f8fafc' : 'none' }}>
                         {/* Order row */}
                         <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -205,8 +222,13 @@ export default function TeamInvoices() {
 
                           <div style={{ fontSize: 12, color: '#94a3b8', flexShrink: 0, minWidth: 80 }}>{order.date}</div>
 
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', flexShrink: 0, minWidth: 100, textAlign: 'left' }} dir="ltr">
-                            {order.total.toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8' }}>LE</span>
+                          <div style={{ flexShrink: 0, minWidth: 110, textAlign: 'left' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }} dir="ltr">
+                              {order.total.toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: '#94a3b8' }}>LE</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: orderProfit >= 0 ? '#059669' : '#e11d48', marginTop: 1 }} dir="ltr">
+                              ربح {orderProfit.toLocaleString()} · {orderMargin.toFixed(1)}%
+                            </div>
                           </div>
 
                           <div style={{ flexShrink: 0 }}>
@@ -298,18 +320,29 @@ export default function TeamInvoices() {
                           </div>
                         )}
                       </div>
-                    ))}
+                    )})}
 
                     {/* Month footer */}
                     <div style={{ padding: '10px 20px', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>إجمالي {group.label}</span>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: '#1d4ed8' }} dir="ltr">{monthTotal.toLocaleString()} LE</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: '#1d4ed8' }} dir="ltr">{monthTotal.toLocaleString()} LE</div>
+                        <div style={{ fontSize: 11, color: monthProfit >= 0 ? '#059669' : '#e11d48', marginTop: 1 }} dir="ltr">
+                          ربح {Math.round(monthProfit).toLocaleString()} LE
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {groups.length > PAGE_SIZE && (
+        <div style={{ marginTop: 16 }}>
+          <Pagination page={page} total={groups.length} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       )}
     </div>

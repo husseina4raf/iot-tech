@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Lock, Edit3, TrendingUp, Calendar, ClipboardX, FileText, Phone, MapPin, CreditCard, Package, User } from 'lucide-react'
 import Badge from '../ui/Badge'
 import OrderForm from './OrderForm'
+import Pagination from '../ui/Pagination'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -22,7 +23,9 @@ export default function MonthlyInvoices() {
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth())
   const [period, setPeriod] = useState('month')
+  const [page, setPage] = useState(1)
   const years = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - i)
+  const PAGE_SIZE = 6
 
   const repName = user?.repName
   if (!repName) return (
@@ -39,6 +42,12 @@ export default function MonthlyInvoices() {
 
   const totalOrders = groups.reduce((s, g) => s + g.orders.length, 0)
   const totalRevenue = groups.reduce((s, g) => s + g.orders.reduce((ss, o) => ss + o.total, 0), 0)
+
+  useEffect(() => setPage(1), [period, year, month])
+
+  const pagedGroups = period === 'all'
+    ? groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : groups
 
   const toggleMonth = (key) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -114,10 +123,10 @@ export default function MonthlyInvoices() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {groups.map(group => {
-            const isOpen = openMonths[group.key] !== false // default open for first, closed for rest
+          {pagedGroups.map(group => {
+            const isOpen = openMonths[group.key] !== false
             const monthTotal = group.orders.reduce((s, o) => s + o.total, 0)
-            const open = group.key in openMonths ? openMonths[group.key] : groups.indexOf(group) === 0
+            const open = group.key in openMonths ? openMonths[group.key] : pagedGroups.indexOf(group) === 0
 
             return (
               <div key={group.key} style={card}>
@@ -260,6 +269,12 @@ export default function MonthlyInvoices() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {period === 'all' && groups.length > PAGE_SIZE && (
+        <div style={{ marginTop: 16 }}>
+          <Pagination page={page} total={groups.length} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TrendingUp, Package, ChevronDown } from 'lucide-react'
+import Pagination from '../ui/Pagination'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -26,9 +27,12 @@ export default function ProfitReport() {
   const [month,  setMonth]  = useState(now.getMonth())
   const [period, setPeriod] = useState('month')
   const [expanded, setExpanded] = useState({})
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
   const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - i)
 
   const toggle = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }))
+  useEffect(() => setPage(1), [year, month, period])
 
   const repName = user?.repName
   const repOrders = repName ? orders.filter(o => {
@@ -106,7 +110,7 @@ export default function ProfitReport() {
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {repOrders.map((order, idx) => {
+          {repOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((order, idx) => {
             const orderCost   = order.items.reduce((s, item) => s + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
             const orderBase   = order.subtotal || order.total
             const orderProfit = orderBase - orderCost
@@ -194,6 +198,12 @@ export default function ProfitReport() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {repOrders.length > PAGE_SIZE && (
+        <div style={{ marginTop: 16 }}>
+          <Pagination page={page} total={repOrders.length} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       )}
     </div>

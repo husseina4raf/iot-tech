@@ -67,12 +67,14 @@ export default function SalesReports() {
       const po = prevOrders.filter(o => o.salesRep === rep)
       const revenue     = mo.reduce((s, o) => s + o.total, 0)
       const prevRevenue = po.reduce((s, o) => s + o.total, 0)
+      const profit      = mo.filter(o => o.status === 'تم التحصيل').reduce((s, o) =>
+        s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
       const target      = salesTargets?.find(t => t.repName === rep && t.month === monthKey)?.target || 0
       const trend       = prevRevenue > 0 ? Math.round(((revenue - prevRevenue) / prevRevenue) * 100) : null
       const achievement = target > 0 ? Math.round((revenue / target) * 100) : null
-      return { rep, revenue, prevRevenue, count: mo.length, target, trend, achievement }
+      return { rep, revenue, prevRevenue, profit, count: mo.length, target, trend, achievement }
     })
-  , [SALES_REPS, monthOrders, prevOrders, salesTargets, monthKey])
+  , [SALES_REPS, monthOrders, prevOrders, salesTargets, monthKey, inventory])
 
   const monthTotal  = monthStats.reduce((s, r) => s + r.revenue, 0)
   const maxMonthRev = Math.max(...monthStats.map(r => r.revenue), 1)
@@ -281,6 +283,12 @@ export default function SalesReports() {
 
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }} dir="ltr">
                     {r.revenue.toLocaleString()} <span style={{ fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>LE</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>صافي الربح:</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: r.profit >= 0 ? '#059669' : '#e11d48' }} dir="ltr">
+                      {r.profit >= 0 ? '+' : ''}{Math.round(r.profit).toLocaleString()} LE
+                    </span>
                   </div>
 
                   {editing ? (

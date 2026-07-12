@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus, deleteOrder } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, deleteOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -93,6 +93,12 @@ export default function OrderCard({ order }) {
 
   const col = accent[order.status] || '#475569'
 
+  const orderProfit = order.items?.reduce((s, i) => {
+    const cost = inventory.find(inv => inv.name.toLowerCase() === i.name?.toLowerCase() || inv.nameAr === i.name)?.costPrice || 0
+    return s + (i.price - cost) * i.quantity
+  }, 0) || 0
+  const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
+
   return (
     <div className="fade-in" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', borderRight: `3px solid ${col}`, boxShadow: '0 1px 4px rgba(15,23,42,0.06)', overflow: 'hidden' }}>
       <div style={{ padding: '16px 20px' }}>
@@ -121,7 +127,9 @@ export default function OrderCard({ order }) {
               <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }} dir="ltr">
                 {order.total.toLocaleString()} <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8' }}>LE</span>
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'left' }}>إجمالي الطلب</div>
+              <div style={{ fontSize: 11, color: orderProfit >= 0 ? '#059669' : '#e11d48', textAlign: 'left', marginTop: 2 }} dir="ltr">
+                ربح {orderProfit.toLocaleString()} LE · {orderMargin.toFixed(1)}%
+              </div>
             </div>
             <Badge status={order.status}>{order.status}</Badge>
           </div>

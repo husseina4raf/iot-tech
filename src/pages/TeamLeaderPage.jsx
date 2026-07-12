@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen, PlusCircle } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
@@ -19,12 +19,13 @@ const getCostPrice = (itemName, inventory) => {
 const card = { background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }
 
 const TABS = [
-  { id: 'pending', label: 'بانتظار الموافقة', icon: Clock },
-  { id: 'all', label: 'جميع الفواتير', icon: FileText },
-  { id: 'team', label: 'فواتير الفريق', icon: FolderOpen },
-  { id: 'inventory', label: 'المخزون', icon: Package },
-  { id: 'leaderboard', label: 'المتصدرون', icon: Trophy },
-  { id: 'reports', label: 'تقارير الأرباح', icon: TrendingUp },
+  { id: 'new',       label: 'طلب جديد',          icon: PlusCircle },
+  { id: 'pending',   label: 'بانتظار الموافقة',   icon: Clock },
+  { id: 'all',       label: 'جميع الفواتير',      icon: FileText },
+  { id: 'team',      label: 'فواتير الفريق',      icon: FolderOpen },
+  { id: 'inventory', label: 'المخزون',            icon: Package },
+  { id: 'leaderboard', label: 'المتصدرون',        icon: Trophy },
+  { id: 'reports',   label: 'تقارير الأرباح',     icon: TrendingUp },
 ]
 
 const STATUS_NEXT = {
@@ -247,6 +248,9 @@ export default function TeamLeaderPage() {
         )
       })()}
 
+      {/* ── New Order tab ────────────────────────────────────────────────────── */}
+      {tab === 'new' && <OrderForm />}
+
       {/* ── Leaderboard tab ──────────────────────────────────────────────────── */}
       {tab === 'leaderboard' && <Leaderboard />}
 
@@ -257,7 +261,7 @@ export default function TeamLeaderPage() {
       {tab === 'team' && <TeamInvoices />}
 
       {/* ── Orders tabs ───────────────────────────────────────────────────────── */}
-      {tab !== 'inventory' && tab !== 'leaderboard' && tab !== 'reports' && tab !== 'team' && (<>
+      {tab !== 'new' && tab !== 'inventory' && tab !== 'leaderboard' && tab !== 'reports' && tab !== 'team' && (<>
         {/* Stats */}
         <div className="m-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
           {[
@@ -325,6 +329,8 @@ export default function TeamLeaderPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {displayOrders.map(order => {
               const next = STATUS_NEXT[order.status]
+              const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
+              const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
               return (
                 <div key={order.id} style={{ ...card, overflow: 'hidden' }} className="fade-in">
                   <div style={{ padding: '14px 20px' }}>
@@ -348,6 +354,9 @@ export default function TeamLeaderPage() {
                         <div style={{ textAlign: 'left' }}>
                           <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }} dir="ltr">
                             {order.total.toLocaleString()} <span style={{ fontSize: 11, fontWeight: 400, color: '#94a3b8' }}>LE</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: orderProfit >= 0 ? '#059669' : '#e11d48', marginTop: 2 }} dir="ltr">
+                            ربح {orderProfit.toLocaleString()} LE · {orderMargin.toFixed(1)}%
                           </div>
                         </div>
                         <Badge status={order.status}>{order.status}</Badge>

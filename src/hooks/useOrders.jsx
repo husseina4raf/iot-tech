@@ -218,9 +218,17 @@ export function OrdersProvider({ children }) {
 
   const updateOrderStatus = async (id, status, user) => {
     const order = orders.find(o => o.id === id)
+    const statusEntry = {
+      type: 'status_change',
+      previousStatus: order?.status,
+      newStatus: status,
+      changedAt: new Date().toISOString(),
+      changedBy: user?.name || 'مجهول',
+    }
+    const editHistory = [...(order?.editHistory || []), statusEntry]
     // Optimistic update — change status immediately in local state
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
-    const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status, editHistory } : o))
+    const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString(), edit_history: editHistory }).eq('id', id)
     if (statusErr) {
       console.error('updateOrderStatus:', statusErr)
       toast('فشل تحديث الحالة — ' + statusErr.message, 'error')
@@ -316,6 +324,36 @@ export function OrdersProvider({ children }) {
       type: 'order_restore', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
       field: 'استعادة الطلب', oldValue: 'ملغي', newValue: restoreStatus,
+      changedBy: user?.name || 'مجهول',
+    })
+  }
+
+  const revertLastStatus = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    if (!order) return
+    const history = order.editHistory || []
+    const lastChangeIdx = [...history].reverse().findIndex(h => h.type === 'status_change')
+    if (lastChangeIdx === -1) return
+    const realIdx = history.length - 1 - lastChangeIdx
+    const lastEntry = history[realIdx]
+    const prevStatus = lastEntry.previousStatus
+    const editHistory = history.filter((_, i) => i !== realIdx)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prevStatus, editHistory } : o))
+    const { error } = await supabase.from('orders').update({
+      status: prevStatus,
+      updated_at: new Date().toISOString(),
+      edit_history: editHistory,
+    }).eq('id', id)
+    if (error) {
+      console.error('revertLastStatus:', error)
+      toast('فشل التراجع — ' + error.message, 'error')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
+      return
+    }
+    await pushAudit({
+      type: 'status_revert', orderId: id,
+      orderRef: `${order.clientName} — ${order.company}`,
+      field: 'تراجع عن الحالة', oldValue: order.status, newValue: prevStatus,
       changedBy: user?.name || 'مجهول',
     })
   }
@@ -510,7 +548,7 @@ export function OrdersProvider({ children }) {
       inventory, auditLog, taxInvoices, salesTargets, loading,
       hasMoreOrders, loadMoreOrders,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
-      cancelOrder, restoreOrder, deleteOrder,
+      cancelOrder, restoreOrder, revertLastStatus, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,

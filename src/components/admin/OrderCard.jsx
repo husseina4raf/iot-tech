@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar, Trash2, Ban } from 'lucide-react'
+import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar, Trash2, Ban, RotateCcw } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, deleteOrder, inventory } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, revertLastStatus, deleteOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -36,6 +36,19 @@ export default function OrderCard({ order }) {
     if (!window.confirm(`هل تريد إلغاء طلب "${order.clientName}"؟\nسيختفي الطلب من القوائم ويمكن استعادته لاحقاً من تبويب "الطلبات الملغاة".`)) return
     cancelOrder(order.id, user)
     toast('تم إلغاء الطلب — يمكن استعادته من تبويب الملغاة', 'success')
+  }
+
+  const lastStatusChange = [...(order.editHistory || [])].reverse().find(h => h.type === 'status_change')
+
+  const onRevert = () => {
+    if (!lastStatusChange) return
+    const prevStatus = lastStatusChange.previousStatus
+    if (!window.confirm(`هل تريد التراجع والعودة إلى حالة "${prevStatus}"؟`)) return
+    if (order.status === 'تم الصرف') {
+      if (!window.confirm('تنبيه: لن يتم إعادة المنتجات للمخزون تلقائياً — يرجى تعديل المخزون يدوياً إذا لزم الأمر.\nهل تريد الاستمرار؟')) return
+    }
+    revertLastStatus(order.id, user)
+    toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
   }
 
   const onDelete = () => {
@@ -206,6 +219,16 @@ export default function OrderCard({ order }) {
             </button>
           </>)}
 
+          {['admin', 'super_admin'].includes(user?.role) && lastStatusChange && (
+            <button onClick={onRevert}
+              title={`التراجع إلى: ${lastStatusChange.previousStatus}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#e0e7ff' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#eef2ff' }}>
+              <RotateCcw size={12} />تراجع: {lastStatusChange.previousStatus}
+            </button>
+          )}
+
           {['admin', 'super_admin'].includes(user?.role) && (
             <button onClick={onCancel}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', marginRight: 'auto' }}
@@ -293,13 +316,22 @@ export default function OrderCard({ order }) {
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <History size={10} /> سجل التعديلات
                   </div>
-                  {order.editHistory.map((h, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569', marginBottom: 4 }}>
-                      <Clock size={9} color="#f59e0b" style={{ flexShrink: 0 }} />
-                      <span style={{ flex: 1 }}>{h.note}</span>
-                      <span dir="ltr" style={{ color: '#94a3b8' }}>{new Date(h.editedAt).toLocaleDateString('ar-EG')}</span>
-                    </div>
-                  ))}
+                  {order.editHistory.map((h, i) => {
+                    const isStatus = h.type === 'status_change'
+                    const isCancel = h.type === 'cancellation'
+                    const label = isStatus
+                      ? `${h.previousStatus} ← ${h.newStatus}`
+                      : isCancel ? `إلغاء الطلب (كانت: ${h.previousStatus})`
+                      : (h.note || 'تعديل')
+                    const date = h.changedAt || h.cancelledAt || h.editedAt
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#475569', marginBottom: 4 }}>
+                        <Clock size={9} color="#f59e0b" style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>{label}</span>
+                        {date && <span dir="ltr" style={{ color: '#94a3b8' }}>{new Date(date).toLocaleDateString('ar-EG')}</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen, Trophy, PlusCircle } from 'lucide-react'
+import { ClipboardList, Package, BarChart2, History, FileText, Users, Settings, FolderOpen, Trophy, PlusCircle, Ban } from 'lucide-react'
 import OrdersList from '../components/admin/OrdersList'
 import OrderForm from '../components/sales/OrderForm'
 import InventoryManager from '../components/admin/InventoryManager'
@@ -11,6 +11,7 @@ import UserManager from '../components/admin/UserManager'
 import AppSettings from '../components/admin/AppSettings'
 import TeamInvoices from '../components/sales/TeamInvoices'
 import Leaderboard from '../components/sales/Leaderboard'
+import CancelledOrders from '../components/admin/CancelledOrders'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 
@@ -23,13 +24,14 @@ const ALL_TABS = [
   { id:'users',       label:'المستخدمون',        icon:Users,         roles:['admin','super_admin'] },
   { id:'audit',       label:'سجل التعديلات',    icon:History,       roles:['admin','super_admin'] },
   { id:'tax',         label:'الفواتير الضريبية', icon:FileText,     roles:['admin','super_admin'] },
+  { id:'cancelled',   label:'الطلبات الملغاة',  icon:Ban,           roles:['admin','super_admin'] },
   { id:'settings',    label:'الإعدادات',         icon:Settings,     roles:['super_admin'] },
 ]
 
 export default function AdminPage() {
   const [tab, setTab] = useState(() => localStorage.getItem('admin_tab') || 'orders')
   const changeTab = (id) => { setTab(id); localStorage.setItem('admin_tab', id) }
-  const { auditLog, taxInvoices } = useOrders()
+  const { auditLog, taxInvoices, cancelledOrders } = useOrders()
   const { user } = useAuth()
   const location = useLocation()
 
@@ -45,7 +47,7 @@ export default function AdminPage() {
       {/* Tab bar */}
       <div className="m-tab-scroll" style={{ display:'flex', gap:2, padding:5, borderRadius:14, background:'#fff', border:'1px solid #e4eaf3', marginBottom:20, boxShadow:'0 1px 4px rgba(15,23,42,0.05)', overflowX:'auto' }}>
         {tabs.map(({ id, label, icon:Icon }) => {
-          const badge = id === 'audit' ? auditLog.length : id === 'tax' ? pendingTax : null
+          const badge = id === 'audit' ? auditLog.length : id === 'tax' ? pendingTax : id === 'cancelled' ? cancelledOrders.length : null
           const active = tab === id
           const isSettings = id === 'settings'
           return (
@@ -65,6 +67,7 @@ export default function AdminPage() {
       </div>
 
       {tab === 'new'         && <OrderForm />}
+      {tab === 'cancelled'   && <CancelledOrders />}
       {tab === 'orders'      && <OrdersList />}
       {tab === 'team'        && <TeamInvoices />}
       {tab === 'leaderboard' && <Leaderboard />}

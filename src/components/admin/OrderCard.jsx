@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar, Trash2 } from 'lucide-react'
+import { FileText, Package, Clock, ChevronDown, History, User, Phone, MapPin, CreditCard, Check, X, Calendar, Trash2, Ban } from 'lucide-react'
 import Badge from '../ui/Badge'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus, deleteOrder, inventory } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, deleteOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -32,6 +32,12 @@ export default function OrderCard({ order }) {
   const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
   const onReject = () => { rejectOrder(order.id, user); toast('تم رفض الطلب', 'error') }
   const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
+  const onCancel = () => {
+    if (!window.confirm(`هل تريد إلغاء طلب "${order.clientName}"؟\nسيختفي الطلب من القوائم ويمكن استعادته لاحقاً من تبويب "الطلبات الملغاة".`)) return
+    cancelOrder(order.id, user)
+    toast('تم إلغاء الطلب — يمكن استعادته من تبويب الملغاة', 'success')
+  }
+
   const onDelete = () => {
     if (!window.confirm(`هل أنت متأكد من حذف طلب "${order.clientName}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return
     deleteOrder(order.id, user)
@@ -200,16 +206,25 @@ export default function OrderCard({ order }) {
             </button>
           </>)}
 
-          {user?.role === 'super_admin' && (
-            <button onClick={onDelete}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', marginRight: 'auto' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#ffe4e6' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#fff1f2' }}>
-              <Trash2 size={12} />حذف الطلب
+          {['admin', 'super_admin'].includes(user?.role) && (
+            <button onClick={onCancel}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', marginRight: 'auto' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#ffedd5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff7ed' }}>
+              <Ban size={12} />إلغاء الطلب
             </button>
           )}
 
-          <button onClick={() => setExpanded(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: expanded ? '#f0f4fa' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'Cairo,sans-serif', transition: 'all 0.15s', ...(user?.role !== 'super_admin' && { marginRight: 'auto' }) }}>
+          {user?.role === 'super_admin' && (
+            <button onClick={onDelete}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#ffe4e6' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff1f2' }}>
+              <Trash2 size={12} />حذف نهائي
+            </button>
+          )}
+
+          <button onClick={() => setExpanded(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: expanded ? '#f0f4fa' : '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'Cairo,sans-serif', transition: 'all 0.15s' }}>
             <ChevronDown size={11} style={{ transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'none' }} />
             التفاصيل
           </button>

@@ -264,6 +264,62 @@ export function OrdersProvider({ children }) {
   const approveOrder = (id, user) => updateOrderStatus(id, 'موافق عليه', user)
   const rejectOrder  = (id, user) => updateOrderStatus(id, 'مرفوض', user)
 
+  const cancelOrder = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    if (!order) return
+    const cancelEntry = {
+      type: 'cancellation',
+      previousStatus: order.status,
+      cancelledAt: new Date().toISOString(),
+      cancelledBy: user?.name || 'مجهول',
+    }
+    const editHistory = [...(order.editHistory || []), cancelEntry]
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'ملغي', editHistory } : o))
+    const { error } = await supabase.from('orders').update({
+      status: 'ملغي',
+      updated_at: new Date().toISOString(),
+      edit_history: editHistory,
+    }).eq('id', id)
+    if (error) {
+      console.error('cancelOrder:', error)
+      toast('فشل إلغاء الطلب — ' + error.message, 'error')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
+      return
+    }
+    await pushAudit({
+      type: 'order_cancel', orderId: id,
+      orderRef: `${order.clientName} — ${order.company}`,
+      field: 'إلغاء الطلب', oldValue: order.status, newValue: 'ملغي',
+      changedBy: user?.name || 'مجهول',
+    })
+  }
+
+  const restoreOrder = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    if (!order) return
+    const cancelEntry = [...(order.editHistory || [])].reverse().find(h => h.type === 'cancellation')
+    const restoreStatus = cancelEntry?.previousStatus || 'بانتظار الموافقة'
+    const editHistory = (order.editHistory || []).filter(h => h !== cancelEntry)
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: restoreStatus, editHistory } : o))
+    const { error } = await supabase.from('orders').update({
+      status: restoreStatus,
+      updated_at: new Date().toISOString(),
+      edit_history: editHistory,
+    }).eq('id', id)
+    if (error) {
+      console.error('restoreOrder:', error)
+      toast('فشل استعادة الطلب — ' + error.message, 'error')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
+      return
+    }
+    await pushAudit({
+      type: 'order_restore', orderId: id,
+      orderRef: `${order.clientName} — ${order.company}`,
+      field: 'استعادة الطلب', oldValue: 'ملغي', newValue: restoreStatus,
+      changedBy: user?.name || 'مجهول',
+    })
+  }
+
   const deleteOrder = async (id, user) => {
     const order = orders.find(o => o.id === id)
     setOrders(prev => prev.filter(o => o.id !== id))
@@ -282,10 +338,10 @@ export function OrdersProvider({ children }) {
     })
   }
 
-  const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep)
+  const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep && o.status !== 'ملغي')
 
   const getOrdersByRepGrouped = (rep) => {
-    const repOrders = orders.filter(o => o.salesRep === rep)
+    const repOrders = orders.filter(o => o.salesRep === rep && o.status !== 'ملغي')
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     const grouped = {}
     repOrders.forEach(o => {
@@ -449,9 +505,12 @@ export function OrdersProvider({ children }) {
 
   return (
     <OrdersContext.Provider value={{
-      orders, inventory, auditLog, taxInvoices, salesTargets, loading,
+      orders: orders.filter(o => o.status !== 'ملغي'),
+      cancelledOrders: orders.filter(o => o.status === 'ملغي'),
+      inventory, auditLog, taxInvoices, salesTargets, loading,
       hasMoreOrders, loadMoreOrders,
-      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder, deleteOrder,
+      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
+      cancelOrder, restoreOrder, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,

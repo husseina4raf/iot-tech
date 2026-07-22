@@ -59,7 +59,7 @@ export default function OrderCard({ order }) {
 
   const onCalendar = () => {
     const title = encodeURIComponent(order.clientName)
-    const items = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
+    const items = order.items.map(i => `• ${i.name}${i.model ? ` [${i.model}]` : ''} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nمسؤل المبيعات: ${order.salesRep}` +
       (order.mobile ? `\nالموبايل: ${order.mobile}` : '') +

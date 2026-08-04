@@ -152,7 +152,7 @@ export async function generateDispatchPDF(order) {
     <tr>
       <td style="text-align:center">${i + 1}</td>
       <td>${item.name}</td>
-      <td>${item.model || '—'}</td>
+      <td>${item.model || item.sku || '—'}</td>
       <td>${item.quantity}</td>
       <td>${item.price.toLocaleString()} LE</td>
       <td>${item.total.toLocaleString()} LE</td>
@@ -244,7 +244,7 @@ export async function generateInvoicePDF(order) {
     <tr>
       <td style="text-align:center">${i + 1}</td>
       <td>${item.name}</td>
-      <td>${item.model || '—'}</td>
+      <td>${item.model || item.sku || '—'}</td>
       <td>${item.quantity}</td>
       <td>${item.price.toLocaleString()} LE</td>
       <td>${item.total.toLocaleString()} LE</td>

@@ -287,7 +287,7 @@ export default function OrderCard({ order }) {
                   <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f4fa' }}>
                     <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{item.sku || '—'}</td>
-                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }}>{item.model || '—'}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }}>{item.model || item.sku || '—'}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#0f172a' }}>{item.quantity}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }} dir="ltr">{item.price.toLocaleString()} LE</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 700, color: '#0f172a' }} dir="ltr">{item.total.toLocaleString()} LE</td>

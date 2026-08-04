@@ -59,7 +59,7 @@ export default function OrderCard({ order }) {
 
   const onCalendar = () => {
     const title = encodeURIComponent(order.clientName)
-    const items = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
+    const items = order.items.map(i => `• ${i.name}${i.sku ? ` [${i.sku}]` : ''} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nمسؤل المبيعات: ${order.salesRep}` +
       (order.mobile ? `\nالموبايل: ${order.mobile}` : '') +
@@ -277,7 +277,7 @@ export default function OrderCard({ order }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#0f172a' }}>
-                  {['الصنف', 'الموديل', 'الكمية', 'السعر', 'الإجمالي'].map((h, i) => (
+                  {['الصنف', 'SKU', 'الموديل', 'الكمية', 'السعر', 'الإجمالي'].map((h, i) => (
                     <th key={h} style={{ padding: '9px 14px', color: '#e2e8f0', fontWeight: 600, textAlign: i === 0 ? 'right' : 'center' }}>{h}</th>
                   ))}
                 </tr>
@@ -286,6 +286,7 @@ export default function OrderCard({ order }) {
                 {order.items.map((item, i) => (
                   <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f4fa' }}>
                     <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
+                    <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{item.sku || '—'}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }}>{item.model || '—'}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#0f172a' }}>{item.quantity}</td>
                     <td style={{ padding: '9px 14px', textAlign: 'center', color: '#64748b' }} dir="ltr">{item.price.toLocaleString()} LE</td>
@@ -295,7 +296,7 @@ export default function OrderCard({ order }) {
               </tbody>
               <tfoot>
                 <tr style={{ background: '#f0f4fa', borderTop: '1.5px solid #e4eaf3' }}>
-                  <td colSpan={4} style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', fontSize: 13 }}>الإجمالي شامل {order.vatPercent}% ضريبة</td>
+                  <td colSpan={5} style={{ padding: '9px 14px', fontWeight: 700, color: '#0f172a', fontSize: 13 }}>الإجمالي شامل {order.vatPercent}% ضريبة</td>
                   <td style={{ padding: '9px 14px', textAlign: 'center', fontWeight: 800, color: '#2563eb', fontSize: 13 }} dir="ltr">{order.total.toLocaleString()} LE</td>
                 </tr>
               </tfoot>

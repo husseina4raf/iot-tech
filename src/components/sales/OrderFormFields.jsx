@@ -166,7 +166,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
   const selectProduct = (itemId, inv) => setForm(p => {
     const items = p.items.map(item => {
       if (item.id !== itemId) return item
-      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.model || '', costPrice: inv.costPrice || 0 }
+      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '', costPrice: inv.costPrice || 0 }
     })
     return { ...p, items }
   })

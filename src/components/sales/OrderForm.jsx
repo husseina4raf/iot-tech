@@ -6,7 +6,7 @@ import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function OrderForm({ editOrder = null, onSaved }) {
-  const { addOrder, updateOrder } = useOrders()
+  const { addOrder, updateOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const isEdit = !!editOrder
@@ -69,6 +69,18 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
     if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
     if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
+
+    if (!errs.items) {
+      const outOfStock = form.items.filter(i => {
+        if (!i.name.trim()) return false
+        const inv = inventory.find(p => p.name === i.name)
+        return inv && inv.stock === 0
+      })
+      if (outOfStock.length > 0) {
+        const names = outOfStock.map(i => i.name).join('، ')
+        errs.items = `هذا المنتج غير متاح حالياً في المخزن ولا يمكن إنشاء الطلب: ${names}`
+      }
+    }
     if (!form.locationLink?.trim()) errs.locationLink  = 'رابط الموقع على الخريطة مطلوب'
     if (!form.invoiceName?.trim())  errs.invoiceName   = 'الفاتورة باسم مين مطلوب'
     if (!form.paymentMethod)        errs.paymentMethod = 'طريقة الدفع مطلوبة'

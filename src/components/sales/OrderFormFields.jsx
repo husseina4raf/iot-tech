@@ -166,7 +166,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
   const selectProduct = (itemId, inv) => setForm(p => {
     const items = p.items.map(item => {
       if (item.id !== itemId) return item
-      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '', costPrice: inv.costPrice || 0 }
+      return { ...item, name: inv.name, sku: inv.sku || '', model: inv.sku || '', costPrice: inv.costPrice || 0, stock: inv.stock ?? null }
     })
     return { ...p, items }
   })
@@ -272,6 +272,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
           {form.items.map(item => {
             const costP = item.costPrice || getCostPrice(item.name)
             const isBelowCost = isSalesRep && costP && Number(item.price) > 0 && Number(item.price) < costP
+            const isOutOfStock = item.name && item.stock === 0
             return (
               <div key={item.id}>
                 <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 90px 90px 70px 90px 36px', gap: 8, alignItems: 'center' }}>
@@ -299,7 +300,13 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                     <Trash2 size={14} />
                   </button>
                 </div>
-                {isBelowCost && (
+                {isOutOfStock && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, padding: '5px 10px', borderRadius: 7, background: '#fff1f2', border: '1px solid #fecdd3', fontSize: 11, color: '#9f1239' }}>
+                    <AlertTriangle size={12} color="#e11d48" />
+                    هذا المنتج غير متاح حالياً في المخزن ولا يمكن إنشاء الطلب
+                  </div>
+                )}
+                {!isOutOfStock && isBelowCost && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, padding: '5px 10px', borderRadius: 7, background: '#fff7ed', border: '1px solid #fed7aa', fontSize: 11, color: '#9a3412' }}>
                     <AlertTriangle size={12} color="#f97316" />
                     تحذير: سعر البيع أقل من سعر التكلفة ({costP?.toLocaleString()} LE)

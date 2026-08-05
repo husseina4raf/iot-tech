@@ -284,7 +284,7 @@ export default function TeamInvoices() {
                               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                                 <thead>
                                   <tr style={{ background: '#0f172a' }}>
-                                    {['الصنف', 'SKU', 'الكمية', 'السعر', 'الإجمالي'].map((h, i) => (
+                                    {['الصنف', 'SKU', 'الموديل', 'الكمية', 'السعر', 'الإجمالي'].map((h, i) => (
                                       <th key={h} style={{ padding: '7px 12px', color: '#e2e8f0', fontWeight: 600, textAlign: i === 0 ? 'right' : 'center' }}>{h}</th>
                                     ))}
                                   </tr>
@@ -294,6 +294,7 @@ export default function TeamInvoices() {
                                     <tr key={item.id || i} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f4fa' }}>
                                       <td style={{ padding: '7px 12px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
                                       <td style={{ padding: '7px 12px', textAlign: 'center', color: '#64748b', fontFamily: 'monospace', fontSize: 10 }}>{item.sku || '—'}</td>
+                                      <td style={{ padding: '7px 12px', textAlign: 'center', color: '#64748b' }}>{item.model || item.sku || '—'}</td>
                                       <td style={{ padding: '7px 12px', textAlign: 'center' }}>{item.quantity}</td>
                                       <td style={{ padding: '7px 12px', textAlign: 'center', color: '#64748b' }} dir="ltr">{item.price?.toLocaleString()} LE</td>
                                       <td style={{ padding: '7px 12px', textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }} dir="ltr">{item.total?.toLocaleString()} LE</td>
@@ -302,7 +303,7 @@ export default function TeamInvoices() {
                                 </tbody>
                                 <tfoot>
                                   <tr style={{ background: '#eff6ff', borderTop: '2px solid #bfdbfe' }}>
-                                    <td colSpan={4} style={{ padding: '7px 12px', fontWeight: 700, color: '#1d4ed8', fontSize: 11 }}>
+                                    <td colSpan={5} style={{ padding: '7px 12px', fontWeight: 700, color: '#1d4ed8', fontSize: 11 }}>
                                       الإجمالي{order.vatPercent > 0 ? ` شامل ${order.vatPercent}% ضريبة` : ''}
                                     </td>
                                     <td style={{ padding: '7px 12px', textAlign: 'center', fontWeight: 800, color: '#1d4ed8' }} dir="ltr">

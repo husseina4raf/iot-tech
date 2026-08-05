@@ -100,7 +100,7 @@ export default function TeamLeaderPage() {
 
   const onCalendar = (order) => {
     const title = encodeURIComponent(order.clientName)
-    const items = order.items.map(i => `• ${i.name} × ${i.quantity}`).join('\n')
+    const items = order.items.map(i => `• ${i.name}${i.sku ? ` [${i.sku}]` : ''} × ${i.quantity}`).join('\n')
     const details = encodeURIComponent(
       `رقم الطلب: #${order.serialNumber}\nمسؤل المبيعات: ${order.salesRep}` +
       (order.mobile ? `\nالموبايل: ${order.mobile}` : '') +
@@ -452,7 +452,7 @@ export default function TeamLeaderPage() {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                           <thead>
                             <tr style={{ background: '#0f172a' }}>
-                              {['الصنف', 'SKU', 'الكمية', 'سعر البيع', 'الإجمالي'].map((h, i) => (
+                              {['الصنف', 'SKU', 'الموديل', 'الكمية', 'سعر البيع', 'الإجمالي'].map((h, i) => (
                                 <th key={h} style={{ padding: '8px 14px', color: '#e2e8f0', fontWeight: 600, textAlign: i === 0 ? 'right' : 'center' }}>{h}</th>
                               ))}
                             </tr>
@@ -462,6 +462,7 @@ export default function TeamLeaderPage() {
                               <tr key={item.id || i} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #f0f4fa' }}>
                                 <td style={{ padding: '8px 14px', fontWeight: 600, color: '#0f172a' }}>{item.name}</td>
                                 <td style={{ padding: '8px 14px', textAlign: 'center', color: '#64748b', fontFamily: 'monospace', fontSize: 11 }}>{item.sku || '—'}</td>
+                                <td style={{ padding: '8px 14px', textAlign: 'center', color: '#64748b' }}>{item.model || item.sku || '—'}</td>
                                 <td style={{ padding: '8px 14px', textAlign: 'center' }}>{item.quantity}</td>
                                 <td style={{ padding: '8px 14px', textAlign: 'center', color: '#64748b' }} dir="ltr">{item.price?.toLocaleString()} LE</td>
                                 <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }} dir="ltr">{item.total?.toLocaleString()} LE</td>
@@ -470,7 +471,7 @@ export default function TeamLeaderPage() {
                           </tbody>
                           <tfoot>
                             <tr style={{ background: '#eff6ff', borderTop: '2px solid #bfdbfe' }}>
-                              <td colSpan={4} style={{ padding: '8px 14px', fontWeight: 700, color: '#1d4ed8', fontSize: 12 }}>
+                              <td colSpan={5} style={{ padding: '8px 14px', fontWeight: 700, color: '#1d4ed8', fontSize: 12 }}>
                                 الإجمالي{order.vatPercent > 0 ? ` شامل ${order.vatPercent}% ضريبة` : ''}
                               </td>
                               <td style={{ padding: '8px 14px', textAlign: 'center', fontWeight: 800, color: '#1d4ed8', fontSize: 13 }} dir="ltr">

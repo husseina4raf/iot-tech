@@ -42,10 +42,25 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
   const [errors, setErrors] = useState({})
 
+  const validatePhone = (num) => {
+    const s = (num || '').trim()
+    if (!s) return null
+    if (s.startsWith('+20')) {
+      // Egyptian number: local part must be 01XXXXXXXXX
+      return /^01[0-9]{9}$/.test(s.slice(3)) ? null : 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
+    }
+    if (s.startsWith('+')) {
+      // International: total digits (country code + local) must be 7–15
+      const digits = s.replace(/\D/g, '')
+      return (digits.length >= 7 && digits.length <= 15) ? null : 'رقم دولي غير صحيح — يجب أن يتكون من 7 إلى 15 رقم'
+    }
+    // Legacy format without +: treat as Egyptian
+    return /^01[0-9]{9}$/.test(s) ? null : 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     const errs = {}
-    const phoneRegex = /^01[0-9]{9}$/
 
     if (!form.company.trim())     errs.company    = 'اسم الشركة أو العميل مطلوب'
     if (!form.clientName.trim())  errs.clientName = 'اسم العميل مطلوب'
@@ -53,13 +68,15 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
     if (!form.mobile.trim()) {
       errs.mobile = 'رقم الموبايل مطلوب'
-    } else if (!phoneRegex.test(form.mobile.trim())) {
-      errs.mobile = 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
+    } else {
+      const mErr = validatePhone(form.mobile)
+      if (mErr) errs.mobile = mErr
     }
     if (!form.whatsapp.trim()) {
       errs.whatsapp = 'رقم الواتساب مطلوب'
-    } else if (!phoneRegex.test(form.whatsapp.trim())) {
-      errs.whatsapp = 'رقم واتساب غير صحيح — 01XXXXXXXXX'
+    } else {
+      const wErr = validatePhone(form.whatsapp)
+      if (wErr) errs.whatsapp = wErr
     }
 
     if (!form.governorate?.trim()) errs.governorate = 'المحافظة مطلوبة'

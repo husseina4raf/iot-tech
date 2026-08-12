@@ -294,6 +294,10 @@ export function OrdersProvider({ children }) {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
       return
     }
+    // Restore inventory if goods had already been dispatched
+    if (order.status === 'تم الصرف') {
+      await restoreStockForOrder(order)
+    }
     await pushAudit({
       type: 'order_cancel', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
@@ -350,6 +354,10 @@ export function OrdersProvider({ children }) {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
       return
     }
+    // Restore inventory when reverting a dispatch (goods going back to warehouse)
+    if (order.status === 'تم الصرف') {
+      await restoreStockForOrder(order)
+    }
     await pushAudit({
       type: 'status_revert', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
@@ -398,6 +406,43 @@ export function OrdersProvider({ children }) {
   // operations can't race ahead and overwrite our fresh confirmed state.
   const lockInv  = (id) => pendingInvWrites.current.add(id)
   const unlockInv = (id) => setTimeout(() => pendingInvWrites.current.delete(id), 3000)
+
+  // ── Stock restoration helper ──────────────────────────────────────────────────
+  // Called when a dispatched order ('تم الصرف') is cancelled or reverted.
+  // Adds back each item's quantity to inventory as a return lot.
+  const restoreStockForOrder = async (order) => {
+    for (const item of (order.items || [])) {
+      const invItem = inventory.find(i =>
+        i.name.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(i.name.toLowerCase())
+      )
+      if (!invItem) continue
+      const qty = Number(item.quantity) || 0
+      if (qty <= 0) continue
+      const returnLot = {
+        id: `lot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        qty, costPrice: invItem.costPrice || 0,
+        date: new Date().toISOString().split('T')[0],
+        note: `مُرجَع من طلب #${order.serialNumber}`,
+      }
+      const updatedLots = [...(invItem.lots || []), returnLot]
+      const newStock    = (invItem.stock || 0) + qty
+      const fifoCost    = updatedLots[0]?.costPrice ?? (invItem.costPrice || 0)
+      lockInv(invItem.id)
+      setInventory(prev => prev.map(i => i.id === invItem.id
+        ? { ...i, stock: newStock, lots: updatedLots, costPrice: fifoCost } : i))
+      const { error } = await supabase.from('inventory')
+        .update({ stock: newStock, lots: updatedLots, cost_price: fifoCost })
+        .eq('id', invItem.id)
+      if (error) {
+        console.error('restoreStockForOrder:', error)
+        toast(`فشل إعادة المخزون للمنتج "${invItem.name}" — ${error.message}`, 'error')
+        setInventory(prev => prev.map(i => i.id === invItem.id
+          ? { ...i, stock: invItem.stock, lots: invItem.lots, costPrice: invItem.costPrice } : i))
+      }
+      unlockInv(invItem.id)
+    }
+  }
 
   // ── Inventory ─────────────────────────────────────────────────────────────────
   const addInventoryItem = async (item, user) => {

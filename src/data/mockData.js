@@ -7,6 +7,46 @@ export const ORDER_STATUSES  = ['بانتظار الموافقة', 'جديد', '
 export const PAYMENT_METHODS = ['كاش', 'انستاباي', 'تحويل', 'فيزا', 'فودافون كاش', 'ايزى كاش']
 export const INVOICE_TYPES   = ['بيان اسعار', 'فاتورة ضريبية']
 
+export const ARAB_COUNTRIES = [
+  { code: '+20',  nameAr: 'مصر',              flag: '🇪🇬' },
+  { code: '+971', nameAr: 'الإمارات',         flag: '🇦🇪' },
+  { code: '+966', nameAr: 'السعودية',         flag: '🇸🇦' },
+  { code: '+965', nameAr: 'الكويت',           flag: '🇰🇼' },
+  { code: '+974', nameAr: 'قطر',              flag: '🇶🇦' },
+  { code: '+973', nameAr: 'البحرين',          flag: '🇧🇭' },
+  { code: '+968', nameAr: 'عُمان',            flag: '🇴🇲' },
+  { code: '+962', nameAr: 'الأردن',           flag: '🇯🇴' },
+  { code: '+961', nameAr: 'لبنان',            flag: '🇱🇧' },
+  { code: '+218', nameAr: 'ليبيا',            flag: '🇱🇾' },
+  { code: '+216', nameAr: 'تونس',             flag: '🇹🇳' },
+  { code: '+213', nameAr: 'الجزائر',          flag: '🇩🇿' },
+  { code: '+212', nameAr: 'المغرب',           flag: '🇲🇦' },
+  { code: '+249', nameAr: 'السودان',          flag: '🇸🇩' },
+  { code: '+963', nameAr: 'سوريا',            flag: '🇸🇾' },
+  { code: '+964', nameAr: 'العراق',           flag: '🇮🇶' },
+  { code: '+967', nameAr: 'اليمن',            flag: '🇾🇪' },
+  { code: '+970', nameAr: 'فلسطين',           flag: '🇵🇸' },
+]
+
+export const OTHER_COUNTRIES = [
+  { code: '+90',  nameAr: 'تركيا',            flag: '🇹🇷' },
+  { code: '+44',  nameAr: 'المملكة المتحدة',  flag: '🇬🇧' },
+  { code: '+1',   nameAr: 'الولايات المتحدة', flag: '🇺🇸' },
+  { code: '+33',  nameAr: 'فرنسا',            flag: '🇫🇷' },
+  { code: '+49',  nameAr: 'ألمانيا',          flag: '🇩🇪' },
+  { code: '+39',  nameAr: 'إيطاليا',          flag: '🇮🇹' },
+  { code: '+34',  nameAr: 'إسبانيا',          flag: '🇪🇸' },
+  { code: '+7',   nameAr: 'روسيا',            flag: '🇷🇺' },
+  { code: '+86',  nameAr: 'الصين',            flag: '🇨🇳' },
+  { code: '+91',  nameAr: 'الهند',            flag: '🇮🇳' },
+  { code: '+92',  nameAr: 'باكستان',          flag: '🇵🇰' },
+  { code: '+234', nameAr: 'نيجيريا',          flag: '🇳🇬' },
+  { code: '+254', nameAr: 'كينيا',            flag: '🇰🇪' },
+  { code: '+27',  nameAr: 'جنوب أفريقيا',     flag: '🇿🇦' },
+]
+
+export const COUNTRIES = [...ARAB_COUNTRIES, ...OTHER_COUNTRIES]
+
 export const EGYPT_GOVERNORATES = [
   'القاهرة','الجيزة','الإسكندرية','الدقهلية','البحر الأحمر','البحيرة','الفيوم',
   'الغربية','الإسماعيلية','المنوفية','المنيا','القليوبية','الوادي الجديد','السويس',

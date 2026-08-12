@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Calculator, Lock, Search, Package, AlertTriangle, Clock } from 'lucide-react'
-import { INVOICE_TYPES, PAYMENT_METHODS, EGYPT_GOVERNORATES, EGYPT_CITIES } from '../../data/mockData'
+import { INVOICE_TYPES, PAYMENT_METHODS, EGYPT_GOVERNORATES, EGYPT_CITIES, ARAB_COUNTRIES, OTHER_COUNTRIES } from '../../data/mockData'
 import { useAuth } from '../../hooks/useAuth'
 import { useOrders } from '../../hooks/useOrders'
 
@@ -55,6 +55,70 @@ function FTextarea({ label, style = {}, ...props }) {
       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>{label}</label>
       <textarea {...props} style={{ width: '100%', padding: '10px 12px', fontSize: 13, border: `1.5px solid ${f ? '#2563eb' : '#e4eaf3'}`, borderRadius: 8, background: f ? '#fff' : '#f8fafc', color: '#0f172a', outline: 'none', boxShadow: f ? '0 0 0 3px rgba(37,99,235,0.1)' : 'none', resize: 'none', transition: 'all 0.15s', fontFamily: 'Cairo,sans-serif' }}
         onFocus={() => setF(true)} onBlur={() => setF(false)} />
+    </div>
+  )
+}
+
+// Parse a stored phone value into { code, local }.
+// Handles both full international numbers (+XXYYYYY) and legacy Egyptian (01XXXXXXXXX).
+const ALL_COUNTRIES = [...ARAB_COUNTRIES, ...OTHER_COUNTRIES]
+const parsePhone = (val) => {
+  if (!val) return { code: '+20', local: '' }
+  const match = [...ALL_COUNTRIES].sort((a, b) => b.code.length - a.code.length)
+    .find(c => val.startsWith(c.code))
+  return match ? { code: match.code, local: val.slice(match.code.length) } : { code: '+20', local: val }
+}
+
+function PhoneField({ label, required, error, value = '', onChange, style = {} }) {
+  const [f, setF] = useState(false)
+  const initial = parsePhone(value)
+  const [code, setCode] = useState(initial.code)
+  const [local, setLocal] = useState(initial.local)
+
+  useEffect(() => {
+    const p = parsePhone(value)
+    setCode(p.code)
+    setLocal(p.local)
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const emit = (c, l) => { const t = l.trim(); onChange(t ? c + t : '') }
+
+  const selStyle = {
+    flexShrink: 0, width: 105, padding: '10px 6px', fontSize: 12,
+    border: `1.5px solid ${error ? '#e11d48' : '#e4eaf3'}`, borderRadius: 8,
+    background: error ? '#fff7f7' : '#f8fafc', color: '#0f172a',
+    outline: 'none', cursor: 'pointer', fontFamily: 'Cairo,sans-serif',
+  }
+  const inpStyle = {
+    flex: 1, padding: '10px 12px', fontSize: 13,
+    border: `1.5px solid ${f ? '#2563eb' : error ? '#e11d48' : '#e4eaf3'}`,
+    borderRadius: 8, background: f ? '#fff' : error ? '#fff7f7' : '#f8fafc',
+    color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif',
+    boxShadow: f ? '0 0 0 3px rgba(37,99,235,0.1)' : 'none', transition: 'all 0.15s',
+  }
+
+  return (
+    <div style={style}>
+      {label != null && (
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+          {label}{required && <span style={{ color: '#e11d48' }}> *</span>}
+        </label>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <select value={code} dir="ltr" style={selStyle}
+          onChange={e => { setCode(e.target.value); emit(e.target.value, local) }}>
+          <optgroup label="الدول العربية">
+            {ARAB_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+          </optgroup>
+          <optgroup label="دول أخرى">
+            {OTHER_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+          </optgroup>
+        </select>
+        <input value={local} placeholder="رقم الهاتف" dir="ltr" style={inpStyle}
+          onChange={e => { setLocal(e.target.value); emit(code, e.target.value) }}
+          onFocus={() => setF(true)} onBlur={() => setF(false)} />
+      </div>
+      {error && <span style={{ display: 'block', fontSize: 11, color: '#e11d48', marginTop: 3 }}>{error}</span>}
     </div>
   )
 }
@@ -216,8 +280,8 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
               {salesReps.map(r => <option key={r} value={r}>{r}</option>)}
             </FSelect>
           )}
-          <FInput label="موبايل" required error={errors.mobile} placeholder="01XXXXXXXXX" value={form.mobile} onChange={e => upd('mobile', e.target.value)} dir="ltr" />
-          <FInput label="واتساب" required error={errors.whatsapp} placeholder="01XXXXXXXXX" value={form.whatsapp} onChange={e => upd('whatsapp', e.target.value)} dir="ltr" />
+          <PhoneField label="موبايل" required error={errors.mobile} value={form.mobile} onChange={v => upd('mobile', v)} />
+          <PhoneField label="واتساب" required error={errors.whatsapp} value={form.whatsapp} onChange={v => upd('whatsapp', v)} />
 
           {/* Address — 5 split fields */}
           <div style={{ gridColumn: '1/-1' }}>

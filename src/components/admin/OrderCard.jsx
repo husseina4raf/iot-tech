@@ -43,10 +43,8 @@ export default function OrderCard({ order }) {
   const onRevert = () => {
     if (!lastStatusChange) return
     const prevStatus = lastStatusChange.previousStatus
-    if (!window.confirm(`هل تريد التراجع والعودة إلى حالة "${prevStatus}"؟`)) return
-    if (order.status === 'تم الصرف') {
-      if (!window.confirm('تنبيه: لن يتم إعادة المنتجات للمخزون تلقائياً — يرجى تعديل المخزون يدوياً إذا لزم الأمر.\nهل تريد الاستمرار؟')) return
-    }
+    const stockNote = order.status === 'تم الصرف' ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+    if (!window.confirm(`هل تريد التراجع والعودة إلى حالة "${prevStatus}"؟${stockNote}`)) return
     revertLastStatus(order.id, user)
     toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
   }

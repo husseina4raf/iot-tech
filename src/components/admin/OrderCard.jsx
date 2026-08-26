@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, revertLastStatus, deleteOrder, inventory } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, revertLastStatus, returnToSales, deleteOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -47,6 +47,15 @@ export default function OrderCard({ order }) {
     if (!window.confirm(`هل تريد التراجع والعودة إلى حالة "${prevStatus}"؟${stockNote}`)) return
     revertLastStatus(order.id, user)
     toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
+  }
+
+  const onReturnToSales = () => {
+    // Show stock note whenever the order has gone through dispatch (current or historical)
+    const dispatchedStatuses = ['تم الصرف', 'مكتمل', 'تم التحصيل']
+    const stockNote = dispatchedStatuses.includes(order.status) ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+    if (!window.confirm(`هل تريد إعادة الطلب للسيلز للتعديل؟\nسيتغير وضع الطلب إلى "جديد" ويظهر للمندوب مجدداً.${stockNote}`)) return
+    returnToSales(order.id, user)
+    toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
   }
 
   const onDelete = () => {
@@ -224,6 +233,16 @@ export default function OrderCard({ order }) {
               onMouseEnter={e => { e.currentTarget.style.background = '#e0e7ff' }}
               onMouseLeave={e => { e.currentTarget.style.background = '#eef2ff' }}>
               <RotateCcw size={12} />تراجع: {lastStatusChange.previousStatus}
+            </button>
+          )}
+
+          {['team_leader', 'admin', 'super_admin'].includes(user?.role) && ['موافق عليه', 'تم الصرف', 'مكتمل', 'تم التحصيل'].includes(order.status) && (
+            <button onClick={onReturnToSales}
+              title="إعادة الطلب للسيلز للتعديل"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#ffedd5' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#fff7ed' }}>
+              <RotateCcw size={12} />إعادة للسيلز للتعديل
             </button>
           )}
 

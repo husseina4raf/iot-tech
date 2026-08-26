@@ -375,6 +375,76 @@ export function OrdersProvider({ children }) {
     })
   }
 
+  const returnToSales = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    if (!order) return
+    const previousStatus = order.status
+
+    // ── Stock deduction detection ─────────────────────────────────────────────
+    // Stock is deducted the moment an order transitions INTO 'تم الصرف'.
+    // It may need restoring even if the order has since advanced to 'مكتمل' or
+    // 'تم التحصيل' — those moves do NOT reverse the inventory change.
+    //
+    // Algorithm:
+    //  1. If current status is 'تم الصرف', stock is clearly still deducted.
+    //  2. Otherwise scan editHistory for the last status_change TO 'تم الصرف'.
+    //     If found, check whether any subsequent event already restored stock
+    //     (returned_to_sales, a status_revert FROM 'تم الصرف', or a cancellation).
+    //     If none found → stock is still deducted and must be restored now.
+    const stockWasDeducted = (() => {
+      if (previousStatus === 'تم الصرف') return true
+      const history = order.editHistory || []
+      let lastDispatchIdx = -1
+      history.forEach((entry, idx) => {
+        if (entry.type === 'status_change' && entry.newStatus === 'تم الصرف') lastDispatchIdx = idx
+      })
+      if (lastDispatchIdx === -1) return false // Never dispatched → nothing to restore
+      // Any restoration event recorded after the dispatch?
+      return !history.slice(lastDispatchIdx + 1).some(e =>
+        e.type === 'returned_to_sales' ||
+        (e.type === 'status_revert' && e.previousStatus === 'تم الصرف') ||
+        e.type === 'cancellation'
+      )
+    })()
+
+    const returnEntry = {
+      type: 'returned_to_sales',
+      previousStatus,
+      newStatus: 'جديد',
+      returnedAt: new Date().toISOString(),
+      returnedBy: user?.name || 'مجهول',
+      reason: 'إعادة للسيلز للتعديل',
+    }
+    const editHistory = [...(order.editHistory || []), returnEntry]
+
+    // Persist the status change first; roll back locally if it fails
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'جديد', editHistory } : o))
+    const { error } = await supabase.from('orders').update({
+      status: 'جديد',
+      updated_at: new Date().toISOString(),
+      edit_history: editHistory,
+    }).eq('id', id)
+    if (error) {
+      console.error('returnToSales:', error)
+      toast('فشل إعادة الطلب للسيلز — ' + error.message, 'error')
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus, editHistory: order.editHistory } : o))
+      return
+    }
+
+    // Restore stock only when we confirmed the order update succeeded,
+    // and only when stock was actually deducted (and not already restored).
+    if (stockWasDeducted) {
+      await restoreStockForOrder(order)
+    }
+
+    await pushAudit({
+      type: 'returned_to_sales', orderId: id,
+      orderRef: `${order.clientName} — ${order.company}`,
+      field: 'إعادة للسيلز للتعديل', oldValue: previousStatus, newValue: 'جديد',
+      changedBy: user?.name || 'مجهول',
+    })
+  }
+
   const deleteOrder = async (id, user) => {
     const order = orders.find(o => o.id === id)
     setOrders(prev => prev.filter(o => o.id !== id))
@@ -602,7 +672,7 @@ export function OrdersProvider({ children }) {
       inventory, auditLog, taxInvoices, salesTargets, loading,
       hasMoreOrders, loadMoreOrders,
       addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
-      cancelOrder, restoreOrder, revertLastStatus, deleteOrder,
+      cancelOrder, restoreOrder, revertLastStatus, returnToSales, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,

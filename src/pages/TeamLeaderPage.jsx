@@ -48,7 +48,7 @@ export default function TeamLeaderPage() {
   const [allPage,    setAllPage]    = useState(0)
   const [allPerPage, setAllPerPage] = useState(10)
 
-  const { orders, approveOrder, rejectOrder, updateOrderStatus, revertLastStatus, inventory } = useOrders()
+  const { orders, approveOrder, rejectOrder, updateOrderStatus, revertLastStatus, returnToSales, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
 
@@ -335,14 +335,12 @@ export default function TeamLeaderPage() {
               const next = STATUS_NEXT[order.status]
               const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
               const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
-              const lastStatusChange = [...(order.editHistory || [])].reverse().find(h => h.type === 'status_change')
-              const onRevertOrder = () => {
-                if (!lastStatusChange) return
-                const prevStatus = lastStatusChange.previousStatus
-                const stockNote = order.status === 'تم الصرف' ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
-                if (!window.confirm(`هل تريد إعادة فتح الطلب والرجوع إلى حالة "${prevStatus}"؟${stockNote}`)) return
-                revertLastStatus(order.id, user)
-                toast(`تم إعادة فتح الطلب ✓ — الحالة: ${prevStatus}`, 'success')
+              const onReturnToSalesOrder = () => {
+                const dispatchedStatuses = ['تم الصرف', 'مكتمل', 'تم التحصيل']
+                const stockNote = dispatchedStatuses.includes(order.status) ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+                if (!window.confirm(`هل تريد إعادة الطلب للسيلز للتعديل؟\nسيتغير وضع الطلب إلى "جديد" ويظهر للمندوب مجدداً.${stockNote}`)) return
+                returnToSales(order.id, user)
+                toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
               }
               return (
                 <div key={order.id} style={{ ...card, overflow: 'hidden' }} className="fade-in">
@@ -407,13 +405,13 @@ export default function TeamLeaderPage() {
                         </button>
                       )}
 
-                      {lastStatusChange && (
-                        <button onClick={onRevertOrder}
-                          title={`إعادة فتح إلى: ${lastStatusChange.previousStatus}`}
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#e0e7ff'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#eef2ff'}>
-                          <RotateCcw size={12} />إعادة فتح
+                      {['موافق عليه', 'تم الصرف', 'مكتمل', 'تم التحصيل'].includes(order.status) && (
+                        <button onClick={onReturnToSalesOrder}
+                          title="إعادة الطلب للسيلز للتعديل"
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fed7aa', background: '#fff7ed', color: '#c2410c', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#ffedd5'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff7ed'}>
+                          <RotateCcw size={12} />إعادة للسيلز للتعديل
                         </button>
                       )}
 

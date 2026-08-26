@@ -111,7 +111,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     const orderData = { ...rest, address: addressParts.join(' — ') }
 
     if (isEdit) {
-      const wasRejected = editOrder.status === 'مرفوض'
+      const wasRejected = ['مرفوض', 'جديد'].includes(editOrder.status)
       const finalData = wasRejected ? { ...orderData, status: 'بانتظار الموافقة' } : orderData
       updateOrder(editOrder.id, finalData, user)
       toast(wasRejected ? 'تم إرسال الطلب للمراجعة مجدداً ✓' : 'تم تحديث الطلب بنجاح ✓', 'success')

@@ -216,7 +216,16 @@ export function OrdersProvider({ children }) {
     })
   }
 
+  // Statuses that only admin / super_admin may advance an order to.
+  // team_leader can approve/reject and revert, but cannot finalise dispatch or collection.
+  const TEAM_LEADER_FORBIDDEN_STATUSES = ['تم الصرف', 'تم التحصيل']
+
   const updateOrderStatus = async (id, status, user) => {
+    // Role guard — frontend enforcement (DB trigger mirrors this server-side)
+    if (user?.role === 'team_leader' && TEAM_LEADER_FORBIDDEN_STATUSES.includes(status)) {
+      toast('ليس لديك صلاحية تحديث الطلب إلى هذه الحالة', 'error')
+      return
+    }
     const order = orders.find(o => o.id === id)
     const statusEntry = {
       type: 'status_change',

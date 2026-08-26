@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen, PlusCircle } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, FileText, ChevronDown, ChevronRight, User, Package, Phone, MapPin, CreditCard, Calendar, Edit3, AlertTriangle, Trophy, TrendingUp, Search, X, Link, FolderOpen, PlusCircle, RotateCcw } from 'lucide-react'
 import { useOrders } from '../hooks/useOrders'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../components/ui/Toast'
@@ -48,7 +48,7 @@ export default function TeamLeaderPage() {
   const [allPage,    setAllPage]    = useState(0)
   const [allPerPage, setAllPerPage] = useState(10)
 
-  const { orders, approveOrder, rejectOrder, updateOrderStatus, inventory } = useOrders()
+  const { orders, approveOrder, rejectOrder, updateOrderStatus, revertLastStatus, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
 
@@ -335,6 +335,15 @@ export default function TeamLeaderPage() {
               const next = STATUS_NEXT[order.status]
               const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
               const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
+              const lastStatusChange = [...(order.editHistory || [])].reverse().find(h => h.type === 'status_change')
+              const onRevertOrder = () => {
+                if (!lastStatusChange) return
+                const prevStatus = lastStatusChange.previousStatus
+                const stockNote = order.status === 'تم الصرف' ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+                if (!window.confirm(`هل تريد إعادة فتح الطلب والرجوع إلى حالة "${prevStatus}"؟${stockNote}`)) return
+                revertLastStatus(order.id, user)
+                toast(`تم إعادة فتح الطلب ✓ — الحالة: ${prevStatus}`, 'success')
+              }
               return (
                 <div key={order.id} style={{ ...card, overflow: 'hidden' }} className="fade-in">
                   <div style={{ padding: '14px 20px' }}>
@@ -395,6 +404,16 @@ export default function TeamLeaderPage() {
                           onMouseEnter={e => e.currentTarget.style.background = '#d1fae5'}
                           onMouseLeave={e => e.currentTarget.style.background = '#ecfdf5'}>
                           <Calendar size={13} />جدولة التركيب
+                        </button>
+                      )}
+
+                      {lastStatusChange && (
+                        <button onClick={onRevertOrder}
+                          title={`إعادة فتح إلى: ${lastStatusChange.previousStatus}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #c7d2fe', background: '#eef2ff', color: '#4338ca', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#e0e7ff'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#eef2ff'}>
+                          <RotateCcw size={12} />إعادة فتح
                         </button>
                       )}
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus, Trash2, X, Check, User, Lock, Shield, AtSign, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react'
+import { UserPlus, Trash2, X, Check, User, Lock, AtSign, ChevronDown, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../ui/Toast'
 import { ROLE_LABELS } from '../../data/authData'
@@ -220,19 +220,24 @@ export default function UserManager() {
     }
   }
 
-  const handleDelete = (u) => {
+  const [deleting, setDeleting] = useState(null)   // userId currently being deleted
+
+  const handleDelete = async (u) => {
     if (u.id === currentUser?.id) return toast('لا يمكنك حذف حسابك الحالي', 'error')
     if (!window.confirm(`هل أنت متأكد من حذف "${u.name}"؟`)) return
-    deleteUser(u.id)
-    toast('تم حذف المستخدم', 'success')
+    setDeleting(u.id)
+    try {
+      await deleteUser(u.id)
+      toast(`تم حذف "${u.name}" بنجاح ✓`, 'success')
+    } catch (err) {
+      toast(err.message || 'فشل حذف المستخدم — حاول مرة أخرى', 'error')
+    } finally {
+      setDeleting(null)
+    }
   }
 
   // ── User grouping ────────────────────────────────────────────
   const salesUsers = users.filter(u => u.role === 'sales' || u.role === 'team_leader')
-  const mgmtUsers  = users.filter(u => u.role === 'admin'  || u.role === 'super_admin')
-
-  // Can the current user change roles in the mgmt table?
-  const canEditMgmt = currentUser?.role === 'super_admin'
 
   // ── Role options for the add-user form ───────────────────────
   const addFormRoles = [
@@ -331,16 +336,6 @@ export default function UserManager() {
         </div>
       )}
 
-      {/* ── Role-management notice ────────────────────────────────── */}
-      {(currentUser?.role === 'admin' || currentUser?.role === 'super_admin') && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Shield size={13} />
-          {currentUser.role === 'admin'
-            ? 'بإمكانك تغيير صلاحيات مسؤولي المبيعات وقادة الفريق فقط. تغيير الصلاحية يتطلب تأكيدك قبل الحفظ.'
-            : 'بإمكانك تغيير صلاحيات جميع المستخدمين. لا يمكنك تغيير صلاحيتك الخاصة أو إزالة آخر مدير عام.'}
-        </div>
-      )}
-
       {/* ── Table 1: Sales & Team Leaders ────────────────────────── */}
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #f0f4fa', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -384,10 +379,14 @@ export default function UserManager() {
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       <button onClick={() => handleDelete(u)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 11, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', fontWeight: 600 }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#ffe4e6'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#fff1f2'}>
-                        <Trash2 size={11} />حذف
+                        disabled={deleting === u.id}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 7, border: '1.5px solid #fecdd3', background: deleting === u.id ? '#f1f5f9' : '#fff1f2', color: deleting === u.id ? '#94a3b8' : '#e11d48', fontSize: 11, cursor: deleting === u.id ? 'wait' : 'pointer', fontFamily: 'Cairo,sans-serif', fontWeight: 600 }}
+                        onMouseEnter={e => { if (deleting !== u.id) e.currentTarget.style.background = '#ffe4e6' }}
+                        onMouseLeave={e => { if (deleting !== u.id) e.currentTarget.style.background = '#fff1f2' }}>
+                        {deleting === u.id
+                          ? <RefreshCw size={11} style={{ animation: 'spin 0.7s linear infinite' }} />
+                          : <Trash2 size={11} />}
+                        {deleting === u.id ? 'جارٍ الحذف...' : 'حذف'}
                       </button>
                     </td>
                   </tr>
@@ -398,72 +397,6 @@ export default function UserManager() {
         )}
       </div>
 
-      {/* ── Table 2: Admins & Super Admins ───────────────────────── */}
-      <div style={card}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #f0f4fa', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Shield size={15} color="#7c3aed" />
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>حسابات الإدارة</h3>
-          {!canEditMgmt && (
-            <span style={{ fontSize: 11, color: '#94a3b8', marginRight: 4 }}>— صلاحيات العرض والتعديل للمدير العام فقط</span>
-          )}
-          {canEditMgmt && (
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', fontWeight: 700, marginRight: 4 }}>قابلة للتعديل</span>
-          )}
-        </div>
-        {mgmtUsers.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>لا توجد حسابات إدارة</div>
-        ) : (
-          <div className="m-table-scroll">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  {['المستخدم', 'اسم الدخول', 'الصلاحية'].map((h, i) => (
-                    <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: i === 0 ? 'right' : 'center', borderBottom: '1px solid #f0f4fa' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {mgmtUsers.map(u => {
-                  const isSelf = u.id === currentUser?.id
-                  return (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #f8fafc' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700 }}>
-                            {u.name?.[0]}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{u.name}</div>
-                            {isSelf && (
-                              <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>(حسابك الحالي)</span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <span style={{ fontSize: 12, fontFamily: 'monospace', padding: '2px 8px', borderRadius: 6, background: '#f0f4fa', color: '#475569', border: '1px solid #e4eaf3' }} dir="ltr">{u.username || '—'}</span>
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <RoleSelector key={`${u.id}-${roleKey}`} targetUser={u} currentUser={currentUser} onSaved={() => setRoleKey(k => k + 1)} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Last-super-admin warning */}
-        {canEditMgmt && mgmtUsers.filter(u => u.role === 'super_admin').length <= 1 && (
-          <div style={{ padding: '10px 16px', borderTop: '1px solid #f0f4fa', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#92400e', background: '#fffbeb' }}>
-            <AlertTriangle size={12} />
-            يوجد مدير عام واحد فقط — لا يمكن تخفيض صلاحيته حتى يتم إضافة مدير عام آخر.
-          </div>
-        )}
-      </div>
     </div>
   )
 }

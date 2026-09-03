@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
   }
 
   const fetchUsers = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at')
+    const { data } = await supabase.from('profiles').select('*').eq('active', true).order('created_at')
     if (data) setUsers(data.map(mapProfile))
   }, [])
 
@@ -123,7 +123,8 @@ export function AuthProvider({ children }) {
   }
 
   const deleteUser = async (userId) => {
-    await supabase.from('profiles').update({ active: false }).eq('id', userId)
+    const { error } = await supabase.from('profiles').update({ active: false }).eq('id', userId)
+    if (error) throw new Error(error.message)
     await fetchUsers()
   }
 

@@ -127,6 +127,19 @@ export function AuthProvider({ children }) {
     await fetchUsers()
   }
 
+  // ── Role management ───────────────────────────────────────────────────────
+  // Calls the SECURITY DEFINER RPC `change_user_role` which enforces all
+  // permission rules server-side and writes an audit log entry.
+  const changeUserRole = async (targetUserId, newRole) => {
+    const { data, error } = await supabase.rpc('change_user_role', {
+      target_user_id: targetUserId,
+      new_role:       newRole,
+    })
+    if (error) throw new Error(error.message)
+    await fetchUsers()
+    return data   // { ok, previous_role, new_role, target_name }
+  }
+
   const defaultRoute = user ? (ROLE_ROUTES[user.role]?.[0] ?? '/login') : '/login'
 
   if (loading || seeding) {
@@ -143,7 +156,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, users, salesReps,
       login, logout,
-      addUser, deleteUser,
+      addUser, deleteUser, changeUserRole,
       isAuthenticated: !!user, canAccess, defaultRoute,
     }}>
       {children}

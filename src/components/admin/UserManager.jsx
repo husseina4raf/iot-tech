@@ -194,21 +194,30 @@ export default function UserManager() {
     return Object.keys(e).length === 0
   }
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
     if (!validate()) return
-    addUser({
-      name:     form.name.trim(),
-      nameEn:   form.nameEn.trim() || form.name.trim(),
-      repName:  form.repName.trim(),
-      username: form.username.trim().toLowerCase(),
-      password: form.password,
-      role:     form.role || 'sales',
-    })
-    const label = ROLE_BADGE[form.role]?.label || form.role
-    toast(`تم إضافة ${label} بنجاح ✓`, 'success')
-    setShowForm(false)
-    setForm(emptyForm())
-    setErrors({})
+    setSaving(true)
+    try {
+      await addUser({
+        name:     form.name.trim(),
+        nameEn:   form.nameEn.trim() || form.name.trim(),
+        repName:  form.repName.trim(),
+        username: form.username.trim().toLowerCase(),
+        password: form.password,
+        role:     form.role || 'sales',
+      })
+      const label = ROLE_BADGE[form.role]?.label || form.role
+      toast(`تم إضافة ${label} بنجاح ✓`, 'success')
+      setShowForm(false)
+      setForm(emptyForm())
+      setErrors({})
+    } catch (err) {
+      toast(err.message || 'فشل إضافة المستخدم — حاول مرة أخرى', 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDelete = (u) => {
@@ -313,9 +322,10 @@ export default function UserManager() {
               style={{ padding: '8px 16px', borderRadius: 8, border: '1.5px solid #e4eaf3', background: '#fff', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
               إلغاء
             </button>
-            <button onClick={handleSave}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#1d4ed8,#2563eb)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}>
-              <Check size={14} />إضافة المستخدم
+            <button onClick={handleSave} disabled={saving}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 8, border: 'none', background: saving ? '#94a3b8' : 'linear-gradient(135deg,#1d4ed8,#2563eb)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: saving ? 'wait' : 'pointer', fontFamily: 'Cairo,sans-serif' }}>
+              {saving ? <RefreshCw size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> : <Check size={14} />}
+              {saving ? 'جارٍ الإضافة...' : 'إضافة المستخدم'}
             </button>
           </div>
         </div>

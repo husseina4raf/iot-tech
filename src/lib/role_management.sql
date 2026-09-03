@@ -142,20 +142,26 @@ BEGIN
    WHERE id = target_user_id;
 
   -- ── Write audit entry ────────────────────────────────────────
+  -- order_id is FK-constrained to orders.id in the live DB.
+  -- Role changes are not linked to any order, so order_id must be NULL.
+  -- PostgreSQL FK constraints do not apply to NULL values — this is safe.
+  -- The target user's UUID is stored in the `note` column (plain TEXT,
+  -- no constraints) so it is still traceable in the audit log.
   INSERT INTO audit_log (
     id, type, order_id, order_ref,
     field, old_value, new_value,
-    changed_by, changed_at
+    changed_by, note, changed_at
   ) VALUES (
     'al-rc-' || EXTRACT(EPOCH FROM NOW())::BIGINT || '-'
               || SUBSTR(MD5(RANDOM()::TEXT), 1, 6),
     'role_change',
-    target_user_id::TEXT,   -- stored in order_id (TEXT) for traceability
-    target_name,
+    NULL,                    -- FK-safe: no order is associated with a role change
+    target_name,             -- order_ref = target user's display name
     'الصلاحية',
     target_role,
     new_role,
     caller_name,
+    target_user_id::TEXT,    -- note = target user UUID for traceability
     NOW()
   );
 

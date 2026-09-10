@@ -85,7 +85,12 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const salesReps = users.filter(u => u.role === 'sales' && u.active).map(u => u.repName)
+  // Eligible salesperson = Sales OR Team Leader (Team Leaders sell too and must
+  // be attributed profit/commission for orders they create). Admin/Super Admin
+  // are intentionally excluded — they are not salespeople.
+  const salesReps = users
+    .filter(u => (u.role === 'sales' || u.role === 'team_leader') && u.active)
+    .map(u => u.repName)
 
   const login = async (username, password) => {
     const email = `${username.toLowerCase().trim()}@iottech.app`

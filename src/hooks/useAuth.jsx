@@ -88,8 +88,14 @@ export function AuthProvider({ children }) {
   // Eligible salesperson = Sales OR Team Leader (Team Leaders sell too and must
   // be attributed profit/commission for orders they create). Admin/Super Admin
   // are intentionally excluded — they are not salespeople.
+  // `&& u.repName` guards against a user (e.g. a seeded Team Leader) whose
+  // repName is null/empty: such a user cannot be attributed to any order
+  // (orders are matched by repName) and must be excluded from this derived
+  // list rather than crashing every consumer that does `rep[0]` etc. This
+  // does NOT remove them from the system or fabricate a name — it only
+  // excludes an unusable value from a display/aggregation list.
   const salesReps = users
-    .filter(u => (u.role === 'sales' || u.role === 'team_leader') && u.active)
+    .filter(u => (u.role === 'sales' || u.role === 'team_leader') && u.active && u.repName)
     .map(u => u.repName)
 
   const login = async (username, password) => {

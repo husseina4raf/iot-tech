@@ -161,46 +161,56 @@ export function OrdersProvider({ children }) {
   }, [])
 
   // ── Orders ────────────────────────────────────────────────────────────────────
-  const getNextSerial = () => {
-    const nums = orders.map(o => parseInt(o.serialNumber, 10)).filter(Boolean)
-    return String(Math.max(nums.length ? Math.max(...nums) + 1 : 2766, 2766))
-  }
+  // A raw Arabic-lettered message is one of create_order()'s own RAISE
+  // EXCEPTION messages (see order_creation.sql) — those are already
+  // written to be shown to the user as-is. Anything else (a raw
+  // Postgres/network error, e.g. a driver-level duplicate-key message)
+  // gets replaced with a generic, friendly message rather than exposed.
+  const isUserFacingMessage = (msg) => /[؀-ۿ]/.test(msg || '')
+  const friendlyOrderError = (err) => isUserFacingMessage(err?.message)
+    ? err.message
+    : 'تعذر حفظ الطلب — يرجى المحاولة مرة أخرى.'
 
+  // Serial generation is no longer computed here (it previously read
+  // Math.max(...) over this component's local, paginated `orders` array —
+  // exactly the race that let two browsers compute the same serial before
+  // realtime caught up). The complete `orders` table, the sequence, and
+  // the atomic reservation all now live in create_order() — see
+  // src/lib/order_creation.sql.
   const addOrder = async (orderData, user) => {
-    const serial = getNextSerial()
-    const row = {
-      id: `ORD-${serial}`, serial_number: serial,
-      client_name: orderData.clientName, company: orderData.company,
-      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
-      address: orderData.address, location_link: orderData.locationLink,
-      sales_rep: orderData.salesRep, items: orderData.items,
-      subtotal: orderData.subtotal, vat_percent: orderData.vatPercent,
-      vat_amount: orderData.vatAmount, total: orderData.total,
-      invoice_type: orderData.invoiceType, invoice_name: orderData.invoiceName,
-      tax_number: orderData.taxNumber, notes: orderData.notes,
-      payment_method: orderData.paymentMethod,
-      date: orderData.date, time: orderData.time,
-      status: 'بانتظار الموافقة',
-      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      edit_history: [],
+    const { data, error: rpcError } = await supabase.rpc('create_order', {
+      p_order: {
+        clientName:   orderData.clientName,   company:      orderData.company,
+        mobile:       orderData.mobile,       whatsapp:     orderData.whatsapp,
+        address:      orderData.address,      locationLink: orderData.locationLink,
+        salesRep:     orderData.salesRep,     items:        orderData.items,
+        subtotal:     orderData.subtotal,     vatPercent:   orderData.vatPercent,
+        vatAmount:    orderData.vatAmount,    total:        orderData.total,
+        invoiceType:  orderData.invoiceType,  invoiceName:  orderData.invoiceName,
+        taxNumber:    orderData.taxNumber,    notes:        orderData.notes,
+        paymentMethod: orderData.paymentMethod,
+        date: orderData.date, time: orderData.time,
+      },
+    })
+    if (rpcError) {
+      console.error('addOrder (create_order RPC):', rpcError)
+      throw new Error(friendlyOrderError(rpcError))
     }
-    // Optimistic update — add to local state immediately
-    setOrders(prev => [mapOrder(row), ...prev])
-    const { error: insertErr } = await supabase.from('orders').insert(row)
-    if (insertErr) {
-      console.error('addOrder:', insertErr)
-      toast('فشل حفظ الطلب — ' + insertErr.message, 'error')
-      setOrders(prev => prev.filter(o => o.id !== row.id))
-      return
-    }
+    const newOrder = mapOrder(data)
+    // Add to local state only now that the database has confirmed the
+    // insert — the real, server-generated id/serial is used directly, so
+    // there is nothing to roll back and nothing that could ever mismatch
+    // what was actually written. The realtime INSERT handler below already
+    // dedupes by id, so a subsequent echo of this same row is a no-op.
+    setOrders(prev => prev.some(o => o.id === newOrder.id) ? prev : [newOrder, ...prev])
     await pushAudit({
-      type: 'order_create', orderId: row.id,
+      type: 'order_create', orderId: newOrder.id,
       orderRef: `${orderData.clientName} — ${orderData.company}`,
       field: 'إنشاء طلب', oldValue: '—',
       newValue: `${orderData.total?.toLocaleString()} LE`,
-      changedBy: user?.name || orderData.salesRep || 'مجهول',
+      changedBy: user?.name || newOrder.salesRep || 'مجهول',
     })
-    return mapOrder(row)
+    return newOrder
   }
 
   const updateOrder = async (id, orderData, user) => {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Send, RotateCcw } from 'lucide-react'
+import { Send, RotateCcw, RefreshCw } from 'lucide-react'
 import OrderFormFields from './OrderFormFields'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
@@ -10,6 +10,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
   const { user } = useAuth()
   const toast = useToast()
   const isEdit = !!editOrder
+  const [submitting, setSubmitting] = useState(false)
 
   const emptyForm = () => ({
     company: '', clientName: '', mobile: '', whatsapp: '',
@@ -58,7 +59,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     return /^01[0-9]{9}$/.test(s) ? null : 'رقم غير صحيح — يجب أن يبدأ بـ 01 ويتكون من 11 رقم'
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = {}
 
@@ -115,13 +116,25 @@ export default function OrderForm({ editOrder = null, onSaved }) {
       const finalData = wasRejected ? { ...orderData, status: 'بانتظار الموافقة' } : orderData
       updateOrder(editOrder.id, finalData, user)
       toast(wasRejected ? 'تم إرسال الطلب للمراجعة مجدداً ✓' : 'تم تحديث الطلب بنجاح ✓', 'success')
-    } else {
-      addOrder(orderData, user)
-      toast('تم إرسال الطلب بنجاح ✓', 'success')
-      setForm(emptyForm())
+      onSaved?.()
+      return
     }
 
-    onSaved?.()
+    // New order: wait for confirmed database success before showing success
+    // or clearing the form. Success is only ever reported once addOrder()
+    // has actually resolved; on failure the form keeps everything the user
+    // typed, so they can just retry instead of re-entering the whole order.
+    setSubmitting(true)
+    try {
+      await addOrder(orderData, user)
+      toast('تم إرسال الطلب بنجاح ✓', 'success')
+      setForm(emptyForm())
+      onSaved?.()
+    } catch (err) {
+      toast(err.message || 'تعذر حفظ الطلب — يرجى المحاولة مرة أخرى.', 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -136,12 +149,13 @@ export default function OrderForm({ editOrder = null, onSaved }) {
             مسح النموذج
           </button>
         )}
-        <button type="submit"
-          style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 24px', background:'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, borderRadius:10, border:'none', cursor:'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 4px 12px rgba(37,99,235,0.35)' }}>
-          <Send size={14} />
-          {isEdit ? 'حفظ التعديلات' : 'إرسال الطلب'}
+        <button type="submit" disabled={submitting}
+          style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 24px', background: submitting ? '#94a3b8' : 'linear-gradient(135deg,#1d4ed8,#2563eb)', color:'#fff', fontSize:13, fontWeight:700, borderRadius:10, border:'none', cursor: submitting ? 'wait' : 'pointer', fontFamily:'Cairo,sans-serif', boxShadow:'0 4px 12px rgba(37,99,235,0.35)' }}>
+          {submitting ? <RefreshCw size={14} style={{ animation:'spin 0.7s linear infinite' }} /> : <Send size={14} />}
+          {submitting ? 'جارٍ الإرسال...' : (isEdit ? 'حفظ التعديلات' : 'إرسال الطلب')}
         </button>
       </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </form>
   )
 }

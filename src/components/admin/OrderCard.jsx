@@ -23,7 +23,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sl-spin')) {
 }
 
 export default function OrderCard({ order }) {
-  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, revertLastStatus, returnToSales, deleteOrder, inventory } = useOrders()
+  const { approveOrder, rejectOrder, updateOrderStatus, cancelOrder, revertLastStatus, returnToSales, deleteOrder } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
@@ -119,10 +119,16 @@ export default function OrderCard({ order }) {
 
   const col = accent[order.status] || '#475569'
 
+  // Historical cost — the snapshot stored on this order's own item at the
+  // time it was added (item.costPrice), never the current live inventory
+  // cost. Missing/undefined/null/zero is explicitly treated as 0.
   const orderProfit = order.items?.reduce((s, i) => {
-    const cost = inventory.find(inv => inv.name.toLowerCase() === i.name?.toLowerCase() || inv.nameAr === i.name)?.costPrice || 0
-    return s + (i.price - cost) * i.quantity
+    const cost = Number(i.costPrice) || 0
+    return s + (Number(i.price) - cost) * Number(i.quantity)
   }, 0) || 0
+  // Margin's denominator (order.total) is left unchanged deliberately — see
+  // the Profit fix report: this pre-existing VAT-basis nuance in the margin
+  // percentage (not the profit amount) was out of scope for this fix.
   const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
 
   return (

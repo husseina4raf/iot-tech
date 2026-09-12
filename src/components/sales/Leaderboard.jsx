@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Trophy, TrendingUp, FileText, Medal } from 'lucide-react'
-import { useOrders } from '../../hooks/useOrders'
+import { Trophy, TrendingUp, FileText, Medal, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { useProfitSummary } from '../../hooks/useProfitSummary'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -16,15 +16,7 @@ const medalColors = [
   { bg:'#fff7ed', border:'#fed7aa', color:'#9a3412', shadow:'rgba(234,88,12,0.2)',    icon:'🥉' },
 ]
 
-const getCostPrice = (itemName, inventory) => {
-  const inv = inventory.find(i =>
-    i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName
-  )
-  return inv?.costPrice || 0
-}
-
 export default function Leaderboard() {
-  const { orders, inventory } = useOrders()
   const { salesReps, users, user: currentUser } = useAuth()
 
   const now = new Date()
@@ -32,32 +24,27 @@ export default function Leaderboard() {
   const [month, setMonth] = useState(now.getMonth())  // 0-based
   const [period, setPeriod] = useState('month') // 'month' | 'all'
 
-  // Build stats per rep
+  // Ranking is Profit-based (status = تم التحصيل, subtotal − stored item
+  // cost) — this file never had a separate "revenue" ranking to preserve.
+  // Sourced from get_profit_summary (complete `orders` table, independent
+  // of OrdersList pagination), requesting all reps (repName omitted).
+  const { rows: profitRows, loading: profitLoading, error: profitError } = useProfitSummary({
+    year:  period === 'month' ? String(year) : null,
+    month: period === 'month' ? String(month + 1).padStart(2, '0') : null,
+  })
+
+  // Build stats per rep — Sales and Team Leaders alike (salesReps already
+  // includes both; see useAuth.jsx). A rep with no qualifying rows this
+  // period simply defaults to zero, same as before.
   const stats = salesReps.map(rep => {
     const repUser = users.find(u => u.repName === rep)
-    const repOrders = orders.filter(o => {
-      if (o.salesRep !== rep) return false
-      if (o.status !== 'تم التحصيل') return false
-      if (period === 'month') {
-        // Order date format: DD-MM-YYYY
-        const parts = o.date?.split('-')
-        if (!parts || parts.length < 3) return false
-        const oYear  = parseInt(parts[2], 10)
-        const oMonth = parseInt(parts[1], 10) - 1  // 0-based
-        return oYear === year && oMonth === month
-      }
-      return true
-    })
-    const profit = repOrders.reduce((s, o) =>
-      s + (o.subtotal || o.total) - o.items.reduce((ss, item) =>
-        ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
-    , 0)
+    const row = profitRows.find(r => r.rep_name === rep)
     return {
       rep,
       name: repUser?.name || rep,
       avatar: repUser?.avatar || rep[0],
-      total:  profit,
-      count:  repOrders.length,
+      total:  Number(row?.total_profit) || 0,
+      count:  Number(row?.order_count) || 0,
       isMe:   rep === currentUser?.repName,
     }
   }).sort((a, b) => b.total - a.total)
@@ -102,6 +89,19 @@ export default function Leaderboard() {
         </span>
       </div>
 
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
+      {profitError ? (
+        <div style={{ ...card, padding:'16px 20px', display:'flex', alignItems:'center', gap:10, color:'#e11d48', border:'1px solid #fecdd3', background:'#fff1f2' }}>
+          <AlertTriangle size={16} />
+          <span style={{ fontSize:13, fontWeight:600 }}>تعذّر حساب الأرباح — {profitError}</span>
+        </div>
+      ) : profitLoading ? (
+        <div style={{ ...card, padding:40, display:'flex', alignItems:'center', justifyContent:'center', gap:10, color:'#94a3b8' }}>
+          <RefreshCw size={18} style={{ animation:'spin 0.7s linear infinite' }} />
+          <span style={{ fontSize:13 }}>جارٍ حساب الأرباح...</span>
+        </div>
+      ) : (<>
       {/* Top 3 podium */}
       {stats.length > 0 && stats[0].total > 0 && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
@@ -185,6 +185,7 @@ export default function Leaderboard() {
           </div>
         )}
       </div>
+      </>)}
     </div>
   )
 }

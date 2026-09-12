@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Users, Package, BarChart2, Target, Edit3, Check, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, Package, BarChart2, Target, Edit3, Check, X, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
+import { useProfitSummary } from '../../hooks/useProfitSummary'
 
 const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 const GRADIENTS = [
@@ -14,17 +15,19 @@ const GRADIENTS = [
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
-const getCostPrice = (itemName, inventory) => {
-  const inv = inventory.find(i => i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName)
-  return inv?.costPrice || 0
-}
+// Historical, per-order-item cost snapshot — never the live inventory cost.
+// Used only for the Products tab's per-product cost breakdown, which
+// (unlike the rep-based Profit figures below) is not covered by the
+// get_profit_summary RPC and still reads from the paginated `orders` list.
+// Missing/undefined/null/zero is explicitly treated as 0.
+const getItemCost = (item) => Number(item.costPrice) || 0
 
 const today     = new Date()
 const thisYear  = String(today.getFullYear())
 const thisMonth = String(today.getMonth() + 1).padStart(2, '0')
 
 export default function SalesReports() {
-  const { orders, inventory, salesTargets, upsertTarget } = useOrders()
+  const { orders, salesTargets, upsertTarget } = useOrders()
   const { salesReps: SALES_REPS, user } = useAuth()
   const canEdit = ['admin', 'super_admin'].includes(user?.role)
 
@@ -61,23 +64,39 @@ export default function SalesReports() {
     orders.filter(o => { const p = o.date?.split('-'); return p?.length >= 3 && `${p[2]}-${p[1].padStart(2,'0')}` === prevMonthKey })
   , [orders, prevMonthKey])
 
+  // ── Canonical Profit — complete-dataset, server-side aggregation ───────────
+  // get_profit_summary (src/lib/profit_aggregation.sql): status = تم التحصيل
+  // only, revenue basis = order.subtotal (VAT-exclusive), cost = stored
+  // item.costPrice. Independent of OrdersList pagination and of the current
+  // live inventory cost. "Revenue" (o.total, all statuses) below is a
+  // deliberately separate, unchanged concept — see the audit.
+  const { rows: monthProfitRows, loading: monthProfitLoading, error: monthProfitError } = useProfitSummary({
+    year: selYear, month: selMonth,
+  })
+
   const monthStats = useMemo(() =>
     SALES_REPS.map(rep => {
       const mo = monthOrders.filter(o => o.salesRep === rep)
       const po = prevOrders.filter(o => o.salesRep === rep)
       const revenue     = mo.reduce((s, o) => s + o.total, 0)
       const prevRevenue = po.reduce((s, o) => s + o.total, 0)
-      const profit      = mo.filter(o => o.status === 'تم التحصيل').reduce((s, o) =>
-        s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+      const profitRow   = monthProfitRows.find(r => r.rep_name === rep)
+      const profit      = Number(profitRow?.total_profit) || 0
       const target      = salesTargets?.find(t => t.repName === rep && t.month === monthKey)?.target || 0
       const trend       = prevRevenue > 0 ? Math.round(((revenue - prevRevenue) / prevRevenue) * 100) : null
       const achievement = target > 0 ? Math.round((profit / target) * 100) : null
       return { rep, revenue, prevRevenue, profit, count: mo.length, target, trend, achievement }
     })
-  , [SALES_REPS, monthOrders, prevOrders, salesTargets, monthKey, inventory])
+  , [SALES_REPS, monthOrders, prevOrders, salesTargets, monthKey, monthProfitRows])
 
   const monthTotal  = monthStats.reduce((s, r) => s + r.revenue, 0)
   const maxMonthRev = Math.max(...monthStats.map(r => r.revenue), 1)
+  // Sums re-derive from monthStats (already correctly rep-scoped and RPC-
+  // sourced) rather than re-aggregating monthProfitRows directly, so the
+  // Global KPIs total can never drift from what the per-rep cards show.
+  const totalProfitFromStats = monthStats.reduce((s, r) => s + r.profit, 0)
+  const totalSubtotalFromRows = SALES_REPS.reduce((s, rep) =>
+    s + (Number(monthProfitRows.find(r => r.rep_name === rep)?.total_subtotal) || 0), 0)
 
   const startEdit = () => {
     const d = {}
@@ -100,24 +119,34 @@ export default function SalesReports() {
   }
 
   // ── Rep performance tab data ──────────────────────────────────────────────────
+  // Own RPC call — this tab has independent year/month filters from the
+  // Monthly Summary tab above.
+  const { rows: perfProfitRows, loading: perfProfitLoading, error: perfProfitError } = useProfitSummary({
+    year: perfYear || null, month: perfMonth || null,
+  })
+
   const perfStats = useMemo(() => {
     let src = orders
     if (perfYear)  src = src.filter(o => o.date?.split('-')[2] === perfYear)
     if (perfMonth) src = src.filter(o => o.date?.split('-')[1]?.padStart(2,'0') === perfMonth)
     return SALES_REPS.map(rep => {
       const ro = src.filter(o => o.salesRep === rep)
-      const revenue   = ro.reduce((s, o) => s + o.total, 0)
-      const collected = ro.filter(o => o.status === 'تم التحصيل')
-      const collRev   = collected.reduce((s, o) => s + o.total, 0)
-      const profit    = collected.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+      const revenue      = ro.reduce((s, o) => s + o.total, 0)
+      const profitRow     = perfProfitRows.find(r => r.rep_name === rep)
+      const profit        = Number(profitRow?.total_profit) || 0
+      // VAT-exclusive collected subtotal — the margin's denominator must be
+      // on the same basis as `profit` (also subtotal-based); using the
+      // all-status, VAT-inclusive `revenue` here would understate margin%
+      // for VAT-invoice orders (see the VAT / Profit audit).
+      const collSubtotal  = Number(profitRow?.total_subtotal) || 0
       const completed = ro.filter(o => ['تم الصرف', 'مكتمل', 'تم التحصيل'].includes(o.status)).length
       // count distinct active months for this rep
       const activeMonths = new Set(ro.map(o => { const p = o.date?.split('-'); return p?.length >= 3 ? `${p[2]}-${p[1]?.padStart(2,'0')}` : null }).filter(Boolean)).size
       const perMonth = activeMonths > 0 ? Math.round(ro.length / activeMonths) : 0
-      return { rep, count: ro.length, revenue, collRev, profit, completed, activeMonths, perMonth,
+      return { rep, count: ro.length, revenue, collSubtotal, profit, completed, activeMonths, perMonth,
         rate: ro.length > 0 ? Math.round((completed / ro.length) * 100) : 0 }
     }).sort((a, b) => b.revenue - a.revenue)
-  }, [SALES_REPS, orders, inventory, perfYear, perfMonth])
+  }, [SALES_REPS, orders, perfYear, perfMonth, perfProfitRows])
 
   // ── Monthly trend tab data ────────────────────────────────────────────────────
   const trendData = useMemo(() => {
@@ -137,29 +166,33 @@ export default function SalesReports() {
   const maxTrendRev = Math.max(...trendData.map(m => m.revenue), 1)
 
   // ── Products tab data ─────────────────────────────────────────────────────────
+  // NOTE: this breakdown is grouped by product, not by rep — a dimension the
+  // canonical get_profit_summary RPC does not aggregate (it groups by rep
+  // only, per the reports that actually needed a rep parameter). It still
+  // reads from the paginated `orders` state and is therefore not guaranteed
+  // complete for very large histories; only its cost basis was fixed here
+  // (stored item.costPrice, never live inventory), per the blanket rule
+  // that historical Profit must never use current inventory cost.
   const productData = useMemo(() => {
     const src = (prodRep ? orders.filter(o => o.salesRep === prodRep) : orders).filter(o => o.status === 'تم التحصيل')
     const map = {}
     src.forEach(o => o.items.forEach(item => {
+      const cp = getItemCost(item)
       if (!map[item.name]) {
-        const cp = getCostPrice(item.name, inventory)
         map[item.name] = { name: item.name, units: 0, revenue: 0, totalCost: 0, orders: 0, hasCost: cp > 0 }
       }
-      const cp = getCostPrice(item.name, inventory)
       map[item.name].units     += Number(item.quantity) || 0
       map[item.name].revenue   += item.total
       map[item.name].totalCost += cp * item.quantity
       map[item.name].orders    += 1
     }))
     return Object.values(map).sort((a, b) => b.revenue - a.revenue)
-  }, [orders, inventory, prodRep])
+  }, [orders, prodRep])
 
   // ── Global KPIs — only orders from known sales reps ──────────────────────────
   const repMonthOrders    = monthOrders.filter(o => SALES_REPS.includes(o.salesRep))
-  const collectedMonthOrders = repMonthOrders.filter(o => o.status === 'تم التحصيل')
-  const totalRevenue      = repMonthOrders.reduce((s, o) => s + o.total, 0)
-  const collectedRevenue  = collectedMonthOrders.reduce((s, o) => s + o.total, 0)
-  const totalProfit       = collectedMonthOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0), 0)
+  const totalRevenue      = repMonthOrders.reduce((s, o) => s + o.total, 0)   // unchanged — all-status, o.total
+  const totalProfit       = totalProfitFromStats                              // canonical, RPC-sourced (see monthStats above)
 
   const TABS = [
     { id: 'monthly',  label: 'الملخص الشهري',  icon: Target },
@@ -188,16 +221,29 @@ export default function SalesReports() {
         </span>
       </div>
 
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
+      {monthProfitError && (
+        <div style={{ ...card, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#e11d48', border: '1px solid #fecdd3', background: '#fff1f2' }}>
+          <AlertTriangle size={15} />
+          <span style={{ fontSize: 12, fontWeight: 600 }}>تعذّر حساب الأرباح — {monthProfitError}</span>
+        </div>
+      )}
+
       {/* Global KPIs */}
       <div className="m-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'إجمالي الإيرادات', value: `${(totalRevenue / 1000).toFixed(1)}K LE`, color: '#1d4ed8' },
-          { label: 'صافي الربح',       value: `${(totalProfit  / 1000).toFixed(1)}K LE`,  color: '#059669' },
-          { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(collectedRevenue, 1)) * 100)}%`, color: '#7c3aed' },
-          { label: 'إجمالي الطلبات',   value: repMonthOrders.length, color: '#0891b2' },
+          { label: 'إجمالي الإيرادات', value: `${(totalRevenue / 1000).toFixed(1)}K LE`, color: '#1d4ed8', isProfit: false },
+          { label: 'صافي الربح',       value: `${(totalProfit  / 1000).toFixed(1)}K LE`,  color: '#059669', isProfit: true },
+          { label: 'هامش الربح',       value: `${Math.round((totalProfit / Math.max(totalSubtotalFromRows, 1)) * 100)}%`, color: '#7c3aed', isProfit: true },
+          { label: 'إجمالي الطلبات',   value: repMonthOrders.length, color: '#0891b2', isProfit: false },
         ].map(k => (
           <div key={k.label} style={{ ...card, padding: '16px 18px' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, marginBottom: 3 }} dir="ltr">{k.value}</div>
+            {k.isProfit && monthProfitLoading ? (
+              <RefreshCw size={18} color="#94a3b8" style={{ animation: 'spin 0.7s linear infinite', marginBottom: 6 }} />
+            ) : (
+              <div style={{ fontSize: 22, fontWeight: 800, color: k.color, marginBottom: 3 }} dir="ltr">{k.value}</div>
+            )}
             <div style={{ fontSize: 12, color: '#64748b' }}>{k.label}</div>
           </div>
         ))}
@@ -286,9 +332,13 @@ export default function SalesReports() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <span style={{ fontSize: 11, color: '#64748b' }}>صافي الربح:</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: r.profit >= 0 ? '#059669' : '#e11d48' }} dir="ltr">
-                      {r.profit >= 0 ? '+' : ''}{Math.round(r.profit).toLocaleString()} LE
-                    </span>
+                    {monthProfitLoading ? (
+                      <RefreshCw size={12} color="#94a3b8" style={{ animation: 'spin 0.7s linear infinite' }} />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 800, color: r.profit >= 0 ? '#059669' : '#e11d48' }} dir="ltr">
+                        {r.profit >= 0 ? '+' : ''}{Math.round(r.profit).toLocaleString()} LE
+                      </span>
+                    )}
                   </div>
 
                   {editing ? (
@@ -359,6 +409,12 @@ export default function SalesReports() {
                 {perfYear  ? ` ${perfYear}` : !perfMonth ? ' (كل الوقت)' : ''}
               </h3>
             </div>
+            {perfProfitError && (
+              <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8, color: '#e11d48', borderBottom: '1px solid #fecdd3', background: '#fff1f2' }}>
+                <AlertTriangle size={14} />
+                <span style={{ fontSize: 12, fontWeight: 600 }}>تعذّر حساب الأرباح — {perfProfitError}</span>
+              </div>
+            )}
             <div className="m-table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 560 }}>
                 <thead>
@@ -391,10 +447,14 @@ export default function SalesReports() {
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }} dir="ltr">{r.revenue.toLocaleString()} LE</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#059669' }} dir="ltr">{Math.round(r.profit).toLocaleString()} LE</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#059669' }} dir="ltr">
+                        {perfProfitLoading
+                          ? <RefreshCw size={12} color="#94a3b8" style={{ animation: 'spin 0.7s linear infinite' }} />
+                          : `${Math.round(r.profit).toLocaleString()} LE`}
+                      </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', fontWeight: 700 }}>
-                          {r.collRev > 0 ? `${Math.round((r.profit / r.collRev) * 100)}%` : '—'}
+                          {perfProfitLoading ? '…' : r.collSubtotal > 0 ? `${Math.round((r.profit / r.collSubtotal) * 100)}%` : '—'}
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Calendar, FileText, Phone, MapPin, CreditCard, User, Search, X, ClipboardX, TrendingUp, Link } from 'lucide-react'
+import { ChevronDown, ChevronRight, Calendar, FileText, Phone, MapPin, CreditCard, User, Search, X, ClipboardX, TrendingUp, Link, RefreshCw, AlertTriangle } from 'lucide-react'
 import Badge from '../ui/Badge'
 import Pagination from '../ui/Pagination'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
+import { useProfitSummary } from '../../hooks/useProfitSummary'
 
 const MONTHS_AR = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -14,11 +15,22 @@ const PAGE_SIZE = 6
 
 const card = { background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }
 
-const getCostPrice = (name, inventory) =>
-  inventory.find(i => i.name?.toLowerCase() === name?.toLowerCase() || i.nameAr === name)?.costPrice || 0
+// Historical, per-order-item cost snapshot — never the live inventory cost.
+// Missing/undefined/null/zero is explicitly treated as 0.
+const getItemCost = (item) => Number(item.costPrice) || 0
+
+// Client-side fallback formula for "Profit" — used only where the canonical
+// RPC total can't apply (see below): free-text search has no server-side
+// equivalent in get_profit_summary, so a searched view falls back to this,
+// computed over whatever is currently loaded/paginated. It is still fixed
+// to the same canonical rule (تم التحصيل only, stored item.costPrice) —
+// only its completeness-over-full-history guarantee is what's lost here.
+const clientProfit = (ordersList) => ordersList
+  .filter(o => o.status === 'تم التحصيل')
+  .reduce((s, o) => s + (o.items?.reduce((ss, i) => ss + (Number(i.price) - getItemCost(i)) * Number(i.quantity), 0) || 0), 0)
 
 export default function TeamInvoices() {
-  const { orders, inventory } = useOrders()
+  const { orders } = useOrders()
   const { salesReps } = useAuth()
 
   const [selectedRep, setSelectedRep] = useState('')
@@ -72,10 +84,32 @@ export default function TeamInvoices() {
 
   useEffect(() => setPage(1), [selectedRep, search, filterDay, filterMonth, filterYear])
 
+  // "إجمالي الفواتير" / "إجمالي المبيعات" are a separate, pre-existing
+  // concept from Profit — count/revenue of all matching (non-cancelled)
+  // invoices regardless of status. Left exactly as before; only "الأرباح"
+  // below is the canonical Profit figure this fix applies to.
   const totalOrders = filtered.length
   const totalRevenue = filtered.reduce((s, o) => s + o.total, 0)
-  const totalProfit  = filtered.reduce((s, o) =>
-    s + (o.items?.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0), 0)
+
+  // ── Canonical Profit ("إجمالي الأرباح") ─────────────────────────────────
+  // status = تم التحصيل only (previously this counted EVERY status —
+  // pending, rejected, in-progress — which was the serious issue the audit
+  // flagged), revenue basis = order.subtotal, cost = stored item.costPrice.
+  // Sourced from the complete-dataset RPC whenever possible; `search` has
+  // no server-side equivalent here, so a search-narrowed view falls back
+  // to the same formula computed over the currently loaded/paginated list
+  // (see clientProfit above) — a disclosed, narrower-scope exception, not
+  // a different business rule.
+  const { rows: profitRows, loading: profitLoading, error: profitError } = useProfitSummary({
+    repName: selectedRep || null,
+    year:    filterYear  || null,
+    month:   filterMonth || null,
+    day:     filterDay   || null,
+  })
+  const totalProfit = search
+    ? clientProfit(filtered)
+    : profitRows.reduce((s, r) => s + (Number(r.total_profit) || 0), 0)
+
   const hasFilter = search || filterDay || filterMonth || filterYear || selectedRep
   const pagedGroups = groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -145,19 +179,31 @@ export default function TeamInvoices() {
         </div>
       </div>
 
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      {profitError && !search && (
+        <div style={{ ...card, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#e11d48', border: '1px solid #fecdd3', background: '#fff1f2' }}>
+          <AlertTriangle size={15} />
+          <span style={{ fontSize: 12, fontWeight: 600 }}>تعذّر حساب الأرباح — {profitError}</span>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="m-grid-3">
         {[
-          { label: 'إجمالي الفواتير', value: totalOrders, color: '#2563eb', bg: '#eff6ff' },
-          { label: 'إجمالي المبيعات', value: `${totalRevenue.toLocaleString()} LE`, color: '#059669', bg: '#ecfdf5' },
-          { label: 'إجمالي الأرباح', value: `${Math.round(totalProfit).toLocaleString()} LE`, color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'إجمالي الفواتير', value: totalOrders, color: '#2563eb', bg: '#eff6ff', isProfit: false },
+          { label: 'إجمالي المبيعات', value: `${totalRevenue.toLocaleString()} LE`, color: '#059669', bg: '#ecfdf5', isProfit: false },
+          { label: 'إجمالي الأرباح', value: `${Math.round(totalProfit).toLocaleString()} LE`, color: '#7c3aed', bg: '#f5f3ff', isProfit: true },
         ].map(s => (
           <div key={s.label} style={{ ...card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <TrendingUp size={20} color={s.color} />
+              {s.isProfit && profitLoading && !search
+                ? <RefreshCw size={18} color={s.color} style={{ animation: 'spin 0.7s linear infinite' }} />
+                : <TrendingUp size={20} color={s.color} />}
             </div>
             <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }} dir="ltr">{s.value}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }} dir="ltr">
+                {s.isProfit && profitLoading && !search ? '...' : s.value}
+              </div>
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>{s.label}</div>
             </div>
           </div>
@@ -175,8 +221,11 @@ export default function TeamInvoices() {
           {pagedGroups.map((group, gi) => {
             const isOpen = group.key in openMonths ? openMonths[group.key] : gi === 0 && page === 1
             const monthTotal  = group.orders.reduce((s, o) => s + o.total, 0)
-            const monthProfit = group.orders.reduce((s, o) =>
-              s + (o.items?.reduce((ss, i) => ss + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0), 0)
+            // Collected-only, stored-cost profit for this month's group —
+            // computed from the orders currently loaded/paginated into this
+            // list (see clientProfit's note above re: the search fallback;
+            // the same completeness caveat applies to this per-group figure).
+            const monthProfit = clientProfit(group.orders)
 
             return (
               <div key={group.key} style={card}>
@@ -204,7 +253,13 @@ export default function TeamInvoices() {
                 {isOpen && (
                   <div style={{ borderTop: '1px solid #f0f4fa' }}>
                     {group.orders.map((order, idx) => {
-                      const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
+                      // Per-order inline figure — kept for any status (an
+                      // informational "profit if this order is/were
+                      // collected" tag, same as OrderCard's), but the cost
+                      // basis is fixed to the stored snapshot, never live
+                      // inventory. This one figure is intentionally not
+                      // status-restricted, unlike the aggregate totals above.
+                      const orderProfit = order.items?.reduce((s, i) => s + (Number(i.price) - getItemCost(i)) * Number(i.quantity), 0) || 0
                       const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
                       return (
                       <div key={order.id} style={{ borderBottom: idx < group.orders.length - 1 ? '1px solid #f8fafc' : 'none' }}>

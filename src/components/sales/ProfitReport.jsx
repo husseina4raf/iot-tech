@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, Package, ChevronDown } from 'lucide-react'
+import { TrendingUp, Package, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react'
 import Pagination from '../ui/Pagination'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
+import { useProfitSummary } from '../../hooks/useProfitSummary'
 
 const MONTHS_AR = [
   'يناير','فبراير','مارس','أبريل','مايو','يونيو',
@@ -11,15 +12,14 @@ const MONTHS_AR = [
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
-const getCostPrice = (itemName, inventory) => {
-  const inv = inventory.find(i =>
-    i.name.toLowerCase() === itemName.toLowerCase() || i.nameAr === itemName
-  )
-  return inv?.costPrice || 0
-}
+// Historical, order-line cost — the snapshot stored on the order itself at
+// creation time. NEVER falls back to the live inventory cost: a product's
+// current cost must not retroactively change a past order's profit.
+// Missing/undefined/null/zero is treated explicitly as 0 (no cost known).
+const getItemCost = (item) => Number(item.costPrice) || 0
 
 export default function ProfitReport() {
-  const { orders, inventory } = useOrders()
+  const { orders } = useOrders()
   const { user } = useAuth()
 
   const now = new Date()
@@ -35,6 +35,13 @@ export default function ProfitReport() {
   useEffect(() => setPage(1), [year, month, period])
 
   const repName = user?.repName
+
+  // The order list below is still built from the paginated `orders` array —
+  // it renders actual order/item rows (client name, per-item breakdown),
+  // which can only come from real loaded order records. Its own per-order
+  // figures now use the stored item.costPrice (never live inventory), so
+  // each row shown is individually correct; only the top summary cards
+  // (below) are guaranteed complete regardless of pagination.
   const repOrders = repName ? orders.filter(o => {
     if (o.salesRep !== repName) return false
     if (o.status !== 'تم التحصيل') return false
@@ -46,12 +53,20 @@ export default function ProfitReport() {
     return true
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
 
-  // Totals across all filtered orders
-  const totalRevenue = repOrders.reduce((s, o) => s + (o.subtotal || o.total), 0)
-  const totalCost    = repOrders.reduce((s, o) =>
-    s + o.items.reduce((ss, item) => ss + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
-  , 0)
-  const totalProfit  = totalRevenue - totalCost
+  // ── Canonical, pagination-independent totals ────────────────────────────
+  // Sourced from get_profit_summary (src/lib/profit_aggregation.sql), which
+  // aggregates the COMPLETE `orders` table server-side — not the frontend's
+  // paginated `orders` state. Status = تم التحصيل only, revenue basis =
+  // order.subtotal (VAT-exclusive), cost = stored item.costPrice.
+  const { rows: profitRows, loading: profitLoading, error: profitError } = useProfitSummary({
+    repName,
+    year:  period === 'month' ? String(year) : null,
+    month: period === 'month' ? String(month + 1).padStart(2, '0') : null,
+  })
+  const summary = profitRows[0]
+  const totalRevenue = Number(summary?.total_subtotal) || 0
+  const totalCost    = Number(summary?.total_cost) || 0
+  const totalProfit  = Number(summary?.total_profit) || 0
 
   return (
     <div>
@@ -82,19 +97,31 @@ export default function ProfitReport() {
         </span>
       </div>
 
-      {/* Summary cards */}
-      <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
-        {[
-          { label:'إجمالي الإيرادات', value:`${totalRevenue.toLocaleString()} LE`,           color:'#1d4ed8', bg:'#eff6ff' },
-          { label:'إجمالي التكلفة',   value:`${Math.round(totalCost).toLocaleString()} LE`,   color:'#64748b', bg:'#f8fafc' },
-          { label:'صافي الربح',       value:`${Math.round(totalProfit).toLocaleString()} LE`, color: totalProfit>=0?'#059669':'#e11d48', bg: totalProfit>=0?'#ecfdf5':'#fff1f2' },
-        ].map(s => (
-          <div key={s.label} style={{ ...card, padding:'16px 20px' }}>
-            <div style={{ fontSize:24, fontWeight:800, color:s.color, marginBottom:4 }} dir="ltr">{s.value}</div>
-            <div style={{ fontSize:12, color:'#64748b' }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+      {/* Summary cards — canonical, complete-dataset totals (get_profit_summary) */}
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      {profitError ? (
+        <div style={{ ...card, padding:'16px 20px', marginBottom:20, display:'flex', alignItems:'center', gap:10, color:'#e11d48', border:'1px solid #fecdd3', background:'#fff1f2' }}>
+          <AlertTriangle size={16} />
+          <span style={{ fontSize:13, fontWeight:600 }}>تعذّر حساب الأرباح — {profitError}</span>
+        </div>
+      ) : (
+        <div className="m-grid-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
+          {[
+            { label:'إجمالي الإيرادات', value:`${totalRevenue.toLocaleString()} LE`,           color:'#1d4ed8', bg:'#eff6ff' },
+            { label:'إجمالي التكلفة',   value:`${Math.round(totalCost).toLocaleString()} LE`,   color:'#64748b', bg:'#f8fafc' },
+            { label:'صافي الربح',       value:`${Math.round(totalProfit).toLocaleString()} LE`, color: totalProfit>=0?'#059669':'#e11d48', bg: totalProfit>=0?'#ecfdf5':'#fff1f2' },
+          ].map(s => (
+            <div key={s.label} style={{ ...card, padding:'16px 20px' }}>
+              {profitLoading ? (
+                <RefreshCw size={18} color="#94a3b8" style={{ animation:'spin 0.7s linear infinite', marginBottom:8 }} />
+              ) : (
+                <div style={{ fontSize:24, fontWeight:800, color:s.color, marginBottom:4 }} dir="ltr">{s.value}</div>
+              )}
+              <div style={{ fontSize:12, color:'#64748b' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Orders list */}
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -111,7 +138,7 @@ export default function ProfitReport() {
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {repOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((order, idx) => {
-            const orderCost   = order.items.reduce((s, item) => s + getCostPrice(item.name, inventory) * (Number(item.quantity) || 0), 0)
+            const orderCost   = order.items.reduce((s, item) => s + getItemCost(item) * (Number(item.quantity) || 0), 0)
             const orderBase   = order.subtotal || order.total
             const orderProfit = orderBase - orderCost
             const margin      = orderBase > 0 ? Math.round((orderProfit / orderBase) * 100) : 0
@@ -162,7 +189,7 @@ export default function ProfitReport() {
                       </thead>
                       <tbody>
                         {order.items.map((item, i) => {
-                          const cost   = getCostPrice(item.name, inventory)
+                          const cost   = getItemCost(item)
                           const hasCost = cost > 0
                           const itemProfit = hasCost ? item.total - cost * (Number(item.quantity) || 0) : null
                           const itemPos    = itemProfit !== null && itemProfit >= 0

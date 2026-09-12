@@ -73,9 +73,16 @@ BEGIN
   -- pattern get_my_rep_name() itself would have used.
   caller_role := get_my_role();
 
-  SELECT rep_name INTO caller_rep
-    FROM profiles
-   WHERE id = auth.uid();
+  -- Explicitly qualified as p.rep_name: this function's own RETURNS TABLE
+  -- declares an output column also named rep_name, and PostgreSQL treats
+  -- that as an in-scope identifier inside the function body — an
+  -- unqualified `rep_name` here is ambiguous between it and
+  -- profiles.rep_name (confirmed: "column reference \"rep_name\" is
+  -- ambiguous" when run unqualified).
+  SELECT p.rep_name
+    INTO caller_rep
+    FROM profiles AS p
+   WHERE p.id = auth.uid();
 
   IF caller_role IS NULL THEN
     RAISE EXCEPTION 'غير مصرح — يجب تسجيل الدخول أولاً';

@@ -36,18 +36,29 @@ export default function Leaderboard() {
   // Build stats per rep — Sales and Team Leaders alike (salesReps already
   // includes both; see useAuth.jsx). A rep with no qualifying rows this
   // period simply defaults to zero, same as before.
-  const stats = salesReps.map(rep => {
-    const repUser = users.find(u => u.repName === rep)
-    const row = profitRows.find(r => r.rep_name === rep)
-    return {
-      rep,
-      name: repUser?.name || rep,
-      avatar: repUser?.avatar || rep[0],
-      total:  Number(row?.total_profit) || 0,
-      count:  Number(row?.order_count) || 0,
-      isMe:   rep === currentUser?.repName,
-    }
-  }).sort((a, b) => b.total - a.total)
+  //
+  // Visibility rule (display-only — does NOT touch salesReps or the
+  // profit RPC, both of which are shared with reports/aggregation and
+  // must keep including Team Leaders for Admin/Super Admin/Team Leader
+  // themselves): a Sales viewer's own leaderboard must not list Team
+  // Leader entries. Determined from each rep's actual profiles.role
+  // (via `repUser`), never from the rep name/string.
+  const stats = salesReps
+    .map(rep => {
+      const repUser = users.find(u => u.repName === rep)
+      const row = profitRows.find(r => r.rep_name === rep)
+      return {
+        rep,
+        role: repUser?.role,
+        name: repUser?.name || rep,
+        avatar: repUser?.avatar || rep[0],
+        total:  Number(row?.total_profit) || 0,
+        count:  Number(row?.order_count) || 0,
+        isMe:   rep === currentUser?.repName,
+      }
+    })
+    .filter(s => !(currentUser?.role === 'sales' && s.role === 'team_leader'))
+    .sort((a, b) => b.total - a.total)
 
   const topTotal = stats[0]?.total || 1
 

@@ -67,18 +67,29 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         if (profile) setUser(profile)
+        await fetchUsers()
       }
       setLoading(false)
-      // Background: seed & fetch users without blocking UI
+      // One-time bootstrap: creates the demo accounts on a brand-new database.
+      // Independent of who (if anyone) is logged in yet, so it stays outside
+      // the per-session fetch below; it re-fetches users itself afterward so
+      // a first-ever run picks up the accounts it just created.
       seedIfEmpty().then(() => fetchUsers())
     })
 
+    // Re-runs fetchUsers() on every genuine sign-in — covers a fresh login
+    // (session becomes available without a page reload) and switching from
+    // one logged-in user to another, not just the initial session restore.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setUser(profile)
+        await fetchUsers()
       } else {
+        // Logged out — clear user-specific state so it doesn't leak into
+        // whatever session (or lack of one) comes next.
         setUser(null)
+        setUsers([])
       }
     })
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from './useAuth'
 import { mapOrder, mapItem, mapAudit, mapTax, mapTarget } from '../lib/mappers'
 
 const OrdersContext = createContext(null)
@@ -9,6 +10,12 @@ const PAGE_SIZE = 100
 
 export function OrdersProvider({ children }) {
   const toast = useToast()
+  // The authenticated user's stable id — null while logged out (or before the
+  // session-restore check has resolved). Protected data must only be fetched
+  // once this identity is known, and must be refetched whenever it changes
+  // (fresh login, or switching from one logged-in user to another).
+  const { user } = useAuth()
+  const authUserId = user?.id ?? null
   const [orders,       setOrders]       = useState([])
   const [inventory,    setInventory]    = useState([])
   const [auditLog,     setAuditLog]     = useState([])
@@ -36,7 +43,39 @@ export function OrdersProvider({ children }) {
   }, [ordersPage, toast])
 
   // ── Initial fetch ─────────────────────────────────────────────────────────────
+  // Gated on `authUserId` rather than running once on mount: this table's RLS
+  // policies require an authenticated request, so fetching before a real user
+  // is known would silently come back empty and (with the old `[]` dependency)
+  // never retry after a fresh login. Re-running when `authUserId` changes also
+  // covers logout → login as a different user without stale data lingering.
   useEffect(() => {
+    if (!authUserId) {
+      // Logged out (or session-restore check not resolved yet) — nothing to
+      // fetch, and any previously-loaded data belongs to a session that's no
+      // longer current. Reset pagination too, so a subsequent login starts a
+      // fresh `loadMoreOrders()` sequence instead of continuing an old one.
+      // The reset runs from a resolved-promise callback rather than directly
+      // in the effect body — same-tick, same behavior, just not a batch of
+      // top-level setState calls the effect itself is making.
+      Promise.resolve().then(() => {
+        setOrders([])
+        setInventory([])
+        setAuditLog([])
+        setTaxInvoices([])
+        setSalesTargets([])
+        setHasMoreOrders(false)
+        setOrdersPage(0)
+        setLoading(true)
+      })
+      return
+    }
+
+    // `loading` is already true here: it defaults to true on first mount, and
+    // the logged-out branch above sets it true on every path into this branch
+    // (a real `authUserId` is only ever reached from `null` — see logout in
+    // useAuth.jsx — so there is no transition that needs an extra reset here).
+    let cancelled = false
+
     Promise.all([
       supabase.from('orders').select('*').order('created_at', { ascending: false }).range(0, PAGE_SIZE - 1),
       supabase.from('inventory').select('*').order('name', { ascending: true }),
@@ -44,12 +83,14 @@ export function OrdersProvider({ children }) {
       supabase.from('tax_invoices').select('*').order('uploaded_at', { ascending: false }),
       supabase.from('sales_targets').select('*').order('month', { ascending: false }),
     ]).then(([o, inv, al, ti, st]) => {
+      if (cancelled) return // a newer auth transition already superseded this fetch
       if (o.error)   { console.error('orders fetch:', o.error);   toast('خطأ في تحميل الطلبات', 'error') }
       if (inv.error) { console.error('inventory fetch:', inv.error); toast('خطأ في تحميل المنتجات — ' + inv.error.message, 'error') }
       if (al.error)  { console.error('audit fetch:', al.error) }
       if (ti.error)  { console.error('tax fetch:', ti.error) }
       setOrders((o.data || []).map(mapOrder))
       setHasMoreOrders((o.data || []).length === PAGE_SIZE)
+      setOrdersPage(0)
       setInventory((inv.data || []).map(mapItem))
       setAuditLog((al.data || []).map(mapAudit))
       setTaxInvoices((ti.data || []).map(mapTax))
@@ -97,10 +138,11 @@ export function OrdersProvider({ children }) {
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
+      cancelled = true
       supabase.removeChannel(ch)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [])
+  }, [authUserId])
 
   // ── Audit helper ──────────────────────────────────────────────────────────────
   const pushAudit = useCallback(async (entry) => {

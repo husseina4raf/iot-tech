@@ -128,19 +128,41 @@ export function AuthProvider({ children }) {
     return ROLE_ROUTES[user.role]?.some(r => path.startsWith(r)) ?? false
   }, [user])
 
+  // Creates a new user account without ever touching the CALLER's own
+  // Supabase Auth session. The previous implementation called
+  // `supabase.auth.signUp(...)` directly from the Admin's own browser
+  // client — signUp() authenticates as the newly created account on the
+  // calling client, which silently replaced the Admin's active session
+  // and caused them to be redirected to Login immediately after creating
+  // a user. All privileged work (auth.users creation, profiles insert,
+  // and compensating cleanup on partial failure) now happens server-side
+  // in the `create-user` Edge Function (supabase/functions/create-user),
+  // which uses the service_role key internally and never exposes it here.
   const addUser = async ({ name, username, password, role, repName }) => {
-    const email = `${username.toLowerCase().trim()}@iottech.app`
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
-    if (authError) throw new Error(authError.message)
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id:       authData.user.id,
-      name,
-      username: username.toLowerCase().trim(),
-      role,
-      rep_name: repName || null,
-      active:   true,
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        name,
+        username: username.toLowerCase().trim(),
+        password,
+        role,
+        repName: repName || null,
+      },
     })
-    if (profileError) throw new Error(profileError.message)
+    if (error) {
+      // supabase-js exposes the Edge Function's raw Response (when it
+      // returned a non-2xx status) on `error.context` — prefer that
+      // response's own `{ error: "..." }` body (already a friendly
+      // Arabic message from the function) over the generic SDK message.
+      let message = error.message
+      try {
+        const body = await error.context?.json?.()
+        if (body?.error) message = body.error
+      } catch {
+        // ignore — fall back to error.message below
+      }
+      throw new Error(message || 'فشل إضافة المستخدم — حاول مرة أخرى')
+    }
+    if (data?.error) throw new Error(data.error)
     await fetchUsers()
   }
 

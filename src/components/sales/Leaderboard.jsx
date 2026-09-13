@@ -143,9 +143,13 @@ export default function Leaderboard() {
           <h3 style={{ fontSize:14, fontWeight:700, color:'#0f172a' }}>الترتيب الكامل</h3>
         </div>
 
-        {stats.every(s => s.total === 0) ? (
+        {stats.length === 0 ? (
+          // Only when there are literally no eligible reps to show (e.g. no
+          // active sales/team_leader profiles at all) — NOT when everyone's
+          // total happens to be zero for the selected period. Zero-activity
+          // reps must still be listed, ranked at the bottom with 0 LE.
           <div style={{ padding:40, textAlign:'center', color:'#94a3b8', fontSize:13 }}>
-            لا توجد مبيعات في هذه الفترة
+            لا يوجد مندوبون لعرضهم
           </div>
         ) : (
           <div>

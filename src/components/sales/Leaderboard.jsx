@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Trophy, TrendingUp, FileText, Medal, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { useProfitSummary } from '../../hooks/useProfitSummary'
+import { useLeaderboardSummary } from '../../hooks/useLeaderboardSummary'
 
 const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', boxShadow:'0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -26,23 +26,32 @@ export default function Leaderboard() {
 
   // Ranking is Profit-based (status = تم التحصيل, subtotal − stored item
   // cost) — this file never had a separate "revenue" ranking to preserve.
-  // Sourced from get_profit_summary (complete `orders` table, independent
-  // of OrdersList pagination), requesting all reps (repName omitted).
-  const { rows: profitRows, loading: profitLoading, error: profitError } = useProfitSummary({
+  // Sourced from get_leaderboard_summary — a dedicated RPC, deliberately
+  // separate from get_profit_summary (used by Profit Report/Sales Reports/
+  // Team Invoices), because those reports must keep restricting a 'sales'
+  // caller to their own rep only, while a Leaderboard is an intentionally
+  // shared ranking where every Sales user is meant to see every other
+  // Sales user's total. Same canonical formula either way; only the
+  // authorization differs. See src/lib/leaderboard_aggregation.sql.
+  const { rows: profitRows, loading: profitLoading, error: profitError } = useLeaderboardSummary({
     year:  period === 'month' ? String(year) : null,
     month: period === 'month' ? String(month + 1).padStart(2, '0') : null,
   })
 
   // Build stats per rep — Sales and Team Leaders alike (salesReps already
   // includes both; see useAuth.jsx). A rep with no qualifying rows this
-  // period simply defaults to zero, same as before.
+  // period simply defaults to zero (get_leaderboard_summary, like
+  // get_profit_summary, only ever returns a row for a rep with at least
+  // one qualifying order — a zero-activity rep is expected to be absent
+  // from `profitRows`, and this merge fills that in as 0).
   //
-  // Visibility rule (display-only — does NOT touch salesReps or the
-  // profit RPC, both of which are shared with reports/aggregation and
-  // must keep including Team Leaders for Admin/Super Admin/Team Leader
-  // themselves): a Sales viewer's own leaderboard must not list Team
-  // Leader entries. Determined from each rep's actual profiles.role
-  // (via `repUser`), never from the rep name/string.
+  // Visibility rule: a Sales viewer's own leaderboard must not list Team
+  // Leader entries at all — get_leaderboard_summary already excludes a
+  // team_leader's profit ROW for a 'sales' caller server-side, but this
+  // filter is still what removes the team_leader's zero-value ENTRY from
+  // the list itself (salesReps enumerates both roles regardless of
+  // viewer). Determined from each rep's actual profiles.role (via
+  // `repUser`), never from the rep name/string. Untouched by this change.
   const stats = salesReps
     .map(rep => {
       const repUser = users.find(u => u.repName === rep)

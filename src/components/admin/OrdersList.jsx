@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, X, SlidersHorizontal } from 'lucide-react'
+import { Search, X, SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import OrderCard from './OrderCard'
 import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { ORDER_STATUSES } from '../../data/mockData'
 import Pagination from '../ui/Pagination'
 import { SkeletonList } from '../ui/Skeleton'
+import { supabase } from '../../lib/supabase'
+import { mapOrder } from '../../lib/mappers'
 
 const PAGE_SIZE = 10
 
@@ -25,22 +27,92 @@ export default function OrdersList() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [rep, setRep] = useState('')
+  const [sku, setSku] = useState('')
+  const [dateFilter, setDateFilter] = useState('')   // 'YYYY-MM-DD' from <input type="date">, or ''
   const [focused, setFocused] = useState(false)
   const [page, setPage] = useState(1)
 
-  const filtered = useMemo(() => orders
-    .filter(o => {
-      const q = search.toLowerCase()
-      return (!q || o.clientName.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.serialNumber.includes(q))
-        && (!status || o.status === status) && (!rep || o.salesRep === rep)
-    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [orders, search, status, rep])
+  // ── Server-side search (SKU / date) ─────────────────────────────────────────
+  // `orders` above is the shared, paginated state (PAGE_SIZE=100 per page,
+  // grown only via "تحميل المزيد"). Filtering SKU/date against it would
+  // silently miss matches on pages that haven't been loaded yet. Whenever
+  // either of these two filters is in use, this queries Supabase directly —
+  // independent of that paginated state — so results are always complete,
+  // regardless of how many order pages happen to be loaded elsewhere.
+  // Existing search/status/rep filters are unaffected: with neither SKU nor
+  // date set, everything below falls back to the exact previous behavior.
+  const [serverOrders,  setServerOrders]  = useState(null)   // null = not in server-search mode
+  const [serverLoading, setServerLoading] = useState(false)
+  const [serverError,   setServerError]   = useState(null)
+  const usingServerSearch = Boolean(sku.trim() || dateFilter)
 
-  useEffect(() => setPage(1), [search, status, rep])
+  useEffect(() => {
+    if (!usingServerSearch) {
+      // Reset via a resolved-promise callback rather than directly in the
+      // effect body — same tick, same behavior, just not a top-level
+      // setState call the effect itself makes (same pattern used
+      // elsewhere in this project, e.g. useProfitSummary.js).
+      Promise.resolve().then(() => {
+        setServerOrders(null)
+        setServerError(null)
+      })
+      return
+    }
+    let cancelled = false
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      setServerLoading(true)
+      setServerError(null)
+    })
+    // Small debounce — mainly for the SKU text input, so a query isn't
+    // fired on every keystroke.
+    const timer = setTimeout(async () => {
+      let query = supabase.from('orders').select('*').order('created_at', { ascending: false })
+      if (dateFilter) {
+        // Full local calendar day, converted to proper UTC ISO boundaries
+        // for the TIMESTAMPTZ `created_at` column — safe regardless of the
+        // database server's own timezone setting, since a TIMESTAMPTZ
+        // comparison is always resolved in UTC internally.
+        const dayStart = new Date(`${dateFilter}T00:00:00`)
+        const dayEnd   = new Date(`${dateFilter}T23:59:59.999`)
+        query = query.gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString())
+      }
+      const { data, error } = await query
+      if (cancelled) return
+      if (error) {
+        console.error('OrdersList server search:', error)
+        setServerError('تعذر البحث — يرجى المحاولة مرة أخرى')
+        setServerOrders([])
+      } else {
+        setServerOrders((data || []).map(mapOrder))
+      }
+      setServerLoading(false)
+    }, 300)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [sku, dateFilter, usingServerSearch])
+
+  const filtered = useMemo(() => {
+    // Search universe: the complete server-search result when SKU/date is
+    // in use, otherwise the existing paginated `orders` array — unchanged.
+    const base = usingServerSearch ? (serverOrders || []) : orders
+    return base
+      .filter(o => {
+        const q = search.toLowerCase()
+        const matchesSearch = !q || o.clientName.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.serialNumber.includes(q)
+        const matchesStatus = !status || o.status === status
+        const matchesRep    = !rep || o.salesRep === rep
+        const skuQuery       = sku.trim().toLowerCase()
+        const matchesSku     = !skuQuery || (o.items || []).some(i => i.sku?.toLowerCase().includes(skuQuery))
+        return matchesSearch && matchesStatus && matchesRep && matchesSku
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  }, [usingServerSearch, serverOrders, orders, search, status, rep, sku])
+
+  useEffect(() => setPage(1), [search, status, rep, sku, dateFilter])
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const clear = () => { setSearch(''); setStatus(''); setRep('') }
-  const hasFilter = search || status || rep
+  const clear = () => { setSearch(''); setStatus(''); setRep(''); setSku(''); setDateFilter('') }
+  const hasFilter = search || status || rep || sku || dateFilter
 
   const sel = { padding: '8px 12px', fontSize: 13, border: '1.5px solid #e4eaf3', borderRadius: 8, background: '#fff', color: '#0f172a', outline: 'none', cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }
 
@@ -76,6 +148,28 @@ export default function OrdersList() {
           <option value="">كل مسؤل المبيعاتين</option>
           {salesReps.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
+        <div style={{ position: 'relative', minWidth: 140 }}>
+          <input value={sku} onChange={e => setSku(e.target.value)} placeholder="بحث برقم SKU..." dir="ltr"
+            style={{ ...sel, width: '100%', paddingLeft: sku ? 26 : 12, boxSizing: 'border-box' }}
+            onFocus={e => e.target.style.borderColor = '#2563eb'} onBlur={e => e.target.style.borderColor = '#e4eaf3'} />
+          {sku && (
+            <button onClick={() => setSku('')} title="مسح SKU"
+              style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2, display: 'flex' }}>
+              <X size={12} />
+            </button>
+          )}
+        </div>
+        <div style={{ position: 'relative' }}>
+          <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} dir="ltr"
+            style={{ ...sel, paddingLeft: dateFilter ? 26 : 12 }}
+            onFocus={e => e.target.style.borderColor = '#2563eb'} onBlur={e => e.target.style.borderColor = '#e4eaf3'} />
+          {dateFilter && (
+            <button onClick={() => setDateFilter('')} title="مسح التاريخ"
+              style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 2, display: 'flex' }}>
+              <X size={12} />
+            </button>
+          )}
+        </div>
         {hasFilter && (
           <button onClick={clear} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8, border: '1px solid #fecdd3', background: '#fff1f2', color: '#9f1239', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', flexShrink: 0 }}>
             <X size={12} /> مسح
@@ -84,9 +178,15 @@ export default function OrdersList() {
         <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b', flexShrink: 0 }}>{filtered.length} طلب</span>
       </div>
 
+      {usingServerSearch && serverError && (
+        <div style={{ padding: '10px 16px', borderRadius: 10, background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', fontSize: 12, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertTriangle size={14} />{serverError}
+        </div>
+      )}
+
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {loading ? <SkeletonList count={6} /> : filtered.length === 0 ? (
+        {(usingServerSearch ? serverLoading : loading) ? <SkeletonList count={6} /> : filtered.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 60, borderRadius: 14, background: '#fff', border: '1px solid #e4eaf3' }}>
             <Search size={36} color="#e4eaf3" style={{ marginBottom: 12 }} />
             <p style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', marginBottom: 8 }}>لا توجد طلبات تطابق البحث</p>

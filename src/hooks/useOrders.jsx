@@ -8,6 +8,27 @@ const OrdersContext = createContext(null)
 
 const PAGE_SIZE = 100
 
+// Matches an order item to its inventory record. SKU is authoritative
+// whenever the order item has one — an exact (trimmed, case-insensitive)
+// SKU match is unambiguous, unlike name matching, which can silently
+// match the wrong product whenever one product's name happens to be a
+// substring of another's, or fail entirely once an inventory item's name
+// has been edited since the order was created. Falls back to the
+// original fuzzy name match only when the item genuinely has no SKU
+// (e.g. a free-typed line never selected from the inventory picker).
+// Used by both the dispatch-time deduction and the restore-stock path, so
+// the two always resolve to the same inventory row for the same item.
+function findInventoryMatch(item, inventoryList) {
+  const sku = (item.sku || '').trim().toLowerCase()
+  if (sku) {
+    return inventoryList.find(i => (i.sku || '').trim().toLowerCase() === sku) || null
+  }
+  return inventoryList.find(i =>
+    i.name.toLowerCase().includes(item.name.toLowerCase()) ||
+    item.name.toLowerCase().includes(i.name.toLowerCase())
+  ) || null
+}
+
 export function OrdersProvider({ children }) {
   const toast = useToast()
   // The authenticated user's stable id — null while logged out (or before the
@@ -26,6 +47,11 @@ export function OrdersProvider({ children }) {
   const [ordersPage,    setOrdersPage]    = useState(0)
   // Tracks inventory item IDs we just wrote to — blocks stale real-time events
   const pendingInvWrites = useRef(new Set())
+  // Tracks order IDs currently mid-dispatch (transitioning to تم الصرف) —
+  // closes the rapid-double-click race for inventory deduction. A ref, not
+  // state: it must be synchronously visible to a second invocation within
+  // the same tick, which a batched setState update would not guarantee.
+  const dispatchingOrders = useRef(new Set())
 
   const loadMoreOrders = useCallback(async () => {
     const next = ordersPage + 1
@@ -279,55 +305,114 @@ export function OrdersProvider({ children }) {
       return
     }
     const order = orders.find(o => o.id === id)
-    const statusEntry = {
-      type: 'status_change',
-      previousStatus: order?.status,
-      newStatus: status,
-      changedAt: new Date().toISOString(),
-      changedBy: user?.name || 'مجهول',
-    }
-    const editHistory = [...(order?.editHistory || []), statusEntry]
-    // Optimistic update — change status immediately in local state
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status, editHistory } : o))
-    const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString(), edit_history: editHistory }).eq('id', id)
-    if (statusErr) {
-      console.error('updateOrderStatus:', statusErr)
-      toast('فشل تحديث الحالة — ' + statusErr.message, 'error')
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order?.status } : o))
-      return
+    const isDispatching = status === 'تم الصرف'
+
+    if (isDispatching) {
+      // Idempotency guard #1 — a redundant "already there" request (e.g. a
+      // slower repeated click, after an earlier call's status update has
+      // already committed and re-rendered). Never re-deduct in that case.
+      if (order?.status === status) {
+        toast('تم صرف هذا الطلب بالفعل', 'error')
+        return
+      }
+      // Idempotency guard #2 — a genuinely CONCURRENT call for the same
+      // order (a rapid double-click, before the first call's optimistic
+      // update has re-rendered and hidden the button).
+      if (dispatchingOrders.current.has(id)) {
+        toast('جارٍ معالجة هذا الطلب بالفعل...', 'error')
+        return
+      }
+      dispatchingOrders.current.add(id)
     }
 
-    if (status === 'تم الصرف' && order) {
-      for (const item of order.items) {
-        const invItem = inventory.find(i =>
-          i.name.toLowerCase().includes(item.name.toLowerCase()) ||
-          item.name.toLowerCase().includes(i.name.toLowerCase())
-        )
-        if (!invItem) continue
-        const soldQty = Number(item.quantity) || 0
-        let remaining = soldQty
-        const newLots = (invItem.lots || []).map(lot => {
-          if (remaining <= 0) return lot
-          const consume = Math.min(remaining, lot.qty)
-          remaining -= consume
-          return { ...lot, qty: lot.qty - consume }
-        }).filter(lot => lot.qty > 0)
-        const newStock = Math.max(0, invItem.stock - soldQty)
-        const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (invItem.costPrice || 0)
-        const { error: stockErr } = await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
-        if (stockErr) {
-          console.error('updateOrderStatus — inventory deduction:', stockErr)
-          toast(`فشل خصم المخزون للمنتج "${invItem.name}" — ${stockErr.message}`, 'error')
+    try {
+      // ── Pre-flight: resolve every item's inventory match BEFORE
+      // committing the status change, so an order can never end up marked
+      // تم الصرف while one of its items was silently never deducted. SKU
+      // is authoritative (see findInventoryMatch); a name-only fallback is
+      // used only for items with no SKU. Any unmatched item aborts the
+      // WHOLE transition — no status change, no inventory touched — rather
+      // than partially deducting.
+      let dispatchPlan = null
+      if (isDispatching && order) {
+        const unmatched = []
+        dispatchPlan = order.items.map(item => {
+          const invItem = findInventoryMatch(item, inventory)
+          if (!invItem) unmatched.push(item)
+          return { item, invItem }
+        })
+        if (unmatched.length > 0) {
+          const names = unmatched.map(i => `${i.name}${i.sku ? ` (SKU: ${i.sku})` : ''}`).join('، ')
+          console.error('updateOrderStatus — no inventory match for items:', unmatched)
+          toast(`تعذر تحديث الحالة — لم يتم العثور على تطابق في المخزون للأصناف التالية: ${names}`, 'error')
+          return
         }
       }
-    }
 
-    await pushAudit({
-      type: 'status_change', orderId: id,
-      orderRef: `${order?.clientName} — ${order?.company}`,
-      field: 'الحالة', oldValue: order?.status || '—', newValue: status,
-      changedBy: user?.name || 'مجهول',
-    })
+      const statusEntry = {
+        type: 'status_change',
+        previousStatus: order?.status,
+        newStatus: status,
+        changedAt: new Date().toISOString(),
+        changedBy: user?.name || 'مجهول',
+      }
+      const editHistory = [...(order?.editHistory || []), statusEntry]
+      // Optimistic update — change status immediately in local state
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status, editHistory } : o))
+      const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString(), edit_history: editHistory }).eq('id', id)
+      if (statusErr) {
+        console.error('updateOrderStatus:', statusErr)
+        toast('فشل تحديث الحالة — ' + statusErr.message, 'error')
+        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order?.status } : o))
+        return
+      }
+
+      if (isDispatching && order && dispatchPlan) {
+        let deductionFailed = false
+        for (const { item, invItem } of dispatchPlan) {
+          const soldQty = Number(item.quantity) || 0
+          let remaining = soldQty
+          const newLots = (invItem.lots || []).map(lot => {
+            if (remaining <= 0) return lot
+            const consume = Math.min(remaining, lot.qty)
+            remaining -= consume
+            return { ...lot, qty: lot.qty - consume }
+          }).filter(lot => lot.qty > 0)
+          const newStock = Math.max(0, invItem.stock - soldQty)
+          const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (invItem.costPrice || 0)
+          // Update local state immediately on success — do not rely solely
+          // on the realtime subscription to reflect a confirmed write.
+          lockInv(invItem.id)
+          setInventory(prev => prev.map(i => i.id === invItem.id ? { ...i, stock: newStock, lots: newLots, costPrice: fifoCost } : i))
+          const { error: stockErr } = await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
+          if (stockErr) {
+            deductionFailed = true
+            console.error('updateOrderStatus — inventory deduction:', stockErr)
+            toast(`فشل خصم المخزون للمنتج "${invItem.name}" — ${stockErr.message}`, 'error')
+            // Roll back the optimistic local change for this item only.
+            setInventory(prev => prev.map(i => i.id === invItem.id ? invItem : i))
+          }
+          unlockInv(invItem.id)
+        }
+        if (deductionFailed) {
+          // The order's status was already committed above (pre-flight
+          // matching passed for every item) — a write failure here is a
+          // rarer, non-deterministic case (e.g. a network error), not the
+          // "unmatched item" case this fix targets. Surfaced clearly
+          // rather than left silent, so it can be corrected manually.
+          toast('تنبيه: تم تحديث حالة الطلب إلى "تم الصرف" لكن حدث خطأ أثناء خصم بعض الأصناف من المخزون — يرجى المراجعة اليدوية', 'error')
+        }
+      }
+
+      await pushAudit({
+        type: 'status_change', orderId: id,
+        orderRef: `${order?.clientName} — ${order?.company}`,
+        field: 'الحالة', oldValue: order?.status || '—', newValue: status,
+        changedBy: user?.name || 'مجهول',
+      })
+    } finally {
+      if (isDispatching) dispatchingOrders.current.delete(id)
+    }
   }
 
   const approveOrder = (id, user) => updateOrderStatus(id, 'موافق عليه', user)
@@ -543,10 +628,9 @@ export function OrdersProvider({ children }) {
   // Adds back each item's quantity to inventory as a return lot.
   const restoreStockForOrder = async (order) => {
     for (const item of (order.items || [])) {
-      const invItem = inventory.find(i =>
-        i.name.toLowerCase().includes(item.name.toLowerCase()) ||
-        item.name.toLowerCase().includes(i.name.toLowerCase())
-      )
+      // SKU-first, same as the dispatch-time deduction — keeps both paths
+      // resolving to the same inventory row for the same item.
+      const invItem = findInventoryMatch(item, inventory)
       if (!invItem) continue
       const qty = Number(item.quantity) || 0
       if (qty <= 0) continue

@@ -22,6 +22,10 @@ export const mapOrder = r => ({
   paymentMethod: r.payment_method, date: r.date, time: r.time,
   status: r.status, createdAt: r.created_at, updatedAt: r.updated_at,
   editHistory: r.edit_history || [],
+  // Explicit flag (see src/lib/order_creation.sql) — whether this order's
+  // inventory has been deducted and not yet restored. Drives whether
+  // cancelling/rejecting/returning-to-Sales needs to restore stock.
+  inventoryDeducted: r.inventory_deducted ?? false,
 })
 
 export const mapItem = r => ({

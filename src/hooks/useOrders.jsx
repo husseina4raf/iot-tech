@@ -29,6 +29,17 @@ function findInventoryMatch(item, inventoryList) {
   ) || null
 }
 
+// Translates a duplicate-SKU database error (Postgres 23505, from the
+// partial unique index on inventory.sku — see
+// src/lib/inventory_sku_uniqueness.sql) into the same friendly Arabic
+// message used by InventoryManager.jsx's client-side pre-check. Any other
+// error is passed through with its real message — only this one,
+// specifically recognized case is ever hidden behind a friendlier text.
+function inventoryErrorMessage(error, fallbackPrefix) {
+  if (error?.code === '23505') return 'هذا الـSKU مستخدم بالفعل لمنتج آخر'
+  return fallbackPrefix + (error?.message || '')
+}
+
 export function OrdersProvider({ children }) {
   const toast = useToast()
   // The authenticated user's stable id — null while logged out (or before the
@@ -47,10 +58,11 @@ export function OrdersProvider({ children }) {
   const [ordersPage,    setOrdersPage]    = useState(0)
   // Tracks inventory item IDs we just wrote to — blocks stale real-time events
   const pendingInvWrites = useRef(new Set())
-  // Tracks order IDs currently mid-dispatch (transitioning to تم الصرف) —
-  // closes the rapid-double-click race for inventory deduction. A ref, not
-  // state: it must be synchronously visible to a second invocation within
-  // the same tick, which a batched setState update would not guarantee.
+  // Tracks order IDs currently mid-rejection (transitioning to مرفوض) —
+  // closes the rapid-double-click race for the inventory restore that
+  // rejection triggers. A ref, not state: it must be synchronously visible
+  // to a second invocation within the same tick, which a batched setState
+  // update would not guarantee.
   const dispatchingOrders = useRef(new Set())
 
   const loadMoreOrders = useCallback(async () => {
@@ -294,10 +306,56 @@ export function OrdersProvider({ children }) {
     })
   }
 
+  // Resubmitting an order that was returned to Sales (جديد) or rejected
+  // (مرفوض) must deduct inventory again — but atomically, using the FINAL
+  // edited quantities only, and only once even under a rapid double-click
+  // or concurrent tab. See resubmit_order() in order_creation.sql: it row-
+  // locks the order, checks inventory_deducted itself, and does the order
+  // update + FIFO SKU-first deduction in the same DB transaction.
+  const resubmitOrder = async (id, orderData, user) => {
+    const { data, error: rpcError } = await supabase.rpc('resubmit_order', {
+      p_order_id: id,
+      p_order: {
+        clientName:   orderData.clientName,   company:      orderData.company,
+        mobile:       orderData.mobile,       whatsapp:     orderData.whatsapp,
+        address:      orderData.address,      locationLink: orderData.locationLink,
+        salesRep:     orderData.salesRep,     items:        orderData.items,
+        subtotal:     orderData.subtotal,     vatPercent:   orderData.vatPercent,
+        vatAmount:    orderData.vatAmount,    total:        orderData.total,
+        invoiceType:  orderData.invoiceType,  invoiceName:  orderData.invoiceName,
+        taxNumber:    orderData.taxNumber,    notes:        orderData.notes,
+        paymentMethod: orderData.paymentMethod,
+        date: orderData.date, time: orderData.time,
+        changedByName: user?.name,
+      },
+    })
+    if (rpcError) {
+      console.error('resubmitOrder (resubmit_order RPC):', rpcError)
+      throw new Error(friendlyOrderError(rpcError))
+    }
+    const updatedOrder = mapOrder(data)
+    setOrders(prev => prev.map(o => o.id === id ? updatedOrder : o))
+    await pushAudit({
+      type: 'order_edit', orderId: id,
+      orderRef: `${orderData.clientName} — ${orderData.company}`,
+      field: 'إعادة إرسال الطلب', oldValue: 'مرفوض/جديد', newValue: 'بانتظار الموافقة',
+      changedBy: user?.name || 'مجهول',
+    })
+    return updatedOrder
+  }
+
   // Statuses that only admin / super_admin may advance an order to.
   // team_leader can approve/reject and revert, but cannot finalise dispatch or collection.
   const TEAM_LEADER_FORBIDDEN_STATUSES = ['تم الصرف', 'تم التحصيل']
 
+  // Inventory is deducted at order creation (create_order/resubmit_order —
+  // see order_creation.sql), NOT at any status transition. تم الصرف /
+  // مكتمل / تم التحصيل therefore never touch inventory here. The one
+  // status transition that DOES need to touch inventory is رفض (reject):
+  // since the order's stock was already deducted the moment it was
+  // created, rejecting it must restore that stock — mirroring exactly
+  // what cancelling/returning-to-Sales already do, keyed off the same
+  // `inventory_deducted` flag rather than a status/history guess.
   const updateOrderStatus = async (id, status, user) => {
     // Role guard — frontend enforcement (DB trigger mirrors this server-side)
     if (user?.role === 'team_leader' && TEAM_LEADER_FORBIDDEN_STATUSES.includes(status)) {
@@ -305,19 +363,16 @@ export function OrdersProvider({ children }) {
       return
     }
     const order = orders.find(o => o.id === id)
-    const isDispatching = status === 'تم الصرف'
+    const isRejecting = status === 'مرفوض'
+    const willRestore = isRejecting && order?.inventoryDeducted
 
-    if (isDispatching) {
-      // Idempotency guard #1 — a redundant "already there" request (e.g. a
-      // slower repeated click, after an earlier call's status update has
-      // already committed and re-rendered). Never re-deduct in that case.
+    if (willRestore) {
+      // Same rapid-double-click guard previously used for dispatch —
+      // reused here for the one remaining inventory-affecting transition.
       if (order?.status === status) {
-        toast('تم صرف هذا الطلب بالفعل', 'error')
+        toast('تم رفض هذا الطلب بالفعل', 'error')
         return
       }
-      // Idempotency guard #2 — a genuinely CONCURRENT call for the same
-      // order (a rapid double-click, before the first call's optimistic
-      // update has re-rendered and hidden the button).
       if (dispatchingOrders.current.has(id)) {
         toast('جارٍ معالجة هذا الطلب بالفعل...', 'error')
         return
@@ -326,29 +381,6 @@ export function OrdersProvider({ children }) {
     }
 
     try {
-      // ── Pre-flight: resolve every item's inventory match BEFORE
-      // committing the status change, so an order can never end up marked
-      // تم الصرف while one of its items was silently never deducted. SKU
-      // is authoritative (see findInventoryMatch); a name-only fallback is
-      // used only for items with no SKU. Any unmatched item aborts the
-      // WHOLE transition — no status change, no inventory touched — rather
-      // than partially deducting.
-      let dispatchPlan = null
-      if (isDispatching && order) {
-        const unmatched = []
-        dispatchPlan = order.items.map(item => {
-          const invItem = findInventoryMatch(item, inventory)
-          if (!invItem) unmatched.push(item)
-          return { item, invItem }
-        })
-        if (unmatched.length > 0) {
-          const names = unmatched.map(i => `${i.name}${i.sku ? ` (SKU: ${i.sku})` : ''}`).join('، ')
-          console.error('updateOrderStatus — no inventory match for items:', unmatched)
-          toast(`تعذر تحديث الحالة — لم يتم العثور على تطابق في المخزون للأصناف التالية: ${names}`, 'error')
-          return
-        }
-      }
-
       const statusEntry = {
         type: 'status_change',
         previousStatus: order?.status,
@@ -367,40 +399,13 @@ export function OrdersProvider({ children }) {
         return
       }
 
-      if (isDispatching && order && dispatchPlan) {
-        let deductionFailed = false
-        for (const { item, invItem } of dispatchPlan) {
-          const soldQty = Number(item.quantity) || 0
-          let remaining = soldQty
-          const newLots = (invItem.lots || []).map(lot => {
-            if (remaining <= 0) return lot
-            const consume = Math.min(remaining, lot.qty)
-            remaining -= consume
-            return { ...lot, qty: lot.qty - consume }
-          }).filter(lot => lot.qty > 0)
-          const newStock = Math.max(0, invItem.stock - soldQty)
-          const fifoCost = newLots.length > 0 ? newLots[0].costPrice : (invItem.costPrice || 0)
-          // Update local state immediately on success — do not rely solely
-          // on the realtime subscription to reflect a confirmed write.
-          lockInv(invItem.id)
-          setInventory(prev => prev.map(i => i.id === invItem.id ? { ...i, stock: newStock, lots: newLots, costPrice: fifoCost } : i))
-          const { error: stockErr } = await supabase.from('inventory').update({ stock: newStock, lots: newLots, cost_price: fifoCost }).eq('id', invItem.id)
-          if (stockErr) {
-            deductionFailed = true
-            console.error('updateOrderStatus — inventory deduction:', stockErr)
-            toast(`فشل خصم المخزون للمنتج "${invItem.name}" — ${stockErr.message}`, 'error')
-            // Roll back the optimistic local change for this item only.
-            setInventory(prev => prev.map(i => i.id === invItem.id ? invItem : i))
-          }
-          unlockInv(invItem.id)
-        }
-        if (deductionFailed) {
-          // The order's status was already committed above (pre-flight
-          // matching passed for every item) — a write failure here is a
-          // rarer, non-deterministic case (e.g. a network error), not the
-          // "unmatched item" case this fix targets. Surfaced clearly
-          // rather than left silent, so it can be corrected manually.
-          toast('تنبيه: تم تحديث حالة الطلب إلى "تم الصرف" لكن حدث خطأ أثناء خصم بعض الأصناف من المخزون — يرجى المراجعة اليدوية', 'error')
+      if (willRestore) {
+        await restoreStockForOrder(order)
+        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
+        if (flagErr) {
+          console.error('updateOrderStatus — clearing inventory_deducted:', flagErr)
+        } else {
+          setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
         }
       }
 
@@ -411,7 +416,7 @@ export function OrdersProvider({ children }) {
         changedBy: user?.name || 'مجهول',
       })
     } finally {
-      if (isDispatching) dispatchingOrders.current.delete(id)
+      if (willRestore) dispatchingOrders.current.delete(id)
     }
   }
 
@@ -440,9 +445,14 @@ export function OrdersProvider({ children }) {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
       return
     }
-    // Restore inventory if goods had already been dispatched
-    if (order.status === 'تم الصرف') {
+    // Restore inventory if it had already been deducted (deduction now
+    // happens at order-creation time — see order_creation.sql — so this is
+    // keyed off the explicit `inventoryDeducted` flag, not order status).
+    if (order.inventoryDeducted) {
       await restoreStockForOrder(order)
+      const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
+      if (flagErr) console.error('cancelOrder — clearing inventory_deducted:', flagErr)
+      else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
     }
     await pushAudit({
       type: 'order_cancel', orderId: id,
@@ -500,10 +510,9 @@ export function OrdersProvider({ children }) {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
       return
     }
-    // Restore inventory when reverting a dispatch (goods going back to warehouse)
-    if (order.status === 'تم الصرف') {
-      await restoreStockForOrder(order)
-    }
+    // NOTE: dispatch (تم الصرف) no longer deducts inventory (deduction now
+    // happens at order-creation time — see order_creation.sql), so
+    // reverting FROM it no longer needs to restore stock here.
     await pushAudit({
       type: 'status_revert', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
@@ -518,31 +527,10 @@ export function OrdersProvider({ children }) {
     const previousStatus = order.status
 
     // ── Stock deduction detection ─────────────────────────────────────────────
-    // Stock is deducted the moment an order transitions INTO 'تم الصرف'.
-    // It may need restoring even if the order has since advanced to 'مكتمل' or
-    // 'تم التحصيل' — those moves do NOT reverse the inventory change.
-    //
-    // Algorithm:
-    //  1. If current status is 'تم الصرف', stock is clearly still deducted.
-    //  2. Otherwise scan editHistory for the last status_change TO 'تم الصرف'.
-    //     If found, check whether any subsequent event already restored stock
-    //     (returned_to_sales, a status_revert FROM 'تم الصرف', or a cancellation).
-    //     If none found → stock is still deducted and must be restored now.
-    const stockWasDeducted = (() => {
-      if (previousStatus === 'تم الصرف') return true
-      const history = order.editHistory || []
-      let lastDispatchIdx = -1
-      history.forEach((entry, idx) => {
-        if (entry.type === 'status_change' && entry.newStatus === 'تم الصرف') lastDispatchIdx = idx
-      })
-      if (lastDispatchIdx === -1) return false // Never dispatched → nothing to restore
-      // Any restoration event recorded after the dispatch?
-      return !history.slice(lastDispatchIdx + 1).some(e =>
-        e.type === 'returned_to_sales' ||
-        (e.type === 'status_revert' && e.previousStatus === 'تم الصرف') ||
-        e.type === 'cancellation'
-      )
-    })()
+    // Inventory is deducted at order-creation time and tracked explicitly
+    // via `inventoryDeducted` (see order_creation.sql / mappers.js) — no
+    // need to infer it from editHistory any more.
+    const stockWasDeducted = order.inventoryDeducted
 
     const returnEntry = {
       type: 'returned_to_sales',
@@ -572,6 +560,9 @@ export function OrdersProvider({ children }) {
     // and only when stock was actually deducted (and not already restored).
     if (stockWasDeducted) {
       await restoreStockForOrder(order)
+      const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
+      if (flagErr) console.error('returnToSales — clearing inventory_deducted:', flagErr)
+      else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
     }
 
     await pushAudit({
@@ -671,8 +662,13 @@ export function OrdersProvider({ children }) {
       stock:qty, lots, description:item.description||null, warranty:item.warranty||null,
     }
     const { error: invErr } = await supabase.from('inventory').insert(row)
-    if (invErr) { console.error('addInventoryItem:', invErr); toast('فشل إضافة المنتج — ' + invErr.message, 'error'); return }
+    if (invErr) {
+      console.error('addInventoryItem:', invErr)
+      toast(inventoryErrorMessage(invErr, 'فشل إضافة المنتج — '), 'error')
+      return null
+    }
     await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة صنف', oldValue:'—', newValue:`${qty} وحدة`, changedBy:user?.name||'مجهول' })
+    return mapItem(row)
   }
 
   const addStockLot = async (itemId, { qty, costPrice, note }, user) => {
@@ -729,7 +725,7 @@ export function OrdersProvider({ children }) {
     setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data, costPrice: data.costPrice ?? i.costPrice } : i))
     if (Object.keys(upd).length) {
       const { error: itmErr } = await supabase.from('inventory').update(upd).eq('id', id)
-      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast('فشل تعديل المنتج — ' + itmErr.message, 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); unlockInv(id); return }
+      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast(inventoryErrorMessage(itmErr, 'فشل تعديل المنتج — '), 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); unlockInv(id); return }
       const { data: confirmedItem } = await supabase.from('inventory').select('*').eq('id', id).single()
       if (confirmedItem) setInventory(prev => prev.map(i => i.id === id ? mapItem(confirmedItem) : i))
     }
@@ -807,7 +803,7 @@ export function OrdersProvider({ children }) {
       cancelledOrders: orders.filter(o => o.status === 'ملغي'),
       inventory, auditLog, taxInvoices, salesTargets, loading,
       hasMoreOrders, loadMoreOrders,
-      addOrder, updateOrder, updateOrderStatus, approveOrder, rejectOrder,
+      addOrder, updateOrder, resubmitOrder, updateOrderStatus, approveOrder, rejectOrder,
       cancelOrder, restoreOrder, revertLastStatus, returnToSales, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,

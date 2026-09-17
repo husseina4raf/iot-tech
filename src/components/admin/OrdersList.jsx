@@ -69,13 +69,14 @@ export default function OrdersList() {
     const timer = setTimeout(async () => {
       let query = supabase.from('orders').select('*').order('created_at', { ascending: false })
       if (dateFilter) {
-        // Full local calendar day, converted to proper UTC ISO boundaries
-        // for the TIMESTAMPTZ `created_at` column — safe regardless of the
-        // database server's own timezone setting, since a TIMESTAMPTZ
-        // comparison is always resolved in UTC internally.
-        const dayStart = new Date(`${dateFilter}T00:00:00`)
-        const dayEnd   = new Date(`${dateFilter}T23:59:59.999`)
-        query = query.gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString())
+        // `orders.date` is the Sales-selected "تاريخ التركيب" (installation/
+        // delivery date) — a plain DD-MM-YYYY TEXT field, the same one shown
+        // on the invoice (see OrderFormFields.jsx / pdfTemplates.js) — NOT
+        // `created_at` (row-insert time). Exact string equality, no
+        // timestamp/timezone arithmetic at all, so a picked calendar date
+        // can never shift by a day.
+        const [y, m, d] = dateFilter.split('-')
+        query = query.eq('date', `${d}-${m}-${y}`)
       }
       const { data, error } = await query
       if (cancelled) return

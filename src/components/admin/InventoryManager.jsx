@@ -158,8 +158,25 @@ export default function InventoryManager() {
     if (!importPreview?.rows?.length) return
     setImportLoading(true)
     let added = 0, lotAdded = 0, skipped = 0
+    // SKU is authoritative whenever a row has one — never merge into a
+    // different product just because the NAME happens to match; product
+    // names are explicitly allowed to repeat. Only rows with no SKU at
+    // all fall back to the previous name-based matching.
+    //
+    // Tracks SKUs created/matched WITHIN this import run, keyed by
+    // normalized SKU → { id, costPrice }. `inventory` (component state)
+    // won't reflect a row added earlier in this same loop until a
+    // realtime event round-trips back, so without this a second row
+    // sharing that same new SKU would incorrectly be treated as "not
+    // found" and create a duplicate product instead of topping up the
+    // first (or wrongly re-adding it as new every time).
+    const importedSkuMap = new Map()
     for (const row of importPreview.rows) {
-      const existing = inventory.find(i => i.name.toLowerCase() === row.name.toLowerCase())
+      const rowSku = (row.sku || '').trim().toLowerCase()
+      const existing = rowSku
+        ? (importedSkuMap.get(rowSku) || inventory.find(i => (i.sku || '').trim().toLowerCase() === rowSku) || null)
+        : (inventory.find(i => i.name.toLowerCase() === row.name.toLowerCase()) || null)
+
       if (existing) {
         if (existing.costPrice === Number(row.costPrice)) {
           skipped++
@@ -167,9 +184,11 @@ export default function InventoryManager() {
           await addStockLot(existing.id, { qty: Number(row.stock) || 0, costPrice: Number(row.costPrice), note: `استيراد Excel — سعر ${row.costPrice} LE` }, user)
           lotAdded++
         }
+        if (rowSku) importedSkuMap.set(rowSku, { id: existing.id, costPrice: Number(row.costPrice) })
       } else {
-        await addInventoryItem(row, user)
+        const created = await addInventoryItem(row, user)
         added++
+        if (rowSku && created) importedSkuMap.set(rowSku, { id: created.id, costPrice: created.costPrice })
       }
     }
     setImportLoading(false)
@@ -193,6 +212,17 @@ export default function InventoryManager() {
     const e = {}
     if (!form.name.trim())                       e.name      = 'اسم المنتج مطلوب'
     if (!form.costPrice || Number(form.costPrice) <= 0) e.costPrice = 'سعر التكلفة مطلوب'
+    // SKU is optional, but when provided it must be unique — trimmed and
+    // case-insensitive, matching the same normalization already used for
+    // SKU comparisons elsewhere (see findInventoryMatch in useOrders.jsx).
+    // Product NAME duplication remains allowed — this check is SKU-only.
+    // The item currently being edited is excluded so keeping its own SKU
+    // never triggers a false "already in use" error.
+    const sku = form.sku?.trim().toLowerCase()
+    if (sku) {
+      const dupSku = inventory.some(i => i.id !== editId && (i.sku || '').trim().toLowerCase() === sku)
+      if (dupSku) e.sku = 'هذا الـSKU مستخدم بالفعل لمنتج آخر'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -388,7 +418,7 @@ export default function InventoryManager() {
               </button>
             </div>
             <div className="m-grid-2" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
-              <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr"/>
+              <FInput label="SKU" value={form.sku} onChange={e => upd('sku', e.target.value)} placeholder="2396" dir="ltr" error={errors.sku}/>
               <FInput label="اسم الموديل" required error={errors.name} value={form.name} onChange={e => upd('name', e.target.value)} placeholder="Smart Lock XYZ" />
               <FCombo label="الماركة / البراند" options={INVENTORY_BRANDS} value={form.brand} onChange={e => upd('brand', e.target.value)} placeholder="اختر أو اكتب ماركة جديدة" />
               <FCombo label="التصنيف" options={INVENTORY_CATEGORIES} value={form.category} onChange={e => upd('category', e.target.value)} placeholder="اختر أو اكتب تصنيف جديد" />

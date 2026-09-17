@@ -6,7 +6,7 @@ import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function OrderForm({ editOrder = null, onSaved }) {
-  const { addOrder, updateOrder, inventory } = useOrders()
+  const { addOrder, updateOrder, resubmitOrder, inventory } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const isEdit = !!editOrder
@@ -113,9 +113,26 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
     if (isEdit) {
       const wasRejected = ['مرفوض', 'جديد'].includes(editOrder.status)
-      const finalData = wasRejected ? { ...orderData, status: 'بانتظار الموافقة' } : orderData
-      updateOrder(editOrder.id, finalData, user)
-      toast(wasRejected ? 'تم إرسال الطلب للمراجعة مجدداً ✓' : 'تم تحديث الطلب بنجاح ✓', 'success')
+      if (wasRejected) {
+        // Resubmitting after a return-to-Sales/rejection must re-deduct
+        // inventory with the FINAL edited quantities, atomically and
+        // idempotently — see resubmit_order() in order_creation.sql. Must
+        // wait for confirmed success before reporting success, exactly
+        // like a brand-new order below.
+        setSubmitting(true)
+        try {
+          await resubmitOrder(editOrder.id, orderData, user)
+          toast('تم إرسال الطلب للمراجعة مجدداً ✓', 'success')
+          onSaved?.()
+        } catch (err) {
+          toast(err.message || 'تعذر إرسال الطلب — يرجى المحاولة مرة أخرى.', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+        return
+      }
+      updateOrder(editOrder.id, orderData, user)
+      toast('تم تحديث الطلب بنجاح ✓', 'success')
       onSaved?.()
       return
     }

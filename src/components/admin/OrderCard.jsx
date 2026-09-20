@@ -49,13 +49,17 @@ export default function OrderCard({ order }) {
     toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
   }
 
-  const onReturnToSales = () => {
-    // Show stock note whenever the order has gone through dispatch (current or historical)
-    const dispatchedStatuses = ['تم الصرف', 'مكتمل', 'تم التحصيل']
-    const stockNote = dispatchedStatuses.includes(order.status) ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+  const onReturnToSales = async () => {
+    // Inventory is deducted at order-creation time now, not at dispatch —
+    // so whether stock will be restored depends on the explicit
+    // `inventoryDeducted` flag, not on which status the order has reached.
+    const stockNote = order.inventoryDeducted ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
     if (!window.confirm(`هل تريد إعادة الطلب للسيلز للتعديل؟\nسيتغير وضع الطلب إلى "جديد" ويظهر للمندوب مجدداً.${stockNote}`)) return
-    returnToSales(order.id, user)
-    toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
+    // returnToSales() already shows its own error toast on failure (order
+    // update failure or incomplete inventory restore) — only show success
+    // here once it's confirmed the whole operation actually completed.
+    const ok = await returnToSales(order.id, user)
+    if (ok) toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
   }
 
   const onDelete = () => {

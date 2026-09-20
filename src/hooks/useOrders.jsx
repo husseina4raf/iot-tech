@@ -448,11 +448,18 @@ export function OrdersProvider({ children }) {
     // Restore inventory if it had already been deducted (deduction now
     // happens at order-creation time — see order_creation.sql — so this is
     // keyed off the explicit `inventoryDeducted` flag, not order status).
+    // The flag is only cleared once the restore is CONFIRMED complete —
+    // restoreStockForOrder() reports whether every item actually
+    // succeeded, so a partial failure (already surfaced via its own error
+    // toast) leaves inventory_deducted untouched rather than lying about
+    // the order's true stock state.
     if (order.inventoryDeducted) {
-      await restoreStockForOrder(order)
-      const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
-      if (flagErr) console.error('cancelOrder — clearing inventory_deducted:', flagErr)
-      else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
+      const restored = await restoreStockForOrder(order)
+      if (restored) {
+        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
+        if (flagErr) console.error('cancelOrder — clearing inventory_deducted:', flagErr)
+        else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
+      }
     }
     await pushAudit({
       type: 'order_cancel', orderId: id,
@@ -521,9 +528,13 @@ export function OrdersProvider({ children }) {
     })
   }
 
+  // Returns `true` only when the order was returned to Sales AND (if stock
+  // had been deducted) inventory was fully restored — callers (e.g.
+  // OrderCard.jsx) use this to decide whether to show a success toast,
+  // instead of assuming success as soon as the call is made.
   const returnToSales = async (id, user) => {
     const order = orders.find(o => o.id === id)
-    if (!order) return
+    if (!order) return false
     const previousStatus = order.status
 
     // ── Stock deduction detection ─────────────────────────────────────────────
@@ -553,16 +564,27 @@ export function OrdersProvider({ children }) {
       console.error('returnToSales:', error)
       toast('فشل إعادة الطلب للسيلز — ' + error.message, 'error')
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus, editHistory: order.editHistory } : o))
-      return
+      return false
     }
 
     // Restore stock only when we confirmed the order update succeeded,
     // and only when stock was actually deducted (and not already restored).
+    // inventory_deducted is only cleared once the restore is CONFIRMED
+    // complete (see restoreStockForOrder()'s return value) — a partial
+    // failure already shows its own error toast and leaves the flag as-is
+    // rather than falsely reporting the stock as restored.
+    let stockRestored = true
     if (stockWasDeducted) {
-      await restoreStockForOrder(order)
-      const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
-      if (flagErr) console.error('returnToSales — clearing inventory_deducted:', flagErr)
-      else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
+      stockRestored = await restoreStockForOrder(order)
+      if (stockRestored) {
+        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
+        if (flagErr) {
+          console.error('returnToSales — clearing inventory_deducted:', flagErr)
+          stockRestored = false
+        } else {
+          setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
+        }
+      }
     }
 
     await pushAudit({
@@ -571,6 +593,8 @@ export function OrdersProvider({ children }) {
       field: 'إعادة للسيلز للتعديل', oldValue: previousStatus, newValue: 'جديد',
       changedBy: user?.name || 'مجهول',
     })
+
+    return stockRestored
   }
 
   const deleteOrder = async (id, user) => {
@@ -617,7 +641,17 @@ export function OrdersProvider({ children }) {
   // ── Stock restoration helper ──────────────────────────────────────────────────
   // Called when a dispatched order ('تم الصرف') is cancelled or reverted.
   // Adds back each item's quantity to inventory as a return lot.
+  //
+  // Returns `true` only if EVERY item's inventory write actually succeeded.
+  // This is a plain sequence of independent client-side UPDATE calls, not a
+  // database transaction — if one item fails partway through, the items
+  // already written stay restored (not rolled back) while the boolean
+  // result tells the caller the overall restore is incomplete, so it must
+  // NOT treat the order's stock as fully restored (e.g. must not clear
+  // inventory_deducted). This does not fix the underlying items again —
+  // it only prevents the flag from lying about what happened.
   const restoreStockForOrder = async (order) => {
+    let allSucceeded = true
     for (const item of (order.items || [])) {
       // SKU-first, same as the dispatch-time deduction — keeps both paths
       // resolving to the same inventory row for the same item.
@@ -641,6 +675,7 @@ export function OrdersProvider({ children }) {
         .update({ stock: newStock, lots: updatedLots, cost_price: fifoCost })
         .eq('id', invItem.id)
       if (error) {
+        allSucceeded = false
         console.error('restoreStockForOrder:', error)
         toast(`فشل إعادة المخزون للمنتج "${invItem.name}" — ${error.message}`, 'error')
         setInventory(prev => prev.map(i => i.id === invItem.id
@@ -648,6 +683,7 @@ export function OrdersProvider({ children }) {
       }
       unlockInv(invItem.id)
     }
+    return allSucceeded
   }
 
   // ── Inventory ─────────────────────────────────────────────────────────────────

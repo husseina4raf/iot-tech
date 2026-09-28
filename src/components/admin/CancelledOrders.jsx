@@ -15,16 +15,15 @@ export default function CancelledOrders() {
   const { user } = useAuth()
   const toast = useToast()
 
-  const onRestore = (order) => {
-    if (!window.confirm(`هل تريد استعادة طلب "${order.clientName}"؟\nسيعود الطلب إلى حالته السابقة.`)) return
-    restoreOrder(order.id, user)
-    toast('تمت استعادة الطلب ✓', 'success')
+  const onRestore = async (order) => {
+    if (!window.confirm(`هل تريد استعادة طلب "${order.clientName}"؟\nسيعود الطلب إلى حالته السابقة، وسيتم خصم كمياته من المخزون مجدداً إذا كان محجوزاً قبل الإلغاء.`)) return
+    // The hook shows its own error toast (e.g. stock no longer sufficient)
+    if (await restoreOrder(order.id, user)) toast('تمت استعادة الطلب ✓', 'success')
   }
 
-  const onDelete = (order) => {
+  const onDelete = async (order) => {
     if (!window.confirm(`هل أنت متأكد من الحذف النهائي لطلب "${order.clientName}"؟\nلا يمكن التراجع عن هذا الإجراء.`)) return
-    deleteOrder(order.id, user)
-    toast('تم الحذف النهائي للطلب', 'success')
+    if (await deleteOrder(order.id, user)) toast('تم الحذف النهائي للطلب', 'success')
   }
 
   if (cancelledOrders.length === 0) {

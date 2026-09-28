@@ -60,11 +60,13 @@ const emptyForm = () => ({
 })
 
 export default function InventoryManager() {
-  const { inventory, addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem } = useOrders()
+  const { inventory, addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem, adjustInventoryStock, reconcileInventoryLots } = useOrders()
   const { user } = useAuth()
   const toast = useToast()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
+  // The product exactly as it was when the edit form opened — only fields the admin actually changes are sent, and the stock figure is compared against this by the database
+  const [editOriginal, setEditOriginal] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [adjustModal, setAdjustModal] = useState(null) // { id, name, currentStock }
   const [adjustQty, setAdjustQty] = useState('')
@@ -157,7 +159,7 @@ export default function InventoryManager() {
   const handleConfirmImport = async () => {
     if (!importPreview?.rows?.length) return
     setImportLoading(true)
-    let added = 0, lotAdded = 0, skipped = 0
+    let added = 0, lotAdded = 0, skipped = 0, failed = 0
     // SKU is authoritative whenever a row has one — never merge into a
     // different product just because the NAME happens to match; product
     // names are explicitly allowed to repeat. Only rows with no SKU at
@@ -178,16 +180,18 @@ export default function InventoryManager() {
         : (inventory.find(i => i.name.toLowerCase() === row.name.toLowerCase()) || null)
 
       if (existing) {
-        if (existing.costPrice === Number(row.costPrice)) {
+        if (existing.costPrice === Number(row.costPrice) || (Number(row.stock) || 0) < 1) {
           skipped++
-        } else {
-          await addStockLot(existing.id, { qty: Number(row.stock) || 0, costPrice: Number(row.costPrice), note: `استيراد Excel — سعر ${row.costPrice} LE` }, user)
+        } else if (await addStockLot(existing.id, { qty: Number(row.stock) || 0, costPrice: Number(row.costPrice), note: `استيراد Excel — سعر ${row.costPrice} LE` }, user)) {
           lotAdded++
+        } else {
+          failed++
         }
         if (rowSku) importedSkuMap.set(rowSku, { id: existing.id, costPrice: Number(row.costPrice) })
       } else {
         const created = await addInventoryItem(row, user)
-        added++
+        if (created) added++
+        else failed++
         if (rowSku && created) importedSkuMap.set(rowSku, { id: created.id, costPrice: created.costPrice })
       }
     }
@@ -196,6 +200,7 @@ export default function InventoryManager() {
     if (added)    parts.push(`${added} منتج جديد`)
     if (lotAdded) parts.push(`${lotAdded} دفعة جديدة لمنتجات موجودة`)
     if (skipped)  parts.push(`${skipped} مكرر تم تجاهله`)
+    if (failed)   parts.push(`${failed} فشل (راجع الرسائل أعلاه)`)
     toast(parts.join(' · ') + ' ✓', 'success')
     setImportPreview(null)
   }
@@ -204,6 +209,7 @@ export default function InventoryManager() {
   const openEdit = (item) => {
     setForm({ sku: item.sku || '', name: item.name, nameAr: item.nameAr, brand: item.brand || '', stock: item.stock, minStock: item.minStock, price: item.price, costPrice: item.costPrice || '', category: item.category || INVENTORY_CATEGORIES[0], supplier: item.supplier || '', notes: item.notes || '' })
     setEditId(item.id)
+    setEditOriginal(item)
     setErrors({})
     setShowForm(true)
   }
@@ -214,7 +220,7 @@ export default function InventoryManager() {
     if (!form.costPrice || Number(form.costPrice) <= 0) e.costPrice = 'سعر التكلفة مطلوب'
     // SKU is optional, but when provided it must be unique — trimmed and
     // case-insensitive, matching the same normalization already used for
-    // SKU comparisons elsewhere (see findInventoryMatch in useOrders.jsx).
+    // SKU comparisons elsewhere (see _order_resolve_inventory_id in order_creation.sql).
     // Product NAME duplication remains allowed — this check is SKU-only.
     // The item currently being edited is excluded so keeping its own SKU
     // never triggers a false "already in use" error.
@@ -227,40 +233,78 @@ export default function InventoryManager() {
     return Object.keys(e).length === 0
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return
-    const data = { ...form, stock: Number(form.stock) || 0, minStock: Number(form.minStock) || 3, price: Number(form.price) || 0, costPrice: Number(form.costPrice) || 0 }
     if (editId) {
-      updateInventoryItem(editId, data, user)
-      toast('تم تحديث المنتج ✓', 'success')
+      const orig = editOriginal
+      const same = (x, y) => String(x ?? '').trim() === String(y ?? '').trim()
+      // Descriptive changes only — and only the ones actually changed. Stock, lots and cost are
+      // never re-sent from a stale form (that used to silently overwrite reservations made
+      // since the form was opened).
+      const changes = {}
+      if (!same(form.name, orig.name))         changes.name = form.name.trim()
+      if (!same(form.sku, orig.sku))           changes.sku = form.sku.trim()
+      if (!same(form.brand, orig.brand))       changes.brand = form.brand
+      if (!same(form.category, orig.category)) changes.category = form.category
+      if ((Number(form.price) || 0) !== (Number(orig.price) || 0))          changes.price = Number(form.price) || 0
+      if ((Number(form.costPrice) || 0) !== (Number(orig.costPrice) || 0))  changes.costPrice = Number(form.costPrice) || 0
+
+      const newStock = Number(form.stock) || 0
+      const stockChanged = newStock !== (Number(orig.stock) || 0)
+      if (stockChanged && (!Number.isInteger(newStock) || newStock < 0)) {
+        return toast('الكمية المتاحة يجب أن تكون عدداً صحيحاً غير سالب', 'error')
+      }
+
+      let ok = true
+      if (Object.keys(changes).length) ok = await updateInventoryItem(editId, changes, user)
+      // expectedStock = what the admin saw; the database refuses if reservations changed it since
+      if (ok && stockChanged) ok = await adjustInventoryStock(editId, { expectedStock: Number(orig.stock) || 0, newStock, note: 'تعديل من شاشة المنتج' }, user)
+      if (!ok) return   // the hook already showed the reason; keep the form open
+      toast(Object.keys(changes).length || stockChanged ? 'تم تحديث المنتج ✓' : 'لا توجد تغييرات لحفظها', 'success')
     } else {
+      const data = { ...form, stock: Number(form.stock) || 0, minStock: Number(form.minStock) || 3, price: Number(form.price) || 0, costPrice: Number(form.costPrice) || 0 }
       addInventoryItem(data, user)
       toast('تم إضافة المنتج ✓', 'success')
     }
-    setShowForm(false); setEditId(null); setForm(emptyForm())
+    setShowForm(false); setEditId(null); setEditOriginal(null); setForm(emptyForm())
   }
 
-  const handleDelete = (item) => {
+  const handleDelete = async (item) => {
     if (!window.confirm(`هل أنت متأكد من حذف "${item.name}"؟`)) return
-    deleteInventoryItem(item.id, user)
-    toast('تم حذف المنتج', 'success')
+    // Refused by the database while a reserved order still depends on the product (reason shown by the hook)
+    if (await deleteInventoryItem(item.id, user)) toast('تم حذف المنتج', 'success')
   }
 
-  const handleAdjust = () => {
-    if (!adjustQty || isNaN(adjustQty) || Number(adjustQty) <= 0) return toast('يرجى إدخال كمية صحيحة', 'error')
+  const handleAdjust = async () => {
+    if (!adjustQty || isNaN(adjustQty) || Number(adjustQty) <= 0 || !Number.isInteger(Number(adjustQty))) return toast('يرجى إدخال كمية صحيحة (عدد صحيح أكبر من صفر)', 'error')
     if (!adjustCost || isNaN(adjustCost) || Number(adjustCost) <= 0) return toast('يرجى إدخال سعر التكلفة', 'error')
-    addStockLot(adjustModal.id, { qty: Number(adjustQty), costPrice: Number(adjustCost), note: adjustNote }, user)
+    if (!(await addStockLot(adjustModal.id, { qty: Number(adjustQty), costPrice: Number(adjustCost), note: adjustNote }, user))) return
     toast('تم إضافة الدفعة ✓', 'success')
     setAdjustModal(null); setAdjustQty(''); setAdjustCost(''); setAdjustNote('')
   }
 
+  // A product whose stock figure and lots disagree cannot be sold from safely (orders are refused
+  // until it is fixed). This is the explicit, reasoned, server-audited way to fix it.
+  const handleReconcile = async (item) => {
+    const lotsSum = (item.lots || []).reduce((sum, l) => sum + (Number(l.qty) || 0), 0)
+    const stock = Number(item.stock) || 0
+    const mode = lotsSum < stock ? 'add_lot_for_shortfall' : 'set_stock_to_lots'
+    const explain = mode === 'add_lot_for_shortfall'
+      ? `سيتم إضافة دفعة تسوية بكمية ${stock - lotsSum} لتغطية النقص في الدفعات (المخزون ${stock} — مجموع الدفعات ${lotsSum}).`
+      : `سيتم ضبط المخزون ليساوي مجموع الدفعات (${lotsSum}) بدلاً من ${stock}.`
+    const reason = window.prompt(`${item.name}\n${explain}\nاكتب سبب التسوية (مطلوب):`)
+    if (!reason || !reason.trim()) return
+    if (await reconcileInventoryLots(item.id, mode, reason.trim())) toast('تمت تسوية الدفعات ✓', 'success')
+  }
+
   const toggleLots = (id) => setExpandedLots(p => ({ ...p, [id]: !p[id] }))
 
-  const handleSaveLot = () => {
+  const handleSaveLot = async () => {
     if (!editLot) return
-    if (!editLot.qty || Number(editLot.qty) <= 0) return toast('الكمية يجب أن تكون أكبر من 0', 'error')
+    if (!editLot.qty || Number(editLot.qty) <= 0 || !Number.isInteger(Number(editLot.qty))) return toast('الكمية يجب أن تكون عدداً صحيحاً أكبر من 0', 'error')
     if (!editLot.costPrice || Number(editLot.costPrice) <= 0) return toast('سعر التكلفة يجب أن يكون أكبر من 0', 'error')
-    updateStockLot(editLot.itemId, editLot.lotId, { qty: editLot.qty, costPrice: editLot.costPrice, note: editLot.note }, user)
+    // expectedQty = the lot quantity when editing began; the database refuses if it changed since
+    if (!(await updateStockLot(editLot.itemId, editLot.lotId, { qty: editLot.qty, costPrice: editLot.costPrice, note: editLot.note, expectedQty: Number(editLot.originalQty) }, user))) return
     toast('تم تعديل الدفعة ✓', 'success')
     setEditLot(null)
   }
@@ -546,6 +590,12 @@ export default function InventoryManager() {
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:16, fontWeight:800, color: isLow ? '#e11d48' : '#0f172a' }}>{item.stock}</span>
                       <span style={{ fontSize:10, color:'#94a3b8' }}>وحدة</span>
+                      {(item.lots || []).reduce((sum, l) => sum + (Number(l.qty) || 0), 0) !== (Number(item.stock) || 0) && (
+                        <button onClick={() => handleReconcile(item)} title="مخزون الصنف لا يطابق مجموع دفعاته — لن تُقبل طلبات عليه حتى تتم التسوية"
+                          style={{ padding:'2px 7px', borderRadius:5, border:'1px solid #fecdd3', background:'#fff1f2', color:'#be123c', fontSize:10, fontWeight:700, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
+                          ⚠ الدفعات لا تطابق المخزون — تسوية
+                        </button>
+                      )}
                       {lotCount > 0 && (
                         <button onClick={() => toggleLots(item.id)}
                           style={{ display:'flex', alignItems:'center', gap:2, padding:'2px 7px', borderRadius:5, border:`1px solid ${lotsOpen ? '#93c5fd' : '#bfdbfe'}`, background: lotsOpen ? '#eff6ff' : '#fff', color:'#1d4ed8', fontSize:10, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif', marginTop:2 }}>
@@ -637,7 +687,7 @@ export default function InventoryManager() {
                                       <td style={{ padding:'7px 14px', textAlign:'center', fontWeight:700, color:'#059669' }} dir="ltr">{lot.costPrice.toLocaleString()} LE</td>
                                       <td style={{ padding:'7px 14px', textAlign:'center', color:'#64748b', fontSize:11 }}>{lot.note || '—'}</td>
                                       <td style={{ padding:'7px 14px', textAlign:'center' }}>
-                                        <button onClick={() => setEditLot({ itemId: item.id, lotId: lot.id, qty: lot.qty, costPrice: lot.costPrice, note: lot.note || '' })}
+                                        <button onClick={() => setEditLot({ itemId: item.id, lotId: lot.id, qty: lot.qty, originalQty: lot.qty, costPrice: lot.costPrice, note: lot.note || '' })}
                                           style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'3px 9px', borderRadius:6, border:'1.5px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
                                           <Pencil size={10}/>تعديل
                                         </button>

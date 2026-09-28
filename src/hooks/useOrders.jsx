@@ -3,30 +3,44 @@ import { supabase } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 import { useAuth } from './useAuth'
 import { mapOrder, mapItem, mapAudit, mapTax, mapTarget } from '../lib/mappers'
+import { friendlyRpcError } from '../lib/orderInventory'
 
 const OrdersContext = createContext(null)
 
 const PAGE_SIZE = 100
 
-// Matches an order item to its inventory record. SKU is authoritative
-// whenever the order item has one — an exact (trimmed, case-insensitive)
-// SKU match is unambiguous, unlike name matching, which can silently
-// match the wrong product whenever one product's name happens to be a
-// substring of another's, or fail entirely once an inventory item's name
-// has been edited since the order was created. Falls back to the
-// original fuzzy name match only when the item genuinely has no SKU
-// (e.g. a free-typed line never selected from the inventory picker).
-// Used by both the dispatch-time deduction and the restore-stock path, so
-// the two always resolve to the same inventory row for the same item.
-function findInventoryMatch(item, inventoryList) {
-  const sku = (item.sku || '').trim().toLowerCase()
-  if (sku) {
-    return inventoryList.find(i => (i.sku || '').trim().toLowerCase() === sku) || null
+// Inventory matching (SKU-first, name fallback only when the line has no
+// SKU) and every stock movement now live in the database — see
+// _order_resolve_inventory_id() / _order_apply_inventory() in
+// src/lib/order_creation.sql. The client no longer computes stock values.
+
+// Calls an order RPC. If Postgres aborted the call with a deadlock (40P01) or
+// serialization failure (40001) the whole transaction was rolled back, so
+// retrying once is safe (no partial effect, no duplicate). Network errors and
+// every other error are NOT retried: after those it is unknown whether the
+// server committed.
+async function callRpc(fn, args) {
+  const res = await supabase.rpc(fn, args)
+  if (res.error && (res.error.code === '40P01' || res.error.code === '40001')) {
+    return supabase.rpc(fn, args)
   }
-  return inventoryList.find(i =>
-    i.name.toLowerCase().includes(item.name.toLowerCase()) ||
-    item.name.toLowerCase().includes(i.name.toLowerCase())
-  ) || null
+  return res
+}
+
+// The order fields every order RPC accepts (camelCase, as the SQL functions read them).
+function buildOrderPayload(d) {
+  return {
+    clientName:    d.clientName,   company:      d.company,
+    mobile:        d.mobile,       whatsapp:     d.whatsapp,
+    address:       d.address,      locationLink: d.locationLink,
+    salesRep:      d.salesRep,     items:        d.items,
+    subtotal:      d.subtotal,     vatPercent:   d.vatPercent,
+    vatAmount:     d.vatAmount,    total:        d.total,
+    invoiceType:   d.invoiceType,  invoiceName:  d.invoiceName,
+    taxNumber:     d.taxNumber,    notes:        d.notes,
+    paymentMethod: d.paymentMethod,
+    date: d.date, time: d.time,
+  }
 }
 
 // Translates a duplicate-SKU database error (Postgres 23505, from the
@@ -56,14 +70,12 @@ export function OrdersProvider({ children }) {
   const [loading,       setLoading]       = useState(true)
   const [hasMoreOrders, setHasMoreOrders] = useState(false)
   const [ordersPage,    setOrdersPage]    = useState(0)
-  // Tracks inventory item IDs we just wrote to — blocks stale real-time events
-  const pendingInvWrites = useRef(new Set())
-  // Tracks order IDs currently mid-rejection (transitioning to مرفوض) —
-  // closes the rapid-double-click race for the inventory restore that
-  // rejection triggers. A ref, not state: it must be synchronously visible
-  // to a second invocation within the same tick, which a batched setState
-  // update would not guarantee.
-  const dispatchingOrders = useRef(new Set())
+  // Order IDs with a lifecycle RPC (return / reject / cancel / un-cancel /
+  // revert) currently in flight — a fast double-click is stopped here without
+  // waiting for a round trip. A ref, not state, so a second invocation in the
+  // same tick sees it synchronously. The database still enforces correctness
+  // on its own (row lock + status checks); this only avoids a needless call.
+  const inFlightOrderOps = useRef(new Set())
 
   const loadMoreOrders = useCallback(async () => {
     const next = ordersPage + 1
@@ -146,8 +158,7 @@ export function OrdersProvider({ children }) {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, p => {
         if (p.eventType === 'INSERT') setInventory(prev => prev.some(i => i.id === p.new.id) ? prev : [...prev, mapItem(p.new)])
-        // Skip UPDATE events for items we just wrote — our confirmed state is already correct
-        if (p.eventType === 'UPDATE' && !pendingInvWrites.current.has(p.new.id)) setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
+        if (p.eventType === 'UPDATE') setInventory(prev => prev.map(i => i.id === p.new.id ? mapItem(p.new) : i))
         if (p.eventType === 'DELETE') setInventory(prev => prev.filter(i => i.id !== p.old.id))
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_log' }, p => {
@@ -198,143 +209,117 @@ export function OrdersProvider({ children }) {
     })
   }, [])
 
-  // ── Orders ────────────────────────────────────────────────────────────────────
-  // A raw Arabic-lettered message is one of create_order()'s own RAISE
-  // EXCEPTION messages (see order_creation.sql) — those are already
-  // written to be shown to the user as-is. Anything else (a raw
-  // Postgres/network error, e.g. a driver-level duplicate-key message)
-  // gets replaced with a generic, friendly message rather than exposed.
-  const isUserFacingMessage = (msg) => /[؀-ۿ]/.test(msg || '')
-  const friendlyOrderError = (err) => isUserFacingMessage(err?.message)
-    ? err.message
-    : 'تعذر حفظ الطلب — يرجى المحاولة مرة أخرى.'
+  // The stock rows were changed by a database function, not by this client, so
+  // local inventory state must be re-read rather than patched from guesses.
+  // Failure here is harmless (realtime / the visibility refetch will catch up).
+  const refreshInventory = async () => {
+    const { data, error } = await supabase.from('inventory').select('*').order('name', { ascending: true })
+    if (error) { console.error('refreshInventory:', error); return }
+    setInventory((data || []).map(mapItem))
+  }
 
-  // Serial generation is no longer computed here (it previously read
-  // Math.max(...) over this component's local, paginated `orders` array —
-  // exactly the race that let two browsers compute the same serial before
-  // realtime caught up). The complete `orders` table, the sequence, and
-  // the atomic reservation all now live in create_order() — see
-  // src/lib/order_creation.sql.
+  // ── Orders ────────────────────────────────────────────────────────────────────
+  // The RPCs' own RAISE EXCEPTION messages are Arabic and shown as-is; raw
+  // Postgres/PostgREST errors are translated (missing function, deadlock,
+  // expired session, ...) or replaced with this generic text plus the error
+  // code, so a failure is diagnosable from the toast (see lib/orderInventory.js).
+  const friendlyOrderError = (err) =>
+    friendlyRpcError(err, 'تعذر حفظ الطلب — يرجى المحاولة مرة أخرى.')
+
+  // Re-reads ONE order from the database and replaces the local copy (or drops it if it
+  // no longer exists). Called after any failed or refused write, so the screen never keeps
+  // showing a state the database rejected or that another user has since changed.
+  const refreshOrder = async (id) => {
+    const { data, error } = await supabase.from('orders').select('*').eq('id', id).maybeSingle()
+    if (error) { console.error('refreshOrder:', error); return }
+    if (!data) { setOrders(prev => prev.filter(o => o.id !== id)); return }
+    const fresh = mapOrder(data)
+    setOrders(prev => prev.some(o => o.id === id) ? prev.map(o => o.id === id ? fresh : o) : [fresh, ...prev])
+  }
+
+  // Serial generation, the stock deduction and the insert all happen inside
+  // create_order() (src/lib/order_creation.sql), in one transaction. `clientRequestId`
+  // (one random id per submission intent, reused only for retries of the SAME payload)
+  // lets the database recognise a retry whose first attempt committed but whose response
+  // was lost, and return that original order instead of creating and deducting twice.
   const addOrder = async (orderData, user) => {
-    const { data, error: rpcError } = await supabase.rpc('create_order', {
-      p_order: {
-        clientName:   orderData.clientName,   company:      orderData.company,
-        mobile:       orderData.mobile,       whatsapp:     orderData.whatsapp,
-        address:      orderData.address,      locationLink: orderData.locationLink,
-        salesRep:     orderData.salesRep,     items:        orderData.items,
-        subtotal:     orderData.subtotal,     vatPercent:   orderData.vatPercent,
-        vatAmount:    orderData.vatAmount,    total:        orderData.total,
-        invoiceType:  orderData.invoiceType,  invoiceName:  orderData.invoiceName,
-        taxNumber:    orderData.taxNumber,    notes:        orderData.notes,
-        paymentMethod: orderData.paymentMethod,
-        date: orderData.date, time: orderData.time,
-      },
+    const { data, error: rpcError } = await callRpc('create_order', {
+      p_order: { ...buildOrderPayload(orderData), clientRequestId: orderData.clientRequestId },
     })
     if (rpcError) {
       console.error('addOrder (create_order RPC):', rpcError)
       throw new Error(friendlyOrderError(rpcError))
     }
     const newOrder = mapOrder(data)
-    // Add to local state only now that the database has confirmed the
-    // insert — the real, server-generated id/serial is used directly, so
-    // there is nothing to roll back and nothing that could ever mismatch
-    // what was actually written. The realtime INSERT handler below already
-    // dedupes by id, so a subsequent echo of this same row is a no-op.
+    // A replayed request returns an order this client may already know (realtime delivers
+    // the INSERT) — then the audit row was already written for it.
+    const alreadyKnown = orders.some(o => o.id === newOrder.id)
     setOrders(prev => prev.some(o => o.id === newOrder.id) ? prev : [newOrder, ...prev])
-    await pushAudit({
-      type: 'order_create', orderId: newOrder.id,
-      orderRef: `${orderData.clientName} — ${orderData.company}`,
-      field: 'إنشاء طلب', oldValue: '—',
-      newValue: `${orderData.total?.toLocaleString()} LE`,
-      changedBy: user?.name || newOrder.salesRep || 'مجهول',
-    })
+    await refreshInventory()
+    if (!alreadyKnown) {
+      await pushAudit({
+        type: 'order_create', orderId: newOrder.id,
+        orderRef: `${orderData.clientName} — ${orderData.company}`,
+        field: 'إنشاء طلب', oldValue: '—',
+        newValue: `${orderData.total?.toLocaleString()} LE`,
+        changedBy: user?.name || newOrder.salesRep || 'مجهول',
+      })
+    }
     return newOrder
   }
 
+  // Plain edit (no status change, no stock movement) → update_order_details(). Carries the
+  // order's updated_at as it was when the form was opened: if anyone changed the order
+  // since, the database refuses (stale form) instead of overwriting. While the order holds
+  // stock its SKUs / quantities / lines are frozen server-side — change those through
+  // Return to Sales → edit → resubmit. Throws on failure; state changes only on success.
   const updateOrder = async (id, orderData, user) => {
-    const order = orders.find(o => o.id === id)
-    const editHistory = [...(order?.editHistory || []), {
-      editedAt: new Date().toISOString(),
-      editedBy: user?.name || 'مجهول',
-      note: 'تم التعديل',
-    }]
-    const updatedRow = {
-      client_name: orderData.clientName, company: orderData.company,
-      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
-      address: orderData.address, location_link: orderData.locationLink,
-      sales_rep: orderData.salesRep, items: orderData.items,
-      subtotal: orderData.subtotal, vat_percent: orderData.vatPercent,
-      vat_amount: orderData.vatAmount, total: orderData.total,
-      invoice_type: orderData.invoiceType, invoice_name: orderData.invoiceName,
-      tax_number: orderData.taxNumber, notes: orderData.notes,
-      payment_method: orderData.paymentMethod,
-      date: orderData.date, time: orderData.time,
-      updated_at: new Date().toISOString(),
-      edit_history: editHistory,
-      ...(orderData.status && { status: orderData.status }),
+    const token = orderData.expectedUpdatedAt ?? orders.find(o => o.id === id)?.updatedAt ?? null
+    const { data, error } = await callRpc('update_order_details', {
+      p_order_id: id,
+      p_expected_updated_at: token,
+      p_order: { ...buildOrderPayload(orderData), changedByName: user?.name },
+    })
+    if (error) {
+      console.error('updateOrder (update_order_details RPC):', error)
+      await refreshOrder(id)
+      throw new Error(friendlyRpcError(error, 'فشل تحديث الطلب — يرجى المحاولة مرة أخرى.'))
     }
-    // Optimistic update — reflect edit immediately
-    setOrders(prev => prev.map(o => o.id === id ? {
-      ...o,
-      clientName: orderData.clientName, company: orderData.company,
-      mobile: orderData.mobile, whatsapp: orderData.whatsapp,
-      address: orderData.address, locationLink: orderData.locationLink,
-      governorate: orderData.governorate, city: orderData.city,
-      district: orderData.district, street: orderData.street, buildingNo: orderData.buildingNo,
-      salesRep: orderData.salesRep, items: orderData.items,
-      subtotal: orderData.subtotal, vatPercent: orderData.vatPercent,
-      vatAmount: orderData.vatAmount, total: orderData.total,
-      invoiceType: orderData.invoiceType, invoiceName: orderData.invoiceName,
-      taxNumber: orderData.taxNumber, notes: orderData.notes,
-      paymentMethod: orderData.paymentMethod, date: orderData.date, time: orderData.time,
-      updatedAt: new Date().toISOString(), editHistory: editHistory,
-      ...(orderData.status && { status: orderData.status }),
-    } : o))
-    const { error: updateErr } = await supabase.from('orders').update(updatedRow).eq('id', id)
-    if (updateErr) {
-      console.error('updateOrder:', updateErr)
-      toast('فشل تحديث الطلب — ' + updateErr.message, 'error')
-      return
-    }
+    const previous = orders.find(o => o.id === id)
+    const updated = mapOrder(data)
+    setOrders(prev => prev.map(o => o.id === id ? updated : o))
     await pushAudit({
       type: 'order_edit', orderId: id,
-      orderRef: `${order?.clientName} — ${order?.company}`,
+      orderRef: `${previous?.clientName ?? updated.clientName} — ${previous?.company ?? updated.company}`,
       field: 'تعديل الطلب',
-      oldValue: `${order?.total?.toLocaleString()} LE`,
+      oldValue: `${previous?.total?.toLocaleString()} LE`,
       newValue: `${orderData.total?.toLocaleString()} LE`,
       changedBy: user?.name || 'مجهول',
     })
+    return updated
   }
 
-  // Resubmitting an order that was returned to Sales (جديد) or rejected
-  // (مرفوض) must deduct inventory again — but atomically, using the FINAL
-  // edited quantities only, and only once even under a rapid double-click
-  // or concurrent tab. See resubmit_order() in order_creation.sql: it row-
-  // locks the order, checks inventory_deducted itself, and does the order
-  // update + FIFO SKU-first deduction in the same DB transaction.
+  // Resubmitting an order that was returned to Sales (جديد) or rejected (مرفوض) deducts
+  // inventory again — atomically, using the FINAL edited quantities only, and only once
+  // even under a rapid double-click or a second tab (resubmit_order row-locks the order and
+  // checks its state itself). The version token stops a stale form overwriting a newer edit.
   const resubmitOrder = async (id, orderData, user) => {
-    const { data, error: rpcError } = await supabase.rpc('resubmit_order', {
+    const { data, error: rpcError } = await callRpc('resubmit_order', {
       p_order_id: id,
       p_order: {
-        clientName:   orderData.clientName,   company:      orderData.company,
-        mobile:       orderData.mobile,       whatsapp:     orderData.whatsapp,
-        address:      orderData.address,      locationLink: orderData.locationLink,
-        salesRep:     orderData.salesRep,     items:        orderData.items,
-        subtotal:     orderData.subtotal,     vatPercent:   orderData.vatPercent,
-        vatAmount:    orderData.vatAmount,    total:        orderData.total,
-        invoiceType:  orderData.invoiceType,  invoiceName:  orderData.invoiceName,
-        taxNumber:    orderData.taxNumber,    notes:        orderData.notes,
-        paymentMethod: orderData.paymentMethod,
-        date: orderData.date, time: orderData.time,
+        ...buildOrderPayload(orderData),
         changedByName: user?.name,
+        expectedUpdatedAt: orderData.expectedUpdatedAt,
       },
     })
     if (rpcError) {
       console.error('resubmitOrder (resubmit_order RPC):', rpcError)
+      await refreshOrder(id)
       throw new Error(friendlyOrderError(rpcError))
     }
     const updatedOrder = mapOrder(data)
     setOrders(prev => prev.map(o => o.id === id ? updatedOrder : o))
+    await refreshInventory()
     await pushAudit({
       type: 'order_edit', orderId: id,
       orderRef: `${orderData.clientName} — ${orderData.company}`,
@@ -348,271 +333,185 @@ export function OrdersProvider({ children }) {
   // team_leader can approve/reject and revert, but cannot finalise dispatch or collection.
   const TEAM_LEADER_FORBIDDEN_STATUSES = ['تم الصرف', 'تم التحصيل']
 
-  // Inventory is deducted at order creation (create_order/resubmit_order —
-  // see order_creation.sql), NOT at any status transition. تم الصرف /
-  // مكتمل / تم التحصيل therefore never touch inventory here. The one
-  // status transition that DOES need to touch inventory is رفض (reject):
-  // since the order's stock was already deducted the moment it was
-  // created, rejecting it must restore that stock — mirroring exactly
-  // what cancelling/returning-to-Sales already do, keyed off the same
-  // `inventory_deducted` flag rather than a status/history guess.
+  // One lifecycle operation per order at a time from THIS tab (a fast double-click is
+  // stopped without a round trip). The database still enforces correctness on its own.
+  const beginOrderOp = (id) => {
+    if (inFlightOrderOps.current.has(id)) {
+      toast('جارٍ معالجة هذا الطلب بالفعل...', 'error')
+      return false
+    }
+    inFlightOrderOps.current.add(id)
+    return true
+  }
+  const endOrderOp = (id) => { inFlightOrderOps.current.delete(id) }
+
+  // Runs one lifecycle RPC (return / reject / cancel / un-cancel / revert). Each is a SINGLE
+  // database transaction that changes the order AND its stock reservation together (see
+  // src/lib/order_lifecycle.sql); this only calls it and refreshes local state from what the
+  // database actually returned — it never computes or writes stock itself. Returns the updated
+  // order, or null on failure. On failure the error toast has ALREADY been shown (callers must
+  // not add another, and must only report success on a non-null result) and the order is
+  // re-read so a stale screen shows the truth.
+  const runOrderRpc = async (id, fn, user, failureFallback, extraParams = {}) => {
+    if (!beginOrderOp(id)) return null
+    try {
+      const { data, error } = await callRpc(fn, { p_order_id: id, p_changed_by: user?.name ?? null, ...extraParams })
+      if (error) {
+        console.error(`${fn}:`, error)
+        toast(friendlyRpcError(error, failureFallback), 'error')
+        await refreshOrder(id)
+        return null
+      }
+      const updated = mapOrder(data)
+      setOrders(prev => prev.map(o => o.id === id ? updated : o))
+      await refreshInventory()
+      return updated
+    } finally {
+      endOrderOp(id)
+    }
+  }
+
+  // Rejection releases the order's stock, so it goes through reject_order.
+  const rejectOrder = async (id, user) => {
+    const order = orders.find(o => o.id === id)
+    const updated = await runOrderRpc(id, 'reject_order', user, 'فشل رفض الطلب — يرجى المحاولة مرة أخرى.')
+    if (!updated) return false
+    await pushAudit({
+      type: 'status_change', orderId: id,
+      orderRef: `${order?.clientName} — ${order?.company}`,
+      field: 'الحالة', oldValue: order?.status || '—', newValue: 'مرفوض',
+      changedBy: user?.name || 'مجهول',
+    })
+    return true
+  }
+
+  // Approve / dispatch / complete / collect → advance_order_status. The call carries the
+  // status this screen saw: if the order has since been rejected, returned, cancelled or
+  // advanced by someone else, the database refuses instead of overwriting the newer change
+  // (and no stale history array is written). None of these move stock — the reservation was
+  // made when the order was created or resubmitted. Returns true only when confirmed.
   const updateOrderStatus = async (id, status, user) => {
-    // Role guard — frontend enforcement (DB trigger mirrors this server-side)
+    // Role guard — frontend enforcement (the database checks the role again)
     if (user?.role === 'team_leader' && TEAM_LEADER_FORBIDDEN_STATUSES.includes(status)) {
       toast('ليس لديك صلاحية تحديث الطلب إلى هذه الحالة', 'error')
-      return
+      return false
     }
+    if (status === 'مرفوض') return rejectOrder(id, user)
+
     const order = orders.find(o => o.id === id)
-    const isRejecting = status === 'مرفوض'
-    const willRestore = isRejecting && order?.inventoryDeducted
-
-    if (willRestore) {
-      // Same rapid-double-click guard previously used for dispatch —
-      // reused here for the one remaining inventory-affecting transition.
-      if (order?.status === status) {
-        toast('تم رفض هذا الطلب بالفعل', 'error')
-        return
-      }
-      if (dispatchingOrders.current.has(id)) {
-        toast('جارٍ معالجة هذا الطلب بالفعل...', 'error')
-        return
-      }
-      dispatchingOrders.current.add(id)
-    }
-
+    if (!order) return false
+    if (!beginOrderOp(id)) return false
     try {
-      const statusEntry = {
-        type: 'status_change',
-        previousStatus: order?.status,
-        newStatus: status,
-        changedAt: new Date().toISOString(),
-        changedBy: user?.name || 'مجهول',
+      const { data, error } = await callRpc('advance_order_status', {
+        p_order_id: id, p_expected_status: order.status, p_new_status: status, p_changed_by: user?.name ?? null,
+      })
+      if (error) {
+        console.error('updateOrderStatus (advance_order_status):', error)
+        toast(friendlyRpcError(error, 'فشل تحديث الحالة — يرجى المحاولة مرة أخرى.'), 'error')
+        await refreshOrder(id)
+        return false
       }
-      const editHistory = [...(order?.editHistory || []), statusEntry]
-      // Optimistic update — change status immediately in local state
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status, editHistory } : o))
-      const { error: statusErr } = await supabase.from('orders').update({ status, updated_at: new Date().toISOString(), edit_history: editHistory }).eq('id', id)
-      if (statusErr) {
-        console.error('updateOrderStatus:', statusErr)
-        toast('فشل تحديث الحالة — ' + statusErr.message, 'error')
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order?.status } : o))
-        return
-      }
-
-      if (willRestore) {
-        await restoreStockForOrder(order)
-        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
-        if (flagErr) {
-          console.error('updateOrderStatus — clearing inventory_deducted:', flagErr)
-        } else {
-          setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
-        }
-      }
-
+      setOrders(prev => prev.map(o => o.id === id ? mapOrder(data) : o))
       await pushAudit({
         type: 'status_change', orderId: id,
-        orderRef: `${order?.clientName} — ${order?.company}`,
-        field: 'الحالة', oldValue: order?.status || '—', newValue: status,
+        orderRef: `${order.clientName} — ${order.company}`,
+        field: 'الحالة', oldValue: order.status || '—', newValue: status,
         changedBy: user?.name || 'مجهول',
       })
+      return true
     } finally {
-      if (willRestore) dispatchingOrders.current.delete(id)
+      endOrderOp(id)
     }
   }
 
   const approveOrder = (id, user) => updateOrderStatus(id, 'موافق عليه', user)
-  const rejectOrder  = (id, user) => updateOrderStatus(id, 'مرفوض', user)
 
   const cancelOrder = async (id, user) => {
     const order = orders.find(o => o.id === id)
-    if (!order) return
-    const cancelEntry = {
-      type: 'cancellation',
-      previousStatus: order.status,
-      cancelledAt: new Date().toISOString(),
-      cancelledBy: user?.name || 'مجهول',
-    }
-    const editHistory = [...(order.editHistory || []), cancelEntry]
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'ملغي', editHistory } : o))
-    const { error } = await supabase.from('orders').update({
-      status: 'ملغي',
-      updated_at: new Date().toISOString(),
-      edit_history: editHistory,
-    }).eq('id', id)
-    if (error) {
-      console.error('cancelOrder:', error)
-      toast('فشل إلغاء الطلب — ' + error.message, 'error')
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
-      return
-    }
-    // Restore inventory if it had already been deducted (deduction now
-    // happens at order-creation time — see order_creation.sql — so this is
-    // keyed off the explicit `inventoryDeducted` flag, not order status).
-    // The flag is only cleared once the restore is CONFIRMED complete —
-    // restoreStockForOrder() reports whether every item actually
-    // succeeded, so a partial failure (already surfaced via its own error
-    // toast) leaves inventory_deducted untouched rather than lying about
-    // the order's true stock state.
-    if (order.inventoryDeducted) {
-      const restored = await restoreStockForOrder(order)
-      if (restored) {
-        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
-        if (flagErr) console.error('cancelOrder — clearing inventory_deducted:', flagErr)
-        else setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
-      }
-    }
+    if (!order) return false
+    const updated = await runOrderRpc(id, 'cancel_order', user, 'فشل إلغاء الطلب — يرجى المحاولة مرة أخرى.', { p_expected_status: order.status })
+    if (!updated) return false
     await pushAudit({
       type: 'order_cancel', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
       field: 'إلغاء الطلب', oldValue: order.status, newValue: 'ملغي',
       changedBy: user?.name || 'مجهول',
     })
+    return true
   }
 
   const restoreOrder = async (id, user) => {
     const order = orders.find(o => o.id === id)
-    if (!order) return
-    const cancelEntry = [...(order.editHistory || [])].reverse().find(h => h.type === 'cancellation')
-    const restoreStatus = cancelEntry?.previousStatus || 'بانتظار الموافقة'
-    const editHistory = (order.editHistory || []).filter(h => h !== cancelEntry)
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: restoreStatus, editHistory } : o))
-    const { error } = await supabase.from('orders').update({
-      status: restoreStatus,
-      updated_at: new Date().toISOString(),
-      edit_history: editHistory,
-    }).eq('id', id)
-    if (error) {
-      console.error('restoreOrder:', error)
-      toast('فشل استعادة الطلب — ' + error.message, 'error')
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
-      return
-    }
+    if (!order) return false
+    const updated = await runOrderRpc(id, 'restore_cancelled_order', user, 'فشل استعادة الطلب — يرجى المحاولة مرة أخرى.')
+    if (!updated) return false
     await pushAudit({
       type: 'order_restore', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
-      field: 'استعادة الطلب', oldValue: 'ملغي', newValue: restoreStatus,
+      field: 'استعادة الطلب', oldValue: 'ملغي', newValue: updated.status,
       changedBy: user?.name || 'مجهول',
     })
+    return true
   }
 
+  // Reverts only the newest lifecycle entry, and only if it still explains the current status
+  // (the database re-checks this; the button is hidden otherwise — getRevertableStatusChange).
   const revertLastStatus = async (id, user) => {
     const order = orders.find(o => o.id === id)
-    if (!order) return
-    const history = order.editHistory || []
-    const lastChangeIdx = [...history].reverse().findIndex(h => h.type === 'status_change')
-    if (lastChangeIdx === -1) return
-    const realIdx = history.length - 1 - lastChangeIdx
-    const lastEntry = history[realIdx]
-    const prevStatus = lastEntry.previousStatus
-    const editHistory = history.filter((_, i) => i !== realIdx)
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prevStatus, editHistory } : o))
-    const { error } = await supabase.from('orders').update({
-      status: prevStatus,
-      updated_at: new Date().toISOString(),
-      edit_history: editHistory,
-    }).eq('id', id)
-    if (error) {
-      console.error('revertLastStatus:', error)
-      toast('فشل التراجع — ' + error.message, 'error')
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: order.status, editHistory: order.editHistory } : o))
-      return
-    }
-    // NOTE: dispatch (تم الصرف) no longer deducts inventory (deduction now
-    // happens at order-creation time — see order_creation.sql), so
-    // reverting FROM it no longer needs to restore stock here.
+    if (!order) return false
+    const updated = await runOrderRpc(id, 'revert_order_status', user, 'فشل التراجع — يرجى المحاولة مرة أخرى.', { p_expected_status: order.status })
+    if (!updated) return false
     await pushAudit({
       type: 'status_revert', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
-      field: 'تراجع عن الحالة', oldValue: order.status, newValue: prevStatus,
+      field: 'تراجع عن الحالة', oldValue: order.status, newValue: updated.status,
       changedBy: user?.name || 'مجهول',
     })
+    return true
   }
 
-  // Returns `true` only when the order was returned to Sales AND (if stock
-  // had been deducted) inventory was fully restored — callers (e.g.
-  // OrderCard.jsx) use this to decide whether to show a success toast,
-  // instead of assuming success as soon as the call is made.
+  // Returns true only when the order was returned to Sales AND (if it held stock) that stock
+  // was released — one database transaction (return_order_to_sales), no half-done state.
   const returnToSales = async (id, user) => {
     const order = orders.find(o => o.id === id)
     if (!order) return false
-    const previousStatus = order.status
-
-    // ── Stock deduction detection ─────────────────────────────────────────────
-    // Inventory is deducted at order-creation time and tracked explicitly
-    // via `inventoryDeducted` (see order_creation.sql / mappers.js) — no
-    // need to infer it from editHistory any more.
-    const stockWasDeducted = order.inventoryDeducted
-
-    const returnEntry = {
-      type: 'returned_to_sales',
-      previousStatus,
-      newStatus: 'جديد',
-      returnedAt: new Date().toISOString(),
-      returnedBy: user?.name || 'مجهول',
-      reason: 'إعادة للسيلز للتعديل',
-    }
-    const editHistory = [...(order.editHistory || []), returnEntry]
-
-    // Persist the status change first; roll back locally if it fails
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'جديد', editHistory } : o))
-    const { error } = await supabase.from('orders').update({
-      status: 'جديد',
-      updated_at: new Date().toISOString(),
-      edit_history: editHistory,
-    }).eq('id', id)
-    if (error) {
-      console.error('returnToSales:', error)
-      toast('فشل إعادة الطلب للسيلز — ' + error.message, 'error')
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus, editHistory: order.editHistory } : o))
-      return false
-    }
-
-    // Restore stock only when we confirmed the order update succeeded,
-    // and only when stock was actually deducted (and not already restored).
-    // inventory_deducted is only cleared once the restore is CONFIRMED
-    // complete (see restoreStockForOrder()'s return value) — a partial
-    // failure already shows its own error toast and leaves the flag as-is
-    // rather than falsely reporting the stock as restored.
-    let stockRestored = true
-    if (stockWasDeducted) {
-      stockRestored = await restoreStockForOrder(order)
-      if (stockRestored) {
-        const { error: flagErr } = await supabase.from('orders').update({ inventory_deducted: false }).eq('id', id)
-        if (flagErr) {
-          console.error('returnToSales — clearing inventory_deducted:', flagErr)
-          stockRestored = false
-        } else {
-          setOrders(prev => prev.map(o => o.id === id ? { ...o, inventoryDeducted: false } : o))
-        }
-      }
-    }
-
+    const updated = await runOrderRpc(id, 'return_order_to_sales', user, 'فشل إعادة الطلب للسيلز — يرجى المحاولة مرة أخرى.', { p_expected_status: order.status })
+    if (!updated) return false
     await pushAudit({
       type: 'returned_to_sales', orderId: id,
       orderRef: `${order.clientName} — ${order.company}`,
-      field: 'إعادة للسيلز للتعديل', oldValue: previousStatus, newValue: 'جديد',
+      field: 'إعادة للسيلز للتعديل', oldValue: order.status, newValue: 'جديد',
       changedBy: user?.name || 'مجهول',
     })
-
-    return stockRestored
+    return true
   }
 
+  // Permanent delete. The database refuses while the order still holds stock (Cancel it first —
+  // that returns the stock — then delete it from the cancelled list) and RLS restricts who may
+  // delete at all; a delete RLS silently filtered removes 0 rows, which is reported as a failure
+  // here instead of a false success. Local state changes only once the row is really gone.
   const deleteOrder = async (id, user) => {
     const order = orders.find(o => o.id === id)
-    setOrders(prev => prev.filter(o => o.id !== id))
-    const { error: delErr } = await supabase.from('orders').delete().eq('id', id)
+    const { data, error: delErr } = await supabase.from('orders').delete().eq('id', id).select('id')
     if (delErr) {
       console.error('deleteOrder:', delErr)
-      toast('فشل حذف الطلب — ' + delErr.message, 'error')
-      setOrders(prev => [...prev, order].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)))
-      return
+      toast(friendlyRpcError(delErr, 'فشل حذف الطلب — يرجى المحاولة مرة أخرى.'), 'error')
+      await refreshOrder(id)
+      return false
     }
+    if (!data || data.length === 0) {
+      toast('لم يتم حذف الطلب — قد لا تملك الصلاحية أو تم حذفه بالفعل', 'error')
+      await refreshOrder(id)
+      return false
+    }
+    setOrders(prev => prev.filter(o => o.id !== id))
     await pushAudit({
       type: 'order_delete', orderId: id,
       orderRef: `${order?.clientName} — ${order?.company}`,
       field: 'حذف طلب', oldValue: order?.status || '—', newValue: '—',
       changedBy: user?.name || 'مجهول',
     })
+    return true
   }
 
   const getOrdersByRep = (rep) => orders.filter(o => o.salesRep === rep && o.status !== 'ملغي')
@@ -632,61 +531,18 @@ export function OrdersProvider({ children }) {
     return Object.values(grouped).sort((a, b) => b.key.localeCompare(a.key))
   }
 
-  // ── Inventory write-lock helper ───────────────────────────────────────────────
-  // Marks an item as "we just wrote" so real-time UPDATE events from earlier
-  // operations can't race ahead and overwrite our fresh confirmed state.
-  const lockInv  = (id) => pendingInvWrites.current.add(id)
-  const unlockInv = (id) => setTimeout(() => pendingInvWrites.current.delete(id), 3000)
-
-  // ── Stock restoration helper ──────────────────────────────────────────────────
-  // Called when a dispatched order ('تم الصرف') is cancelled or reverted.
-  // Adds back each item's quantity to inventory as a return lot.
-  //
-  // Returns `true` only if EVERY item's inventory write actually succeeded.
-  // This is a plain sequence of independent client-side UPDATE calls, not a
-  // database transaction — if one item fails partway through, the items
-  // already written stay restored (not rolled back) while the boolean
-  // result tells the caller the overall restore is incomplete, so it must
-  // NOT treat the order's stock as fully restored (e.g. must not clear
-  // inventory_deducted). This does not fix the underlying items again —
-  // it only prevents the flag from lying about what happened.
-  const restoreStockForOrder = async (order) => {
-    let allSucceeded = true
-    for (const item of (order.items || [])) {
-      // SKU-first, same as the dispatch-time deduction — keeps both paths
-      // resolving to the same inventory row for the same item.
-      const invItem = findInventoryMatch(item, inventory)
-      if (!invItem) continue
-      const qty = Number(item.quantity) || 0
-      if (qty <= 0) continue
-      const returnLot = {
-        id: `lot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        qty, costPrice: invItem.costPrice || 0,
-        date: new Date().toISOString().split('T')[0],
-        note: `مُرجَع من طلب #${order.serialNumber}`,
-      }
-      const updatedLots = [...(invItem.lots || []), returnLot]
-      const newStock    = (invItem.stock || 0) + qty
-      const fifoCost    = updatedLots[0]?.costPrice ?? (invItem.costPrice || 0)
-      lockInv(invItem.id)
-      setInventory(prev => prev.map(i => i.id === invItem.id
-        ? { ...i, stock: newStock, lots: updatedLots, costPrice: fifoCost } : i))
-      const { error } = await supabase.from('inventory')
-        .update({ stock: newStock, lots: updatedLots, cost_price: fifoCost })
-        .eq('id', invItem.id)
-      if (error) {
-        allSucceeded = false
-        console.error('restoreStockForOrder:', error)
-        toast(`فشل إعادة المخزون للمنتج "${invItem.name}" — ${error.message}`, 'error')
-        setInventory(prev => prev.map(i => i.id === invItem.id
-          ? { ...i, stock: invItem.stock, lots: invItem.lots, costPrice: invItem.costPrice } : i))
-      }
-      unlockInv(invItem.id)
-    }
-    return allSucceeded
-  }
-
   // ── Inventory ─────────────────────────────────────────────────────────────────
+  // Every stock / lot / SKU / delete change goes through a database function (see
+  // src/lib/inventory_management.sql) that locks the product row, compares against what the
+  // screen saw wherever a value is being replaced, keeps stock and lots moving together, and
+  // refuses changes that would orphan a reserved order. The client never computes or writes
+  // stock, lots or cost. Each returns true only when the change is confirmed.
+  const inventoryFail = (fn, error, fallback) => {
+    console.error(`${fn}:`, error)
+    toast(friendlyRpcError(error, fallback), 'error')
+  }
+  const applyItemRow = (id, row) => setInventory(prev => prev.map(i => i.id === id ? mapItem(row) : i))
+
   const addInventoryItem = async (item, user) => {
     const qty  = Number(item.stock) || 0
     const uid  = () => `${Date.now()}-${Math.random().toString(36).slice(2,7)}`
@@ -708,74 +564,83 @@ export function OrdersProvider({ children }) {
   }
 
   const addStockLot = async (itemId, { qty, costPrice, note }, user) => {
-    // Always fetch fresh data from Supabase to avoid stale local state
-    const { data: fresh } = await supabase.from('inventory').select('*').eq('id', itemId).single()
-    const item = fresh ? mapItem(fresh) : inventory.find(i => i.id === itemId)
-    if (!item) return
-    const newLot      = { id:`lot-${Date.now()}`, qty:Number(qty), costPrice:Number(costPrice), date:new Date().toISOString().split('T')[0], note:note||'' }
-    const updatedLots = [...(item.lots||[]), newLot]
-    const newStock    = updatedLots.reduce((s,l)=>s+(Number(l.qty)||0), 0)
-    const fifoCost    = updatedLots[0]?.costPrice ?? Number(costPrice)
-    lockInv(itemId)
-    setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:updatedLots, stock:newStock, costPrice:fifoCost } : i))
-    const { error: lotErr } = await supabase.from('inventory').update({ lots:updatedLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
-    if (lotErr) { console.error('addStockLot:', lotErr); toast('فشل إضافة الدفعة — ' + lotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); unlockInv(itemId); return }
-    // Force-confirm from DB so no stale real-time event can overwrite our result
-    const { data: confirmed } = await supabase.from('inventory').select('*').eq('id', itemId).single()
-    if (confirmed) setInventory(prev => prev.map(i => i.id === itemId ? mapItem(confirmed) : i))
-    unlockInv(itemId)
-    await pushAudit({ type:'inventory', orderRef:item.name, field:'إضافة دفعة', oldValue:`${item.stock} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
+    const item = inventory.find(i => i.id === itemId)
+    const { data, error } = await callRpc('add_stock_lot', {
+      p_item_id: itemId, p_qty: Number(qty), p_cost: Number(costPrice), p_note: note || null,
+    })
+    if (error) { inventoryFail('addStockLot', error, 'فشل إضافة الدفعة — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(itemId, data)
+    await pushAudit({ type:'inventory', orderRef:item?.name||itemId, field:'إضافة دفعة', oldValue:`${item?.stock ?? '—'} وحدة`, newValue:`+${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
+    return true
   }
 
-  const updateStockLot = async (itemId, lotId, { qty, costPrice, note }, user) => {
-    const item    = inventory.find(i => i.id === itemId)
-    if (!item) return
-    const oldLot  = item.lots?.find(l => l.id === lotId)
-    const newLots  = (item.lots||[]).map(l => l.id===lotId ? {...l, qty:Number(qty), costPrice:Number(costPrice), note:note??l.note} : l)
-    const newStock = newLots.reduce((s,l)=>s+l.qty, 0)
-    const fifoCost = newLots[0]?.costPrice ?? Number(costPrice)
-    lockInv(itemId)
-    setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:newLots, stock:newStock, costPrice:fifoCost } : i))
-    const { error: updLotErr } = await supabase.from('inventory').update({ lots:newLots, stock:newStock, cost_price:fifoCost }).eq('id', itemId)
-    if (updLotErr) { console.error('updateStockLot:', updLotErr); toast('فشل تعديل الدفعة — ' + updLotErr.message, 'error'); setInventory(prev => prev.map(i => i.id === itemId ? { ...i, lots:item.lots, stock:item.stock, costPrice:item.costPrice } : i)); unlockInv(itemId); return }
-    const { data: confirmedLot } = await supabase.from('inventory').select('*').eq('id', itemId).single()
-    if (confirmedLot) setInventory(prev => prev.map(i => i.id === itemId ? mapItem(confirmedLot) : i))
-    unlockInv(itemId)
-    await pushAudit({ type:'inventory', orderRef:item.name, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
+  // expectedQty = the lot quantity the admin saw; if it changed since (a reservation consumed
+  // it, or another admin edited it) the database refuses instead of overwriting.
+  const updateStockLot = async (itemId, lotId, { qty, costPrice, note, expectedQty }, user) => {
+    const item   = inventory.find(i => i.id === itemId)
+    const oldLot = item?.lots?.find(l => l.id === lotId)
+    const { data, error } = await callRpc('update_stock_lot', {
+      p_item_id: itemId, p_lot_id: lotId,
+      p_expected_qty: expectedQty === undefined ? (oldLot ? Number(oldLot.qty) : null) : expectedQty,
+      p_qty: Number(qty), p_cost: Number(costPrice), p_note: note ?? null,
+    })
+    if (error) { inventoryFail('updateStockLot', error, 'فشل تعديل الدفعة — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(itemId, data)
+    await pushAudit({ type:'inventory', orderRef:item?.name||itemId, field:'تعديل دفعة', oldValue:`${oldLot?.qty} وحدة × ${oldLot?.costPrice} LE`, newValue:`${qty} وحدة × ${costPrice} LE`, changedBy:user?.name||'مجهول', note:note||'' })
+    return true
   }
 
-  const updateInventoryItem = async (id, data, user) => {
+  // Descriptive fields only (name, sku, brand, category, price, costPrice, description, …) and
+  // ONLY the ones the admin actually changed — stock and lots are never sent from here.
+  const updateInventoryItem = async (id, changes, user) => {
     const old = inventory.find(i => i.id === id)
-    const upd = {}
-    if (data.name        !== undefined) upd.name        = data.name
-    if (data.sku         !== undefined) upd.sku         = data.sku
-    if (data.model       !== undefined) upd.model       = data.model
-    if (data.brand       !== undefined) upd.brand       = data.brand
-    if (data.category    !== undefined) upd.category    = data.category
-    if (data.price       !== undefined) upd.price       = data.price
-    if (data.costPrice   !== undefined) upd.cost_price  = data.costPrice
-    if (data.stock       !== undefined) upd.stock       = data.stock
-    if (data.description !== undefined) upd.description = data.description
-    if (data.warranty    !== undefined) upd.warranty    = data.warranty
-    lockInv(id)
-    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...data, costPrice: data.costPrice ?? i.costPrice } : i))
-    if (Object.keys(upd).length) {
-      const { error: itmErr } = await supabase.from('inventory').update(upd).eq('id', id)
-      if (itmErr) { console.error('updateInventoryItem:', itmErr); toast(inventoryErrorMessage(itmErr, 'فشل تعديل المنتج — '), 'error'); setInventory(prev => prev.map(i => i.id === id ? old : i)); unlockInv(id); return }
-      const { data: confirmedItem } = await supabase.from('inventory').select('*').eq('id', id).single()
-      if (confirmedItem) setInventory(prev => prev.map(i => i.id === id ? mapItem(confirmedItem) : i))
-    }
-    unlockInv(id)
-    if (old && data.stock !== undefined && data.stock !== old.stock)
-      await pushAudit({ type:'inventory', orderRef:old.name, field:'تعديل المخزون', oldValue:`${old.stock} وحدة`, newValue:`${data.stock} وحدة`, changedBy:user?.name||'مجهول', note:data.adjustNote||'' })
+    const { data, error } = await callRpc('update_inventory_item', { p_item_id: id, p_changes: changes })
+    if (error) { inventoryFail('updateInventoryItem', error, 'فشل تعديل المنتج — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(id, data)
+    await pushAudit({ type:'inventory', orderRef:old?.name||id, field:'تعديل منتج', oldValue:'—', newValue:Object.keys(changes).join('، '), changedBy:user?.name||'مجهول' })
+    return true
   }
 
+  // Sets the stock figure. expectedStock is the stock the admin SAW when the form opened;
+  // reservations made since make the database refuse rather than be silently overwritten.
+  const adjustInventoryStock = async (id, { expectedStock, newStock, note }, user) => {
+    const old = inventory.find(i => i.id === id)
+    const { data, error } = await callRpc('adjust_inventory_stock', {
+      p_item_id: id, p_expected_stock: Number(expectedStock), p_new_stock: Number(newStock), p_note: note || null,
+    })
+    if (error) { inventoryFail('adjustInventoryStock', error, 'فشل تعديل المخزون — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(id, data)
+    await pushAudit({ type:'inventory', orderRef:old?.name||id, field:'تعديل المخزون', oldValue:`${expectedStock} وحدة`, newValue:`${newStock} وحدة`, changedBy:user?.name||'مجهول', note:note||'' })
+    return true
+  }
+
+  // Refused by the database while a reserved order still depends on the product.
   const deleteInventoryItem = async (id, user) => {
     const item = inventory.find(i => i.id === id)
+    const { error } = await callRpc('delete_inventory_item', { p_item_id: id })
+    if (error) { inventoryFail('deleteInventoryItem', error, 'فشل حذف المنتج — يرجى المحاولة مرة أخرى.'); return false }
     setInventory(prev => prev.filter(i => i.id !== id))
-    const { error: delInvErr } = await supabase.from('inventory').delete().eq('id', id)
-    if (delInvErr) { console.error('deleteInventoryItem:', delInvErr); toast('فشل حذف المنتج — ' + delInvErr.message, 'error'); setInventory(prev => [...prev, item]); return }
     await pushAudit({ type:'inventory', orderRef:item?.name||id, field:'حذف صنف', oldValue:`${item?.stock} وحدة`, newValue:'—', changedBy:user?.name||'مجهول' })
+    return true
+  }
+
+  // Explicit, reasoned, server-audited fix for a product whose stock and lots disagree.
+  // mode: 'add_lot_for_shortfall' | 'set_stock_to_lots'
+  const reconcileInventoryLots = async (id, mode, reason) => {
+    const { data, error } = await callRpc('reconcile_inventory_lots', { p_item_id: id, p_mode: mode, p_reason: reason })
+    if (error) { inventoryFail('reconcileInventoryLots', error, 'فشلت تسوية الدفعات — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(id, data)
+    return true
+  }
+
+  // Super-admin-only, audited override: changes the SKU AND rewrites it on the reserved
+  // orders that carry it, in one transaction. (Ordinary SKU edits are refused while reserved
+  // orders depend on the SKU.)
+  const changeInventorySku = async (id, newSku, reason) => {
+    const { data, error } = await callRpc('change_inventory_sku', { p_item_id: id, p_new_sku: newSku, p_reason: reason })
+    if (error) { inventoryFail('changeInventorySku', error, 'فشل تغيير الـSKU — يرجى المحاولة مرة أخرى.'); return false }
+    applyItemRow(id, data)
+    return true
   }
 
   // ── Sales Targets ─────────────────────────────────────────────────────────────
@@ -843,6 +708,7 @@ export function OrdersProvider({ children }) {
       cancelOrder, restoreOrder, revertLastStatus, returnToSales, deleteOrder,
       getOrdersByRep, getOrdersByRepGrouped,
       addInventoryItem, addStockLot, updateStockLot, updateInventoryItem, deleteInventoryItem,
+      adjustInventoryStock, reconcileInventoryLots, changeInventorySku,
       addTaxInvoice, verifyTaxInvoice, deleteTaxInvoice,
       upsertTarget,
     }}>

@@ -123,7 +123,7 @@ function PhoneField({ label, required, error, value = '', onChange, style = {} }
   )
 }
 
-function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
+function ProductSearch({ value, inventory, onSelect, hideStock = false, disabled = false }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -155,12 +155,13 @@ function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
       <input
         value={query}
         placeholder="ابحث عن منتج..."
+        disabled={disabled}
         onChange={e => { setQuery(e.target.value); setOpen(true) }}
         onFocus={e => { setOpen(true); e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff' }}
         onBlur={e => { e.target.style.borderColor = '#e4eaf3'; e.target.style.background = '#f8fafc' }}
-        style={iStyle}
+        style={disabled ? { ...iStyle, background: '#f0f4fa', color: '#64748b', cursor: 'not-allowed' } : iStyle}
       />
-      {open && (
+      {open && !disabled && (
         <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e4eaf3', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', zIndex: 999, maxHeight: 240, overflowY: 'auto' }}>
           {filtered.length === 0 ? (
             <div style={{ padding: '12px 14px', fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -197,7 +198,7 @@ function ProductSearch({ value, inventory, onSelect, hideStock = false }) {
   )
 }
 
-export default function OrderFormFields({ form, setForm, errors = {}, setErrors = () => { } }) {
+export default function OrderFormFields({ form, setForm, errors = {}, setErrors = () => { }, itemsLocked = false }) {
   const { user, salesReps } = useAuth()
   const { inventory } = useOrders()
   const isSalesRep = user?.role === 'sales'
@@ -322,11 +323,19 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <SectionTitle n="٢">الأصناف</SectionTitle>
+          {!itemsLocked && (
           <button type="button" onClick={addItem} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(37,99,235,0.35)' }}>
             <Plus size={13} />إضافة صنف
           </button>
+          )}
         </div>
 
+        {itemsLocked && (
+          <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1e40af', lineHeight: 1.7 }}>
+            الأصناف والكميات محجوزة من المخزون ولا يمكن تعديلها مباشرةً — لتغييرها استخدم «إعادة للسيلز للتعديل» ثم عدّل وأعد الإرسال.
+            يمكنك تعديل الأسعار وبيانات العميل والملاحظات.
+          </div>
+        )}
         {errors.items && <div style={{ marginBottom: 8, padding: '6px 12px', borderRadius: 8, background: '#fff1f2', border: '1px solid #fecdd3', fontSize: 12, color: '#e11d48', display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={12} />{errors.items}</div>}
         <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 90px 90px 70px 90px 36px', gap: 8, paddingBottom: 8, marginBottom: 4, borderBottom: '1px solid #f0f4fa', fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>
           <span>اسم الصنف</span><span>SKU</span><span>سعر البيع</span><span>الكمية</span><span>الإجمالي</span><span />
@@ -345,6 +354,7 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                     inventory={inventory}
                     onSelect={inv => selectProduct(item.id, inv)}
                     hideStock={isSalesRep}
+                    disabled={itemsLocked}
                   />
                   <input value={item.sku || ''} placeholder="SKU" readOnly dir="ltr"
                     style={{ ...iStyle, background: '#f0f4fa', color: '#64748b', cursor: 'default', fontFamily: 'monospace', fontSize: 11 }} />
@@ -352,17 +362,19 @@ export default function OrderFormFields({ form, setForm, errors = {}, setErrors 
                     style={{ ...iStyle, border: `1.5px solid ${isBelowCost ? '#f97316' : '#e4eaf3'}`, background: isBelowCost ? '#fff7ed' : '#f8fafc' }}
                     onFocus={e => { e.target.style.borderColor = isBelowCost ? '#ea580c' : '#2563eb'; e.target.style.background = '#fff' }}
                     onBlur={e => { e.target.style.borderColor = isBelowCost ? '#f97316' : '#e4eaf3'; e.target.style.background = isBelowCost ? '#fff7ed' : '#f8fafc' }} />
-                  <input type="number" placeholder="1" value={item.quantity || ''} onChange={e => upItem(item.id, 'quantity', e.target.value)} dir="ltr"
-                    style={iStyle} onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff' }} onBlur={e => { e.target.style.borderColor = '#e4eaf3'; e.target.style.background = '#f8fafc' }} />
+                  <input type="number" min="1" step="1" placeholder="1" disabled={itemsLocked} value={item.quantity || ''} onChange={e => upItem(item.id, 'quantity', e.target.value)} dir="ltr"
+                    style={itemsLocked ? { ...iStyle, background: '#f0f4fa', color: '#64748b', cursor: 'not-allowed' } : iStyle} onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.background = '#fff' }} onBlur={e => { e.target.style.borderColor = '#e4eaf3'; e.target.style.background = '#f8fafc' }} />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 40, borderRadius: 8, background: '#f0f4fa', border: '1px solid #e4eaf3', fontSize: 13, fontWeight: 700, color: '#0f172a' }} dir="ltr">
                     {(item.total || 0).toLocaleString()}
                   </div>
+                  {itemsLocked ? <div /> : (
                   <button type="button" onClick={() => rmItem(item.id)} disabled={form.items.length === 1}
                     style={{ width: 36, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: 'none', background: 'transparent', cursor: form.items.length === 1 ? 'not-allowed' : 'pointer', color: '#94a3b8', opacity: form.items.length === 1 ? 0.3 : 1 }}
                     onMouseEnter={e => { if (form.items.length > 1) { e.currentTarget.style.background = '#fff1f2'; e.currentTarget.style.color = '#e11d48' } }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8' }}>
                     <Trash2 size={14} />
                   </button>
+                  )}
                 </div>
                 {isOutOfStock && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, padding: '5px 10px', borderRadius: 7, background: '#fff1f2', border: '1px solid #fecdd3', fontSize: 11, color: '#9f1239' }}>

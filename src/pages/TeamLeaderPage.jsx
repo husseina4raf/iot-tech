@@ -84,18 +84,17 @@ export default function TeamLeaderPage() {
       , 0)
     , [allOrders, inventory])
 
-  const onApprove = (id, ref) => {
-    approveOrder(id, user)
-    toast(`تم اعتماد فاتورة: ${ref} ✓`, 'success')
+  // Success is reported only after the operation is confirmed; the hook shows
+  // its own error toast on failure.
+  const onApprove = async (id, ref) => {
+    if (await approveOrder(id, user)) toast(`تم اعتماد فاتورة: ${ref} ✓`, 'success')
   }
-  const onReject = (id, ref) => {
+  const onReject = async (id, ref) => {
     if (!window.confirm(`هل تريد رفض فاتورة: "${ref}"؟`)) return
-    rejectOrder(id, user)
-    toast('تم رفض الفاتورة', 'error')
+    if (await rejectOrder(id, user)) toast('تم رفض الفاتورة', 'error')
   }
-  const onAdvance = (order, next) => {
-    updateOrderStatus(order.id, next, user)
-    toast(`تم تحديث الحالة إلى ${next} ✓`, 'success')
+  const onAdvance = async (order, next) => {
+    if (await updateOrderStatus(order.id, next, user)) toast(`تم تحديث الحالة إلى ${next} ✓`, 'success')
   }
 
   const onCalendar = (order) => {
@@ -335,12 +334,12 @@ export default function TeamLeaderPage() {
               const next = STATUS_NEXT[order.status]
               const orderProfit = order.items?.reduce((s, i) => s + (i.price - getCostPrice(i.name, inventory)) * i.quantity, 0) || 0
               const orderMargin = order.total > 0 ? (orderProfit / order.total * 100) : 0
-              const onReturnToSalesOrder = () => {
-                const dispatchedStatuses = ['تم الصرف', 'مكتمل', 'تم التحصيل']
-                const stockNote = dispatchedStatuses.includes(order.status) ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+              const onReturnToSalesOrder = async () => {
+                // Stock is reserved at creation now, so whether it is released depends on
+                // the explicit flag — not on which status the order reached.
+                const stockNote = order.inventoryDeducted ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
                 if (!window.confirm(`هل تريد إعادة الطلب للسيلز للتعديل؟\nسيتغير وضع الطلب إلى "جديد" ويظهر للمندوب مجدداً.${stockNote}`)) return
-                returnToSales(order.id, user)
-                toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
+                if (await returnToSales(order.id, user)) toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
               }
               return (
                 <div key={order.id} style={{ ...card, overflow: 'hidden' }} className="fade-in">

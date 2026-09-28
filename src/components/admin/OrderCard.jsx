@@ -5,6 +5,7 @@ import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { generateDispatchPDF, generateInvoicePDF } from '../../utils/pdfTemplates'
+import { isInventoryReservedStatus, getRevertableStatusChange } from '../../lib/orderInventory'
 
 const accent = {
   'بانتظار الموافقة': '#f97316',
@@ -29,24 +30,34 @@ export default function OrderCard({ order }) {
   const [expanded, setExpanded] = useState(false)
   const [pdfLoading, setPdfLoading] = useState('')
 
-  const onApprove = () => { approveOrder(order.id, user); toast('تمت الموافقة على الطلب ✓', 'success') }
-  const onReject = () => { rejectOrder(order.id, user); toast('تم رفض الطلب', 'error') }
-  const onCollect = () => { updateOrderStatus(order.id, 'تم التحصيل', user); toast('تم تسجيل التحصيل ✓', 'success') }
-  const onCancel = () => {
-    if (!window.confirm(`هل تريد إلغاء طلب "${order.clientName}"؟\nسيختفي الطلب من القوائم ويمكن استعادته لاحقاً من تبويب "الطلبات الملغاة".`)) return
-    cancelOrder(order.id, user)
-    toast('تم إلغاء الطلب — يمكن استعادته من تبويب الملغاة', 'success')
+  // Every handler waits for the confirmed result and shows success only then.
+  // The hook already shows its own error toast on failure, so none is added here.
+  const onApprove = async () => { if (await approveOrder(order.id, user)) toast('تمت الموافقة على الطلب ✓', 'success') }
+  const onReject = async () => { if (await rejectOrder(order.id, user)) toast('تم رفض الطلب', 'error') }
+  const onCollect = async () => { if (await updateOrderStatus(order.id, 'تم التحصيل', user)) toast('تم تسجيل التحصيل ✓', 'success') }
+  const onAdvance = async (status) => { if (await updateOrderStatus(order.id, status, user)) toast(`تم تحديث الحالة إلى ${status} ✓`, 'success') }
+  const onCancel = async () => {
+    const stockNote = order.inventoryDeducted ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+    if (!window.confirm(`هل تريد إلغاء طلب "${order.clientName}"؟\nسيختفي الطلب من القوائم ويمكن استعادته لاحقاً من تبويب "الطلبات الملغاة".${stockNote}`)) return
+    if (await cancelOrder(order.id, user)) toast('تم إلغاء الطلب — يمكن استعادته من تبويب الملغاة', 'success')
   }
 
-  const lastStatusChange = [...(order.editHistory || [])].reverse().find(h => h.type === 'status_change')
+  // Only the NEWEST lifecycle entry can be reverted, and only while it still explains the current
+  // status (so an old approval cannot be reverted after the order was returned to Sales).
+  const lastStatusChange = getRevertableStatusChange(order)
 
-  const onRevert = () => {
+  const onRevert = async () => {
     if (!lastStatusChange) return
     const prevStatus = lastStatusChange.previousStatus
-    const stockNote = order.status === 'تم الصرف' ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
+    // Stock only moves when the revert crosses the reserved/unreserved boundary
+    // (same rule the database applies in revert_order_status).
+    const wasReserved  = isInventoryReservedStatus(order.status)
+    const willReserve  = isInventoryReservedStatus(prevStatus)
+    let stockNote = ''
+    if (wasReserved && !willReserve && order.inventoryDeducted) stockNote = '\nسيتم إعادة الكميات إلى المخزون تلقائياً.'
+    if (!wasReserved && willReserve && !order.inventoryDeducted) stockNote = '\nسيتم خصم الكميات من المخزون.'
     if (!window.confirm(`هل تريد التراجع والعودة إلى حالة "${prevStatus}"؟${stockNote}`)) return
-    revertLastStatus(order.id, user)
-    toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
+    if (await revertLastStatus(order.id, user)) toast(`تم التراجع إلى: ${prevStatus} ✓`, 'success')
   }
 
   const onReturnToSales = async () => {
@@ -55,17 +66,16 @@ export default function OrderCard({ order }) {
     // `inventoryDeducted` flag, not on which status the order has reached.
     const stockNote = order.inventoryDeducted ? '\nسيتم إعادة الكميات إلى المخزون تلقائياً.' : ''
     if (!window.confirm(`هل تريد إعادة الطلب للسيلز للتعديل؟\nسيتغير وضع الطلب إلى "جديد" ويظهر للمندوب مجدداً.${stockNote}`)) return
-    // returnToSales() already shows its own error toast on failure (order
-    // update failure or incomplete inventory restore) — only show success
-    // here once it's confirmed the whole operation actually completed.
+    // returnToSales() runs one database transaction (status change + stock
+    // release) and already shows its own error toast on failure — only show
+    // success here once that transaction is confirmed.
     const ok = await returnToSales(order.id, user)
     if (ok) toast('تم إعادة الطلب للسيلز للتعديل ✓', 'success')
   }
 
-  const onDelete = () => {
+  const onDelete = async () => {
     if (!window.confirm(`هل أنت متأكد من حذف طلب "${order.clientName}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return
-    deleteOrder(order.id, user)
-    toast('تم حذف الطلب ✓', 'success')
+    if (await deleteOrder(order.id, user)) toast('تم حذف الطلب ✓', 'success')
   }
 
   const onCalendar = () => {
@@ -190,13 +200,13 @@ export default function OrderCard({ order }) {
           {/* Admin status-advance buttons */}
           {['admin', 'super_admin'].includes(user?.role) && (<>
             {order.status === 'موافق عليه' && (
-              <button onClick={() => { updateOrderStatus(order.id, 'تم الصرف', user); toast('تم تحديث الحالة إلى تم الصرف ✓', 'success') }}
+              <button onClick={() => onAdvance('تم الصرف')}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#d97706', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(217,119,6,0.35)' }}>
                 <Check size={13} />تم الصرف
               </button>
             )}
             {order.status === 'تم الصرف' && (
-              <button onClick={() => { updateOrderStatus(order.id, 'مكتمل', user); toast('تم تحديث الحالة إلى مكتمل ✓', 'success') }}
+              <button onClick={() => onAdvance('مكتمل')}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#7c3aed', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif', boxShadow: '0 2px 8px rgba(124,58,237,0.35)' }}>
                 <Check size={13} />مكتمل
               </button>
@@ -265,7 +275,8 @@ export default function OrderCard({ order }) {
             </button>
           )}
 
-          {user?.role === 'super_admin' && (
+          {/* A reserved order must be cancelled first (that returns its stock); the database refuses the delete otherwise */}
+          {user?.role === 'super_admin' && !order.inventoryDeducted && !isInventoryReservedStatus(order.status) && (
             <button onClick={onDelete}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #fecdd3', background: '#fff1f2', color: '#e11d48', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Cairo,sans-serif' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#ffe4e6' }}

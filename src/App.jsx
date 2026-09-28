@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/Toast'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import Layout from './components/layout/Layout'
 import LoginPage from './pages/LoginPage'
+import UpdateRequiredBanner from './components/ui/UpdateRequiredBanner'
 
 const SalesPage       = lazy(() => import('./pages/SalesPage'))
 const AdminPage       = lazy(() => import('./pages/AdminPage'))
@@ -28,6 +29,7 @@ export default function App() {
       <AuthProvider>
         <SettingsProvider>
           <ToastProvider>
+            <UpdateRequiredBanner />
             <OrdersProvider>
               <Suspense fallback={<PageLoader />}>
                 <Routes>

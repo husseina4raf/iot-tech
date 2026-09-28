@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Send, RotateCcw, RefreshCw } from 'lucide-react'
 import OrderFormFields from './OrderFormFields'
 import { useOrders } from '../../hooks/useOrders'
 import { useToast } from '../ui/Toast'
 import { useAuth } from '../../hooks/useAuth'
+import { parseOrderQuantity, areOrderItemsLocked, newClientRequestId } from '../../lib/orderInventory'
 
 export default function OrderForm({ editOrder = null, onSaved }) {
   const { addOrder, updateOrder, resubmitOrder, inventory } = useOrders()
@@ -11,6 +12,11 @@ export default function OrderForm({ editOrder = null, onSaved }) {
   const toast = useToast()
   const isEdit = !!editOrder
   const [submitting, setSubmitting] = useState(false)
+  // Items/SKUs/quantities are frozen while the order holds stock (the database enforces it too)
+  const itemsLocked = isEdit && areOrderItemsLocked(editOrder)
+  // One request id per submission INTENT: reused only for a retry of the identical payload
+  // (e.g. after a lost response), replaced as soon as the user changes anything or succeeds.
+  const requestRef = useRef({ id: null, fingerprint: null })
 
   const emptyForm = () => ({
     company: '', clientName: '', mobile: '', whatsapp: '',
@@ -86,12 +92,23 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     if (!form.time?.trim())        errs.time        = 'وقت التركيب مطلوب'
 
     if (form.items.some(i => !i.name.trim()))  errs.items = 'يرجى إدخال أسماء جميع الأصناف'
+
+    // Immediate feedback only — the database re-validates every quantity
+    // (create_order / resubmit_order) and is the authority.
+    if (!errs.items) {
+      const badQty = form.items.find(i => parseOrderQuantity(i.quantity) === null)
+      if (badQty) errs.items = `الكمية غير صحيحة للصنف "${badQty.name}" — يجب أن تكون عدداً صحيحاً أكبر من صفر`
+    }
     if (form.total <= 0)                        errs.items = errs.items || 'يرجى إدخال أصناف بأسعار صحيحة'
 
     if (!errs.items) {
       const outOfStock = form.items.filter(i => {
         if (!i.name.trim()) return false
-        const inv = inventory.find(p => p.name === i.name)
+        // SKU-first, like the server: name is not unique
+        const sku = (i.sku || '').trim().toLowerCase()
+        const inv = sku
+          ? inventory.find(p => (p.sku || '').trim().toLowerCase() === sku)
+          : inventory.find(p => p.name === i.name)
         return inv && inv.stock === 0
       })
       if (outOfStock.length > 0) {
@@ -109,7 +126,12 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     setErrors({})
     const { dateRaw, ...rest } = form
     const addressParts = [form.governorate, form.city, form.district, form.street, form.buildingNo].filter(Boolean)
-    const orderData = { ...rest, address: addressParts.join(' — ') }
+    const orderData = {
+      ...rest,
+      address: addressParts.join(' — '),
+      // Send quantities as validated integers, never the raw input string
+      items: form.items.map(i => ({ ...i, quantity: parseOrderQuantity(i.quantity) })),
+    }
 
     if (isEdit) {
       const wasRejected = ['مرفوض', 'جديد'].includes(editOrder.status)
@@ -121,7 +143,7 @@ export default function OrderForm({ editOrder = null, onSaved }) {
         // like a brand-new order below.
         setSubmitting(true)
         try {
-          await resubmitOrder(editOrder.id, orderData, user)
+          await resubmitOrder(editOrder.id, { ...orderData, expectedUpdatedAt: editOrder.updatedAt }, user)
           toast('تم إرسال الطلب للمراجعة مجدداً ✓', 'success')
           onSaved?.()
         } catch (err) {
@@ -131,9 +153,19 @@ export default function OrderForm({ editOrder = null, onSaved }) {
         }
         return
       }
-      updateOrder(editOrder.id, orderData, user)
-      toast('تم تحديث الطلب بنجاح ✓', 'success')
-      onSaved?.()
+      // Plain edit: wait for the database to confirm before reporting success. On failure
+      // (stale form, reserved items, permission…) the form keeps what the user typed and the
+      // order is re-read by the hook so the screen never shows unsaved values as saved.
+      setSubmitting(true)
+      try {
+        await updateOrder(editOrder.id, { ...orderData, expectedUpdatedAt: editOrder.updatedAt }, user)
+        toast('تم تحديث الطلب بنجاح ✓', 'success')
+        onSaved?.()
+      } catch (err) {
+        toast(err.message || 'تعذر حفظ التعديلات — يرجى المحاولة مرة أخرى.', 'error')
+      } finally {
+        setSubmitting(false)
+      }
       return
     }
 
@@ -141,13 +173,21 @@ export default function OrderForm({ editOrder = null, onSaved }) {
     // or clearing the form. Success is only ever reported once addOrder()
     // has actually resolved; on failure the form keeps everything the user
     // typed, so they can just retry instead of re-entering the whole order.
+    const fingerprint = JSON.stringify(orderData)
+    if (!requestRef.current.id || requestRef.current.fingerprint !== fingerprint) {
+      requestRef.current = { id: newClientRequestId(), fingerprint }
+    }
     setSubmitting(true)
     try {
-      await addOrder(orderData, user)
+      await addOrder({ ...orderData, clientRequestId: requestRef.current.id }, user)
+      requestRef.current = { id: null, fingerprint: null }
       toast('تم إرسال الطلب بنجاح ✓', 'success')
       setForm(emptyForm())
       onSaved?.()
     } catch (err) {
+      // The id stays for a retry of the same payload — if the first attempt actually
+      // committed, the retry returns that order instead of creating a second one.
+      if (/معرّف الطلب/.test(err.message || '')) requestRef.current = { id: null, fingerprint: null }
       toast(err.message || 'تعذر حفظ الطلب — يرجى المحاولة مرة أخرى.', 'error')
     } finally {
       setSubmitting(false)
@@ -156,11 +196,11 @@ export default function OrderForm({ editOrder = null, onSaved }) {
 
   return (
     <form onSubmit={handleSubmit} className="fade-in">
-      <OrderFormFields form={form} setForm={setForm} errors={errors} setErrors={setErrors} />
+      <OrderFormFields form={form} setForm={setForm} errors={errors} setErrors={setErrors} itemsLocked={itemsLocked} />
 
       <div style={{ display:'flex', gap:10, marginTop:20, justifyContent:'flex-end' }}>
         {!isEdit && (
-          <button type="button" onClick={() => { setForm(emptyForm()); setErrors({}) }}
+          <button type="button" onClick={() => { setForm(emptyForm()); setErrors({}); requestRef.current = { id: null, fingerprint: null } }}
             style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 20px', border:'1.5px solid #e4eaf3', background:'#fff', color:'#475569', fontSize:13, fontWeight:600, borderRadius:10, cursor:'pointer', fontFamily:'Cairo,sans-serif' }}>
             <RotateCcw size={14} />
             مسح النموذج

@@ -2,16 +2,21 @@ import { useState, useMemo, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Calendar, FileText, Phone, MapPin, CreditCard, User, Search, X, ClipboardX, TrendingUp, Link, RefreshCw, AlertTriangle } from 'lucide-react'
 import Badge from '../ui/Badge'
 import Pagination from '../ui/Pagination'
-import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useProfitSummary } from '../../hooks/useProfitSummary'
+import { useReportOrders } from '../../hooks/useReportOrders'
 
 const MONTHS_AR = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
 ]
 
-const PAGE_SIZE = 6
+// Orders per page, fetched directly from the database (see
+// src/lib/order_reports.sql / useReportOrders) — not a client-side cache
+// window. Month grouping below is a display grouping over the current
+// page's rows only; it no longer depends on however many orders happen to
+// already be loaded into the shared useOrders() array.
+const PAGE_SIZE = 15
 
 const card = { background: '#fff', borderRadius: 14, border: '1px solid #e4eaf3', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }
 
@@ -22,15 +27,23 @@ const getItemCost = (item) => Number(item.costPrice) || 0
 // Client-side fallback formula for "Profit" — used only where the canonical
 // RPC total can't apply (see below): free-text search has no server-side
 // equivalent in get_profit_summary, so a searched view falls back to this,
-// computed over whatever is currently loaded/paginated. It is still fixed
-// to the same canonical rule (تم التحصيل only, stored item.costPrice) —
-// only its completeness-over-full-history guarantee is what's lost here.
+// computed over the current page of server-filtered results (which already
+// matches the same rep/date/search scope — see useReportOrders below). It
+// is still fixed to the same canonical rule (تم التحصيل only, stored
+// item.costPrice) — only its completeness-across-pages guarantee is what's
+// lost here, exactly as before this fix, just no longer capped at whatever
+// 100 orders happened to be cached.
 const clientProfit = (ordersList) => ordersList
   .filter(o => o.status === 'تم التحصيل')
   .reduce((s, o) => s + (o.items?.reduce((ss, i) => ss + (Number(i.price) - getItemCost(i)) * Number(i.quantity), 0) || 0), 0)
 
+const now = new Date()
+// A fixed, small candidate list (like ProfitReport's own year picker) —
+// not derived from whatever orders happen to be loaded client-side, since
+// that was the exact source of the visibility bug this file fixes.
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => String(now.getFullYear() - i))
+
 export default function TeamInvoices() {
-  const { orders } = useOrders()
   const { salesReps } = useAuth()
 
   const [selectedRep, setSelectedRep] = useState('')
@@ -45,32 +58,37 @@ export default function TeamInvoices() {
   const toggleMonth = (key) => setOpenMonths(p => ({ ...p, [key]: !p[key] }))
   const toggleOrder = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }))
 
-  const availableYears = useMemo(() => {
-    const ys = new Set(orders.map(o => o.date?.split('-')[2]).filter(Boolean))
-    return [...ys].sort((a, b) => b.localeCompare(a))
-  }, [orders])
+  useEffect(() => setPage(1), [selectedRep, search, filterDay, filterMonth, filterYear])
 
-  // filtered flat list
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return orders.filter(o => {
-      if (selectedRep && o.salesRep !== selectedRep) return false
-      if (q && !o.clientName?.toLowerCase().includes(q) && !o.mobile?.includes(q) && !o.whatsapp?.includes(q)) return false
-      if (filterYear || filterMonth || filterDay) {
-        const parts = o.date?.split('-') || []
-        const [d, m, y] = parts
-        if (filterYear && y !== filterYear) return false
-        if (filterMonth && m !== String(filterMonth).padStart(2, '0')) return false
-        if (filterDay && d !== String(filterDay).padStart(2, '0')) return false
-      }
-      return true
-    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  }, [orders, selectedRep, search, filterDay, filterMonth, filterYear])
+  // ── Server-side paginated, date-filtered invoice list ──────────────────
+  // Fetches exactly the requested rep / year / month / day / search page
+  // directly from the database (see src/lib/order_reports.sql) instead of
+  // filtering whatever subset of orders happened to already be loaded into
+  // the shared useOrders() array — this is the actual fix: a selected month
+  // now retrieves that month's real invoices, however old, not just
+  // whatever was cached. No status filter here — this screen shows every
+  // non-search-excluded invoice regardless of status, same as before.
+  const {
+    orders: pageOrders, totalCount, totalRevenue: serverTotalRevenue,
+    loading: ordersLoading, error: ordersError,
+  } = useReportOrders({
+    repName:  selectedRep || null,
+    year:     filterYear  || null,
+    month:    filterMonth || null,
+    day:      filterDay   || null,
+    search:   search.trim() || null,
+    page,
+    pageSize: PAGE_SIZE,
+  })
 
-  // group by month
+  // group the CURRENT PAGE's orders by month, for display only — this is
+  // no longer a full chronological browse of every matching order at once
+  // (that would mean loading the entire matching set into the browser,
+  // which is exactly what this fix avoids); it is a display grouping over
+  // one page of server-paginated, already-filtered results.
   const groups = useMemo(() => {
     const map = {}
-    filtered.forEach(o => {
+    pageOrders.forEach(o => {
       const parts = o.date?.split('-')
       if (!parts || parts.length < 3) return
       const key = `${parts[2]}-${parts[1]}`
@@ -80,26 +98,24 @@ export default function TeamInvoices() {
       map[key].orders.push(o)
     })
     return Object.values(map).sort((a, b) => b.key.localeCompare(a.key))
-  }, [filtered])
+  }, [pageOrders])
 
-  useEffect(() => setPage(1), [selectedRep, search, filterDay, filterMonth, filterYear])
-
-  // "إجمالي الفواتير" / "إجمالي المبيعات" are a separate, pre-existing
-  // concept from Profit — count/revenue of all matching (non-cancelled)
-  // invoices regardless of status. Left exactly as before; only "الأرباح"
-  // below is the canonical Profit figure this fix applies to.
-  const totalOrders = filtered.length
-  const totalRevenue = filtered.reduce((s, o) => s + o.total, 0)
+  // "إجمالي الفواتير" / "إجمالي المبيعات" — count/revenue of ALL matching
+  // invoices for the current rep/date/search filter (not just the current
+  // page), both computed server-side over the complete matching set (see
+  // total_count / total_revenue in src/lib/order_reports.sql) — this is
+  // what makes these totals correct even when a filter spans more than one
+  // page, without ever loading the full matching set into the browser.
+  const totalOrders = totalCount
+  const totalRevenue = serverTotalRevenue
 
   // ── Canonical Profit ("إجمالي الأرباح") ─────────────────────────────────
-  // status = تم التحصيل only (previously this counted EVERY status —
-  // pending, rejected, in-progress — which was the serious issue the audit
-  // flagged), revenue basis = order.subtotal, cost = stored item.costPrice.
-  // Sourced from the complete-dataset RPC whenever possible; `search` has
-  // no server-side equivalent here, so a search-narrowed view falls back
-  // to the same formula computed over the currently loaded/paginated list
-  // (see clientProfit above) — a disclosed, narrower-scope exception, not
-  // a different business rule.
+  // status = تم التحصيل only, revenue basis = order.subtotal, cost = stored
+  // item.costPrice. Sourced from the complete-dataset RPC whenever possible
+  // (unaffected by this fix — get_profit_summary already queried the full
+  // table); `search` has no server-side equivalent in that RPC, so a
+  // search-narrowed view falls back to the same formula computed over the
+  // current page of server-filtered results (see clientProfit above).
   const { rows: profitRows, loading: profitLoading, error: profitError } = useProfitSummary({
     repName: selectedRep || null,
     year:    filterYear  || null,
@@ -107,11 +123,10 @@ export default function TeamInvoices() {
     day:     filterDay   || null,
   })
   const totalProfit = search
-    ? clientProfit(filtered)
+    ? clientProfit(pageOrders)
     : profitRows.reduce((s, r) => s + (Number(r.total_profit) || 0), 0)
 
   const hasFilter = search || filterDay || filterMonth || filterYear || selectedRep
-  const pagedGroups = groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const clearAll = () => {
     setSearch(''); setFilterDay(''); setFilterMonth(''); setFilterYear(''); setSelectedRep('')
@@ -167,7 +182,7 @@ export default function TeamInvoices() {
           <select value={filterYear} onChange={e => setFilterYear(e.target.value)} dir="ltr"
             style={{ padding: '7px 10px', fontSize: 12, border: '1.5px solid #e4eaf3', borderRadius: 9, background: '#f8fafc', color: '#0f172a', outline: 'none', fontFamily: 'Cairo,sans-serif', cursor: 'pointer' }}>
             <option value="">سنة</option>
-            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
 
           {hasFilter && (
@@ -180,6 +195,12 @@ export default function TeamInvoices() {
       </div>
 
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      {ordersError && (
+        <div style={{ ...card, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#e11d48', border: '1px solid #fecdd3', background: '#fff1f2' }}>
+          <AlertTriangle size={15} />
+          <span style={{ fontSize: 12, fontWeight: 600 }}>تعذّر تحميل الفواتير — {ordersError}</span>
+        </div>
+      )}
       {profitError && !search && (
         <div style={{ ...card, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#e11d48', border: '1px solid #fecdd3', background: '#fff1f2' }}>
           <AlertTriangle size={15} />
@@ -210,15 +231,20 @@ export default function TeamInvoices() {
         ))}
       </div>
 
-      {/* Orders grouped by month */}
-      {groups.length === 0 ? (
+      {/* Orders grouped by month (current page only — see useReportOrders) */}
+      {ordersLoading ? (
+        <div style={{ ...card, padding: 60, textAlign: 'center' }}>
+          <RefreshCw size={28} color="#94a3b8" style={{ animation: 'spin 0.7s linear infinite', marginBottom: 10 }} />
+          <p style={{ fontSize: 13, color: '#94a3b8' }}>جارٍ تحميل الفواتير...</p>
+        </div>
+      ) : groups.length === 0 ? (
         <div style={{ ...card, padding: 60, textAlign: 'center' }}>
           <ClipboardX size={40} color="#e4eaf3" style={{ margin: '0 auto 12px' }} />
           <p style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8' }}>لا توجد فواتير تطابق هذا البحث</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {pagedGroups.map((group, gi) => {
+          {groups.map((group, gi) => {
             const isOpen = group.key in openMonths ? openMonths[group.key] : gi === 0 && page === 1
             const monthTotal  = group.orders.reduce((s, o) => s + o.total, 0)
             // Collected-only, stored-cost profit for this month's group —
@@ -397,9 +423,9 @@ export default function TeamInvoices() {
         </div>
       )}
 
-      {groups.length > PAGE_SIZE && (
+      {totalCount > PAGE_SIZE && (
         <div style={{ marginTop: 16 }}>
-          <Pagination page={page} total={groups.length} pageSize={PAGE_SIZE} onChange={setPage} />
+          <Pagination page={page} total={totalCount} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       )}
     </div>

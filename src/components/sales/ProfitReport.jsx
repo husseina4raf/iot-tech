@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, Package, ChevronDown, RefreshCw, AlertTriangle } from 'lucide-react'
 import Pagination from '../ui/Pagination'
-import { useOrders } from '../../hooks/useOrders'
 import { useAuth } from '../../hooks/useAuth'
 import { useProfitSummary } from '../../hooks/useProfitSummary'
+import { useReportOrders } from '../../hooks/useReportOrders'
 
 const MONTHS_AR = [
   'يناير','فبراير','مارس','أبريل','مايو','يونيو',
@@ -19,7 +19,6 @@ const card = { background:'#fff', borderRadius:14, border:'1px solid #e4eaf3', b
 const getItemCost = (item) => Number(item.costPrice) || 0
 
 export default function ProfitReport() {
-  const { orders } = useOrders()
   const { user } = useAuth()
 
   const now = new Date()
@@ -36,22 +35,26 @@ export default function ProfitReport() {
 
   const repName = user?.repName
 
-  // The order list below is still built from the paginated `orders` array —
-  // it renders actual order/item rows (client name, per-item breakdown),
-  // which can only come from real loaded order records. Its own per-order
-  // figures now use the stored item.costPrice (never live inventory), so
-  // each row shown is individually correct; only the top summary cards
-  // (below) are guaranteed complete regardless of pagination.
-  const repOrders = repName ? orders.filter(o => {
-    if (o.salesRep !== repName) return false
-    if (o.status !== 'تم التحصيل') return false
-    if (period === 'month') {
-      const parts = o.date?.split('-')
-      if (!parts || parts.length < 3) return false
-      return parseInt(parts[2], 10) === year && parseInt(parts[1], 10) - 1 === month
-    }
-    return true
-  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) : []
+  // ── Server-side paginated, date-filtered order list ─────────────────────
+  // Fetches exactly this rep's تم التحصيل orders for the selected period,
+  // directly from the database (src/lib/order_reports.sql), instead of
+  // filtering the frontend's shared, client-paginated `orders` array —
+  // this is the actual fix: an older month now genuinely retrieves that
+  // month's collected orders, rather than only whatever happened to already
+  // be loaded (previously capped at the 100 most-recently-created orders
+  // company-wide). Each row's own figures still use the stored
+  // item.costPrice snapshot (never live inventory).
+  const {
+    orders: repOrders, totalCount: repOrdersTotal,
+    loading: ordersLoading, error: ordersError,
+  } = useReportOrders({
+    repName,
+    status:   'تم التحصيل',
+    year:     period === 'month' ? String(year) : null,
+    month:    period === 'month' ? String(month + 1).padStart(2, '0') : null,
+    page,
+    pageSize: PAGE_SIZE,
+  })
 
   // ── Canonical, pagination-independent totals ────────────────────────────
   // Sourced from get_profit_summary (src/lib/profit_aggregation.sql), which
@@ -130,14 +133,26 @@ export default function ProfitReport() {
         <span style={{ fontSize:11, color:'#94a3b8', padding:'2px 8px', borderRadius:20, background:'#f0f4fa', border:'1px solid #e4eaf3' }}>تم التحصيل فقط</span>
       </div>
 
-      {repOrders.length === 0 ? (
+      {ordersError && (
+        <div style={{ ...card, padding:'12px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:8, color:'#e11d48', border:'1px solid #fecdd3', background:'#fff1f2' }}>
+          <AlertTriangle size={15} />
+          <span style={{ fontSize:12, fontWeight:600 }}>تعذّر تحميل الطلبات — {ordersError}</span>
+        </div>
+      )}
+
+      {ordersLoading ? (
+        <div style={{ ...card, padding:40, textAlign:'center' }}>
+          <RefreshCw size={24} color="#94a3b8" style={{ animation:'spin 0.7s linear infinite', marginBottom:10 }} />
+          <p style={{ fontSize:13, color:'#94a3b8' }}>جارٍ تحميل الطلبات...</p>
+        </div>
+      ) : repOrders.length === 0 ? (
         <div style={{ ...card, padding:40, textAlign:'center' }}>
           <Package size={36} color="#e4eaf3" style={{ margin:'0 auto 12px' }} />
           <p style={{ fontSize:13, color:'#94a3b8' }}>لا توجد طلبات تم تحصيلها بعد</p>
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {repOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((order, idx) => {
+          {repOrders.map((order, idx) => {
             const orderCost   = order.items.reduce((s, item) => s + getItemCost(item) * (Number(item.quantity) || 0), 0)
             const orderBase   = order.subtotal || order.total
             const orderProfit = orderBase - orderCost
@@ -228,9 +243,9 @@ export default function ProfitReport() {
         </div>
       )}
 
-      {repOrders.length > PAGE_SIZE && (
+      {repOrdersTotal > PAGE_SIZE && (
         <div style={{ marginTop: 16 }}>
-          <Pagination page={page} total={repOrders.length} pageSize={PAGE_SIZE} onChange={setPage} />
+          <Pagination page={page} total={repOrdersTotal} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       )}
     </div>
